@@ -98,3 +98,33 @@ def l1_distance_transform(x, dim=None, vx=1, dtype=None):
     for d, w in enumerate(vx):
         x = l1dt_1d_(x, d-dim, w)
     return x
+
+
+def signed_distance_transform(x, dim=None, vx=1, dtype=None):
+    """Compute the Euclidean distance transform of a binary image
+
+    Parameters
+    ----------
+    x : (..., *spatial) tensor
+        Input tensor
+    dim : int, default=`x.dim()`
+        Number of spatial dimensions
+    vx : [sequence of] float, default=1
+        Voxel size
+
+    Returns
+    -------
+    d : (..., *spatial) tensor
+        Distance map
+
+    References
+    ----------
+    ..[1] "Distance Transforms of Sampled Functions"
+          Pedro F. Felzenszwalb & Daniel P. Huttenlocher
+          Theory of Computing (2012)
+          https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
+    """
+    x = x > 0
+    d = euclidean_distance_transform(x, dim, vx, dtype)
+    d -= euclidean_distance_transform(x.logical_not_(), dim, vx, dtype)
+    return d

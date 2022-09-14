@@ -1,4 +1,5 @@
 from .utils import get_cuda_num_threads, get_cuda_blocks
+from ..utils import make_vector
 from torch.utils.dlpack import to_dlpack
 import cupy as cp
 import numpy as np
@@ -69,8 +70,8 @@ void algo(scalar_t * f, offset_t size, offset_t stride, scalar_t w)
      tmp = min(tmp + w, *f);
      *f = tmp;
   }
-  f -= stride;
-  for (offset_t i = 1; i < size; ++i, f -= stride) {
+  f -= 2 * stride;
+  for (offset_t i = size-2; i >= 0; --i, f -= stride) {
      tmp = min(tmp + w, *f);
      *f = tmp;
   }
@@ -122,14 +123,10 @@ def l1dt_1d_(f, dim=-1, w=1):
     cuf = cp.from_dlpack(to_dlpack(f))
     shape = cp.asarray(cuf.shape)
     stride = cp.asarray([s // cuf.dtype.itemsize for s in cuf.strides])
-    if n <= cp.iinfo('int32').max:
-        kernel = l1dt_kernels[(cuf.dtype, cp.int32)]
-        shape = shape.astype(cp.int32)
-        stride = stride.astype(cp.int32)
-    else:
-        kernel = l1dt_kernels[(cuf.dtype, cp.int64)]
-        shape = shape.astype(cp.int64)
-        stride = stride.astype(cp.int64)
+    offset_t = cp.int32 if n <= cp.iinfo('int32').max else cp.int64
+    kernel = l1dt_kernels[(cuf.dtype, offset_t)]
+    shape = shape.astype(offset_t)
+    stride = stride.astype(offset_t)
     kernel((get_cuda_blocks(n),), (get_cuda_num_threads(),),
            (cuf, cuf.dtype.type(w), cp.int(cuf.ndim), shape, stride))
     f = f.movedim(-1, dim)
@@ -155,11 +152,11 @@ template <typename offset_t, typename scalar_t>
 __device__ 
 scalar_t intersection(scalar_t * f, offset_t * v, scalar_t w2,
                       offset_t k, offset_t q,
-                      offset_t size, offset_t stride, offset_t stride_buf) 
+                      offset_t size, offset_t stride_buf) 
 {
     offset_t vk = v[k * stride_buf];
-    scalar_t fvk = f[vk * stride];
-    scalar_t fq = f[q * stride];
+    scalar_t fvk = f[vk * stride_buf];
+    scalar_t fq = f[q * stride_buf];
     offset_t a = q - vk, b = q + vk;
     scalar_t s = fq - mycast<scalar_t>(fvk);
     s += w2 * mycast<scalar_t>(a * b);
@@ -174,17 +171,17 @@ void fillin(scalar_t * f, offset_t * v, scalar_t * z, scalar_t * d, scalar_t w2,
 {
     offset_t k = 0;
     offset_t vk;
+    z += stride_buf;
     for (offset_t q = 0; q < size; ++q) {
         scalar_t fq = mycast<scalar_t>(q);
-        while ((k < size-1) && (z[(k+1) * stride_buf] < fq)) {
+        while ((k < size-1) && (*z < fq)) {
+            z += stride_buf;
             ++k;
         }
         vk = v[k * stride_buf];
-        d[q * stride_buf] = f[vk * stride] 
-                          + w2 * mycast<scalar_t>(square(q - vk));
+        f[q * stride] = d[vk * stride_buf] 
+                      + w2 * mycast<scalar_t>(square(q - vk));
     }
-    for (offset_t q = 0; q < size; ++q)
-        f[q * stride] = d[q * stride_buf];
 }
 
 template <typename offset_t, typename scalar_t>
@@ -194,25 +191,32 @@ void algo(scalar_t * f, offset_t * v, scalar_t * z, scalar_t * d, scalar_t w2,
 {
     if (size == 1) return;
 
+    for (offset_t q = 0; q < size; ++q, f += stride, d += stride_buf)
+        *d = *f;
+    f -= size * stride;
+    d -= size * stride_buf;
+    
     v[0] = 0;
     z[0] = -(1./0.);
     z[stride_buf] = 1./0.;
     scalar_t s;
     offset_t k = 0;
+    scalar_t * zk; 
     for (offset_t q=1; q < size; ++q) {
+        zk = z + k * stride_buf;
         while (1) {
-            s = intersection(f, v, w2, k, q, size, stride, stride_buf);
-            if ((k == 0) || (s > z[k * stride_buf]))
+            s = intersection(d, v, w2, k, q, size, stride_buf);
+            if ((k == 0) || (s > *zk))
                 break;
             --k;
+            zk -= stride_buf;
         }
-        if (isnan(static_cast<float>(s)))
-            s = -(1./0.);
     
         ++k; 
         v[k * stride_buf] = q;
         z[k * stride_buf] = s;
-        z[(k+1) * stride_buf] = 1./0.; 
+        if (k < size-1)
+            z[(k+1) * stride_buf] = 1./0.; 
     }
     fillin(f, v, z, d, w2, size, stride, stride_buf);
 }
@@ -273,14 +277,10 @@ def edt_1d_(f, dim=-1, w=1):
     cuf = cp.from_dlpack(to_dlpack(f))
     shape = cp.asarray(cuf.shape)
     stride = cp.asarray([s // cuf.dtype.itemsize for s in cuf.strides])
-    if n <= cp.iinfo('int32').max:
-        kernel = edt_kernels[(cuf.dtype, cp.int32)]
-        shape = shape.astype(cp.int32)
-        stride = stride.astype(cp.int32)
-    else:
-        kernel = edt_kernels[(cuf.dtype, cp.int64)]
-        shape = shape.astype(cp.int64)
-        stride = stride.astype(cp.int64)
+    offset_t = cp.int32 if n <= cp.iinfo('int32').max else cp.int64
+    kernel = edt_kernels[(cuf.dtype, offset_t)]
+    shape = shape.astype(offset_t)
+    stride = stride.astype(offset_t)
     nb_blocks, nb_threads = get_cuda_blocks(n), get_cuda_num_threads()
     buf = nb_blocks * nb_threads * f.shape[-1]
     buf *= 2 * cuf.dtype.itemsize + stride.dtype.itemsize

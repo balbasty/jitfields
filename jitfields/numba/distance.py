@@ -76,10 +76,7 @@ def edt_fillin(f, v, z, d, w2):
         while (k < n - 1) and (z[k + 1] < q):
             k += 1
         vk = v[k]
-        d[q] = f[vk] + w2 * nbutils.square(q - vk)
-
-    for q in range(n):
-        f[q] = d[q]
+        f[q] = d[vk] + w2 * nbutils.square(q - vk)
 
 
 @nb.njit
@@ -88,24 +85,25 @@ def edt_algo(f, v, z, d, w2):
     if n == 1:
         return
 
+    for q in range(n):
+        d[q] = f[q]
+
     v[0] = 0
     z[0] = -np.inf
     z[1] = np.inf
     k = 0
     for q in range(1, n):
         while True:
-            s = edt_intersection(f, v, w2, k, q)
+            s = edt_intersection(d, v, w2, k, q)
             if (k == 0) or (s > z[k]):
                 break
             k -= 1
 
-        if pymath.isnan(s):
-            s = -np.inf
-
         k += 1
         v[k] = q
         z[k] = s
-        z[k+1] = np.inf
+        if k < n-1:
+            z[k+1] = np.inf
 
     edt_fillin(f, v, z, d, w2)
 
