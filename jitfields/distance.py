@@ -2,6 +2,10 @@ try:
     from .cuda import distance as cuda_dist
 except ImportError:
     cuda_dist = None
+try:
+    from .numba import distance as cpu_dist
+except ImportError:
+    cpu_dist = None
 import torch
 from .utils import make_vector
 

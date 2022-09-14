@@ -153,7 +153,7 @@ out_t mycast(in_t x) { return static_cast<out_t>(static_cast<float>(x)); }
 
 template <typename offset_t, typename scalar_t>
 __device__ 
-scalar_t intersection(scalar_t * f, offset_t * v, scalar_t * z, scalar_t w2,
+scalar_t intersection(scalar_t * f, offset_t * v, scalar_t w2,
                       offset_t k, offset_t q,
                       offset_t size, offset_t stride, offset_t stride_buf) 
 {
@@ -201,7 +201,7 @@ void algo(scalar_t * f, offset_t * v, scalar_t * z, scalar_t * d, scalar_t w2,
     offset_t k = 0;
     for (offset_t q=1; q < size; ++q) {
         while (1) {
-            s = intersection(f, v, z, w2, k, q, size, stride, stride_buf);
+            s = intersection(f, v, w2, k, q, size, stride, stride_buf);
             if ((k == 0) || (s > z[k * stride_buf]))
                 break;
             --k;
