@@ -1,17 +1,17 @@
-#ifndef JF_INTERPOL
-#define JF_INTERPOL
+#ifndef JF_SPLINE
+#define JF_SPLINE
 
 // This file contains static functions for handling (0-7 order)
-// interpolation weights.
+// spline weights.
 // It also defines an enumerated types that encodes each boundary type.
 // The entry points are:
-// . ff::interpolation::weight     -> node weight based on distance
-// . ff::interpolation::fastweight -> same, assuming x lies in support
-// . ff::interpolation::grad       -> weight derivative // oriented distance
-// . ff::interpolation::fastgrad   -> same, assuming x lies in support
-// . ff::interpolation::hess       -> weight 2nd derivative // oriented distance
-// . ff::interpolation::fasthess   -> same, assuming x lies in support
-// . ff::interpolation::bounds     -> min/max nodes
+// . spline::weight     -> node weight based on distance
+// . spline::fastweight -> same, assuming x lies in support
+// . spline::grad       -> weight derivative // oriented distance
+// . spline::fastgrad   -> same, assuming x lies in support
+// . spline::hess       -> weight 2nd derivative // oriented distance
+// . spline::fasthess   -> same, assuming x lies in support
+// . spline::bounds     -> min/max nodes
 
 // NOTE:
 // 1st derivatives used to be implemented with a recursive call, e.g.:
@@ -28,7 +28,20 @@
 // . second order derivatives [5/6/7]
 // ? other types of basis functions (gauss, sinc)
 
-namespace _interpolation {
+namespace spline {
+
+enum class type : char {
+    Nearest,
+    Linear,
+    Quadratic,
+    Cubic,
+    FourthOrder,
+    FifthOrder,
+    SixthOrder,
+    SeventhOrder
+};
+
+namespace _spline {
 
   // --- order 0 -------------------------------------------------------
 
@@ -830,20 +843,7 @@ namespace _interpolation {
   }
 
 
-} // namespace _interpolation
-
-namespace interpolation {
-
-enum class type : char {
-    Nearest,
-    Linear,
-    Quadratic,
-    Cubic,
-    FourthOrder,
-    FifthOrder,
-    SixthOrder,
-    SeventhOrder
-};
+} // namespace _spline
 
 template <type I> struct utils {};
 
@@ -851,25 +851,25 @@ template <type I> struct utils {};
 template <> struct utils<type::##NAME> { \
     template <typename scalar_t> \
     static inline __device__ scalar_t \
-    weight(scalar_t x) { return _interpolation::weight##ORDER(x); } \
+    weight(scalar_t x) { return _spline::weight##ORDER(x); } \
     template <typename scalar_t> \
     static inline __device__ scalar_t \
-    fastweight(scalar_t x) { return _interpolation::fastweight##ORDER(x); } \
+    fastweight(scalar_t x) { return _spline::fastweight##ORDER(x); } \
     template <typename scalar_t> \
     static inline __device__ scalar_t \
-    grad(scalar_t x) { return _interpolation::grad##ORDER(x); } \
+    grad(scalar_t x) { return _spline::grad##ORDER(x); } \
     template <typename scalar_t> \
     static inline __device__ scalar_t \
-    fastgrad(scalar_t x) { return _interpolation::fastgrad##ORDER(x); } \
+    fastgrad(scalar_t x) { return _spline::fastgrad##ORDER(x); } \
     template <typename scalar_t> \
     static inline __device__ scalar_t \
-    hess(scalar_t x) { return _interpolation::hess##ORDER(x); } \
+    hess(scalar_t x) { return _spline::hess##ORDER(x); } \
     template <typename scalar_t> \
     static inline __device__ scalar_t \
-    fasthess(scalar_t x) { return _interpolation::fasthess##ORDER(x); } \
+    fasthess(scalar_t x) { return _spline::fasthess##ORDER(x); } \
     template <typename scalar_t, typename offset_t> \
     static inline __device__ void \
-    bounds(scalar_t x, offset_t & low, offset_t & upp) { return _interpolation::bounds##ORDER(x, low, upp); } \
+    bounds(scalar_t x, offset_t & low, offset_t & upp) { return _spline::bounds##ORDER(x, low, upp); } \
 };
 
 INTERPOL_UTILS(Nearest, 0)
@@ -883,118 +883,118 @@ INTERPOL_UTILS(SeventhOrder, 7)
 
 template <typename scalar_t>
 static inline __device__ scalar_t
-weight(type interpolation_type, scalar_t x) {
-  switch (interpolation_type) {
-    case type::Nearest:      return _interpolation::weight0(x);
-    case type::Linear:       return _interpolation::weight1(x);
-    case type::Quadratic:    return _interpolation::weight2(x);
-    case type::Cubic:        return _interpolation::weight3(x);
-    case type::FourthOrder:  return _interpolation::weight4(x);
-    case type::FifthOrder:   return _interpolation::weight5(x);
-    case type::SixthOrder:   return _interpolation::weight6(x);
-    case type::SeventhOrder: return _interpolation::weight7(x);
-    default:                 return _interpolation::weight1(x);
+weight(type spline_type, scalar_t x) {
+  switch (spline_type) {
+    case type::Nearest:      return _spline::weight0(x);
+    case type::Linear:       return _spline::weight1(x);
+    case type::Quadratic:    return _spline::weight2(x);
+    case type::Cubic:        return _spline::weight3(x);
+    case type::FourthOrder:  return _spline::weight4(x);
+    case type::FifthOrder:   return _spline::weight5(x);
+    case type::SixthOrder:   return _spline::weight6(x);
+    case type::SeventhOrder: return _spline::weight7(x);
+    default:                 return _spline::weight1(x);
   }
 }
 
 template <typename scalar_t>
 static inline __device__ scalar_t
-fastweight(type interpolation_type, scalar_t x) {
-  switch (interpolation_type) {
-    case type::Nearest:      return _interpolation::fastweight0(x);
-    case type::Linear:       return _interpolation::fastweight1(x);
-    case type::Quadratic:    return _interpolation::fastweight2(x);
-    case type::Cubic:        return _interpolation::fastweight3(x);
-    case type::FourthOrder:  return _interpolation::fastweight4(x);
-    case type::FifthOrder:   return _interpolation::fastweight5(x);
-    case type::SixthOrder:   return _interpolation::fastweight6(x);
-    case type::SeventhOrder: return _interpolation::fastweight7(x);
-    default:                 return _interpolation::fastweight1(x);
+fastweight(type spline_type, scalar_t x) {
+  switch (spline_type) {
+    case type::Nearest:      return _spline::fastweight0(x);
+    case type::Linear:       return _spline::fastweight1(x);
+    case type::Quadratic:    return _spline::fastweight2(x);
+    case type::Cubic:        return _spline::fastweight3(x);
+    case type::FourthOrder:  return _spline::fastweight4(x);
+    case type::FifthOrder:   return _spline::fastweight5(x);
+    case type::SixthOrder:   return _spline::fastweight6(x);
+    case type::SeventhOrder: return _spline::fastweight7(x);
+    default:                 return _spline::fastweight1(x);
   }
 }
 
 template <typename scalar_t>
 static inline __device__ scalar_t
-grad(type interpolation_type, scalar_t x) {
-  switch (interpolation_type) {
-    case type::Nearest:      return _interpolation::grad0(x);
-    case type::Linear:       return _interpolation::grad1(x);
-    case type::Quadratic:    return _interpolation::grad2(x);
-    case type::Cubic:        return _interpolation::grad3(x);
-    case type::FourthOrder:  return _interpolation::grad4(x);
-    case type::FifthOrder:   return _interpolation::grad5(x);
-    case type::SixthOrder:   return _interpolation::grad6(x);
-    case type::SeventhOrder: return _interpolation::grad7(x);
-    default:                 return _interpolation::grad1(x);
+grad(type spline_type, scalar_t x) {
+  switch (spline_type) {
+    case type::Nearest:      return _spline::grad0(x);
+    case type::Linear:       return _spline::grad1(x);
+    case type::Quadratic:    return _spline::grad2(x);
+    case type::Cubic:        return _spline::grad3(x);
+    case type::FourthOrder:  return _spline::grad4(x);
+    case type::FifthOrder:   return _spline::grad5(x);
+    case type::SixthOrder:   return _spline::grad6(x);
+    case type::SeventhOrder: return _spline::grad7(x);
+    default:                 return _spline::grad1(x);
   }
 }
 
 template <typename scalar_t>
 static inline __device__ scalar_t
-fastgrad(type interpolation_type, scalar_t x) {
-  switch (interpolation_type) {
-    case type::Nearest:      return _interpolation::fastgrad0(x);
-    case type::Linear:       return _interpolation::fastgrad1(x);
-    case type::Quadratic:    return _interpolation::fastgrad2(x);
-    case type::Cubic:        return _interpolation::fastgrad3(x);
-    case type::FourthOrder:  return _interpolation::fastgrad4(x);
-    case type::FifthOrder:   return _interpolation::fastgrad5(x);
-    case type::SixthOrder:   return _interpolation::fastgrad6(x);
-    case type::SeventhOrder: return _interpolation::fastgrad7(x);
-    default:                 return _interpolation::fastgrad1(x);
+fastgrad(type spline_type, scalar_t x) {
+  switch (spline_type) {
+    case type::Nearest:      return _spline::fastgrad0(x);
+    case type::Linear:       return _spline::fastgrad1(x);
+    case type::Quadratic:    return _spline::fastgrad2(x);
+    case type::Cubic:        return _spline::fastgrad3(x);
+    case type::FourthOrder:  return _spline::fastgrad4(x);
+    case type::FifthOrder:   return _spline::fastgrad5(x);
+    case type::SixthOrder:   return _spline::fastgrad6(x);
+    case type::SeventhOrder: return _spline::fastgrad7(x);
+    default:                 return _spline::fastgrad1(x);
   }
 }
 
 template <typename scalar_t>
 static inline __device__ scalar_t
-hess(type interpolation_type, scalar_t x) {
-  switch (interpolation_type) {
-    case type::Nearest:      return _interpolation::hess0(x);
-    case type::Linear:       return _interpolation::hess1(x);
-    case type::Quadratic:    return _interpolation::hess2(x);
-    case type::Cubic:        return _interpolation::hess3(x);
-    case type::FourthOrder:  return _interpolation::hess4(x);
-    case type::FifthOrder:   return _interpolation::hess0(x); // notimplemented
-    case type::SixthOrder:   return _interpolation::hess0(x); // notimplemented
-    case type::SeventhOrder: return _interpolation::hess0(x); // notimplemented
-    default:                 return _interpolation::hess1(x);
+hess(type spline_type, scalar_t x) {
+  switch (spline_type) {
+    case type::Nearest:      return _spline::hess0(x);
+    case type::Linear:       return _spline::hess1(x);
+    case type::Quadratic:    return _spline::hess2(x);
+    case type::Cubic:        return _spline::hess3(x);
+    case type::FourthOrder:  return _spline::hess4(x);
+    case type::FifthOrder:   return _spline::hess0(x); // notimplemented
+    case type::SixthOrder:   return _spline::hess0(x); // notimplemented
+    case type::SeventhOrder: return _spline::hess0(x); // notimplemented
+    default:                 return _spline::hess1(x);
   }
 }
 
 template <typename scalar_t>
 static inline __device__ scalar_t
-fasthess(type interpolation_type, scalar_t x) {
-  switch (interpolation_type) {
-    case type::Nearest:      return _interpolation::fasthess0(x);
-    case type::Linear:       return _interpolation::fasthess1(x);
-    case type::Quadratic:    return _interpolation::fasthess2(x);
-    case type::Cubic:        return _interpolation::fasthess3(x);
-    case type::FourthOrder:  return _interpolation::fasthess4(x);
-    case type::FifthOrder:   return _interpolation::fasthess0(x); // notimplemented
-    case type::SixthOrder:   return _interpolation::fasthess0(x); // notimplemented
-    case type::SeventhOrder: return _interpolation::fasthess0(x); // notimplemented
-    default:                 return _interpolation::fasthess1(x);
+fasthess(type spline_type, scalar_t x) {
+  switch (spline_type) {
+    case type::Nearest:      return _spline::fasthess0(x);
+    case type::Linear:       return _spline::fasthess1(x);
+    case type::Quadratic:    return _spline::fasthess2(x);
+    case type::Cubic:        return _spline::fasthess3(x);
+    case type::FourthOrder:  return _spline::fasthess4(x);
+    case type::FifthOrder:   return _spline::fasthess0(x); // notimplemented
+    case type::SixthOrder:   return _spline::fasthess0(x); // notimplemented
+    case type::SeventhOrder: return _spline::fasthess0(x); // notimplemented
+    default:                 return _spline::fasthess1(x);
   }
 }
 
 template <typename scalar_t, typename offset_t>
 static inline __device__ void
-bounds(type interpolation_type, scalar_t x, offset_t & low, offset_t & upp)
+bounds(type spline_type, scalar_t x, offset_t & low, offset_t & upp)
  {
-  switch (interpolation_type) {
-    case type::Nearest:      return _interpolation::bounds0(x, low, upp);
-    case type::Linear:       return _interpolation::bounds1(x, low, upp);
-    case type::Quadratic:    return _interpolation::bounds2(x, low, upp);
-    case type::Cubic:        return _interpolation::bounds3(x, low, upp);
-    case type::FourthOrder:  return _interpolation::bounds4(x, low, upp);
-    case type::FifthOrder:   return _interpolation::bounds5(x, low, upp);
-    case type::SixthOrder:   return _interpolation::bounds6(x, low, upp);
-    case type::SeventhOrder: return _interpolation::bounds7(x, low, upp);
-    default:                 return _interpolation::bounds1(x, low, upp);
+  switch (spline_type) {
+    case type::Nearest:      return _spline::bounds0(x, low, upp);
+    case type::Linear:       return _spline::bounds1(x, low, upp);
+    case type::Quadratic:    return _spline::bounds2(x, low, upp);
+    case type::Cubic:        return _spline::bounds3(x, low, upp);
+    case type::FourthOrder:  return _spline::bounds4(x, low, upp);
+    case type::FifthOrder:   return _spline::bounds5(x, low, upp);
+    case type::SixthOrder:   return _spline::bounds6(x, low, upp);
+    case type::SeventhOrder: return _spline::bounds7(x, low, upp);
+    default:                 return _spline::bounds1(x, low, upp);
   }
 }
 
 
-} // namespace interpolation
+} // namespace spline
 
-#endif // JF_INTERPOL
+#endif // JF_SPLINE

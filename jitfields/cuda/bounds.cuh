@@ -1,9 +1,26 @@
+/* DEPENDENCIES:
+ * #include "atomic.cuh"
+ */
+
 #ifndef JF_BOUNDS
 #define JF_BOUNDS
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //                             INDEXING
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+namespace bound {
+
+enum class type : char {
+  Zero,         // Zero outside of the FOV
+  Replicate,    // Replicate last inbound value = clip coordinates
+  DCT1,         // Symetric w.r.t. center of the last inbound voxel
+  DCT2,         // Symetric w.r.t. edge of the last inbound voxel (=Neuman)
+  DST1,         // Antisymetric w.r.t. center of the last inbound voxel
+  DST2,         // Antisymetric w.r.t. edge of the last inbound voxel (=Dirichlet)
+  DFT,          // Circular / Wrap arounf the FOV
+  NoCheck       // /!\ Checks disabled: assume coordinates are inbound
+};
 
 namespace _index {
 
@@ -135,20 +152,6 @@ template <typename scalar_t, typename size_t>
 static inline __device__ bool inbounds(scalar_t coord, size_t size, scalar_t tol) {
   return coord >= -tol && coord < (scalar_t)(size-1)+tol;
 }
-
-
-namespace bound {
-
-enum class type : char {
-  Zero,         // Zero outside of the FOV
-  Replicate,    // Replicate last inbound value = clip coordinates
-  DCT1,         // Symetric w.r.t. center of the last inbound voxel
-  DCT2,         // Symetric w.r.t. edge of the last inbound voxel (=Neuman)
-  DST1,         // Antisymetric w.r.t. center of the last inbound voxel
-  DST2,         // Antisymetric w.r.t. edge of the last inbound voxel (=Dirichlet)
-  DFT,          // Circular / Wrap arounf the FOV
-  NoCheck       // /!\ Checks disabled: assume coordinates are inbound
-};
 
 template <typename scalar_t, typename offset_t>
 static inline __device__ scalar_t

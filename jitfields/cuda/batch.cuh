@@ -134,7 +134,7 @@ __device__
 offset_t index2offset_nd(offset_t index, int ndim,
                          const offset_t * size,
                          const offset_t * stride,
-                         offset_t[] & x, int n)
+                         offset_t * x, int n)
 {
     offset_t new_index = 0, new_index1;
     offset_t current_stride = 1, next_stride = 1;

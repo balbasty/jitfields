@@ -3,13 +3,15 @@ try:
 except ImportError:
     cuda_resize = None
 try:
-    from .numba import distance as cpu_resize
+    from .numba import resize as cpu_resize
 except ImportError:
     cpu_resize = None
+from .splinc import spline_coeff_nd
+from .utils import ensure_list
 
 
 def resize(x, factor=None, shape=None, ndim=None,
-           anchor='e', order=2, bound='dct2'):
+           anchor='e', order=2, bound='dct2', prefilter=True):
     """Resize a tensor using spline interpolation
 
     Parameters
@@ -36,6 +38,10 @@ def resize(x, factor=None, shape=None, ndim=None,
         Interpolation order.
     bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
         How to deal with out-of-bound values.
+    prefilter : bool, default=True
+        Whether to first compute interpolating coefficients.
+        Must be true for proper interpolation, otherwise this
+        function merely performs a non-interpolating "prolongation".
 
     Returns
     -------
@@ -47,4 +53,26 @@ def resize(x, factor=None, shape=None, ndim=None,
         _resize = cuda_resize.resize
     else:
         _resize = cpu_resize.resize
+
+    if not ndim:
+        if shape and hasattr(shape, '__len__'):
+            ndim = len(shape)
+        elif factor and hasattr(factor, '__len__'):
+            ndim = len(shape)
+        else:
+            ndim = x.dim()
+    if shape:
+        shape = ensure_list(shape, ndim)
+    elif factor:
+        factor = ensure_list(factor, ndim)
+    else:
+        raise ValueError('At least one of shape or factor must be provided')
+    if not shape:
+        if out is not None:
+            shape = out.shape[-ndim:]
+        else:
+            shape = [pymath.ceil(s*f) for s, f in zip(x.shape[-ndim:], factor)]
+
+    if prefilter:
+        spline_coeff_nd(x, order, bound, ndim)
     return _resize(x, factor, shape, ndim, anchor, order, bound)

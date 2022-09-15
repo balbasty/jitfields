@@ -1,5 +1,5 @@
 /* DEPENDENCIES:
- * #include "interpolation.cuh"
+ * #include "spline.cuh"
  * #include "bounds.cuh"
  * #include "batch.cuh"
  */
@@ -10,19 +10,19 @@
  *   (we currently use an outer loop, so we recompute indices many times)
  */
 
-const interpolation::type Z = interpolation::type::Nearest;
-const interpolation::type L = interpolation::type::Linear;
-const interpolation::type Q = interpolation::type::Quadratic;
-const interpolation::type C = interpolation::type::Cubic;
+const spline::type Z = spline::type::Nearest;
+const spline::type L = spline::type::Linear;
+const spline::type Q = spline::type::Quadratic;
+const spline::type C = spline::type::Cubic;
 const bound::type B0 = bound::type::NoCheck;
 const int one = 1;
 const int two = 2;
 const int three = 3;
 
 template <int D,
-          interpolation::type IX=Z,  bound::type BX=B0,
-          interpolation::type IY=IX, bound::type BY=BX,
-          interpolation::type IZ=IY, bound::type BZ=BY>
+          spline::type IX=Z,  bound::type BX=B0,
+          spline::type IY=IX, bound::type BY=BX,
+          spline::type IZ=IY, bound::type BZ=BY>
 struct Multiscale {};
 
 /***********************************************************************
@@ -32,7 +32,7 @@ struct Multiscale {};
  **********************************************************************/
 
 /***                            NEAREST                             ***/
-template <bound::type B> struct Multiscale<one, Z, B, Z, B, Z, B> {
+template <bound::type B> struct Multiscale<one, Z, B> {
     using bound_utils = bound::utils<B>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
@@ -50,7 +50,7 @@ template <bound::type B> struct Multiscale<one, Z, B, Z, B, Z, B> {
 };
 
 /***                            LINEAR                              ***/
-template <bound::type B> struct Multiscale<one, L, B, L, B, L, B> {
+template <bound::type B> struct Multiscale<one, L, B> {
     using bound_utils = bound::utils<B>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
@@ -76,9 +76,9 @@ template <bound::type B> struct Multiscale<one, L, B, L, B, L, B> {
 };
 
 /***                          QUADRATIC                             ***/
-template <bound::type B> struct Multiscale<one, Q, B, Q, B, Q, B> {
+template <bound::type B> struct Multiscale<one, Q, B> {
     using bound_utils = bound::utils<B>;
-    using inter_utils = interpolation::utils<Q>;
+    using spline_utils = spline::utils<Q>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -88,9 +88,9 @@ template <bound::type B> struct Multiscale<one, Q, B, Q, B, Q, B> {
     {
         reduce_t x = (w + shift) * wscl - shift;
         offset_t ix1 = static_cast<offset_t>(floor(x+0.5));
-        reduce_t dx1 = inter_utils::weight(x - ix1);
-        reduce_t dx0 = inter_utils::fastweight(x - (ix1 - 1));
-        reduce_t dx2 = inter_utils::fastweight((ix1 + 1) - x);
+        reduce_t dx1 = spline_utils::weight(x - ix1);
+        reduce_t dx0 = spline_utils::fastweight(x - (ix1 - 1));
+        reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
         signed char  sx0 = bound_utils::sign(ix1-1, nw);
         signed char  sx2 = bound_utils::sign(ix1+1, nw);
         signed char  sx1 = bound_utils::sign(ix1,   nw);
@@ -107,9 +107,9 @@ template <bound::type B> struct Multiscale<one, Q, B, Q, B, Q, B> {
 };
 
 /***                             CUBIC                              ***/
-template <bound::type B> struct Multiscale<one, C, B, C, B, C, B> {
+template <bound::type B> struct Multiscale<one, C, B> {
     using bound_utils = bound::utils<B>;
-    using inter_utils = interpolation::utils<C>;
+    using spline_utils = spline::utils<C>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -119,10 +119,10 @@ template <bound::type B> struct Multiscale<one, C, B, C, B, C, B> {
     {
         reduce_t x = (w + shift) * wscl - shift;
         offset_t ix1 = static_cast<offset_t>(floor(x));
-        reduce_t dx1 = inter_utils::fastweight(x - ix1);
-        reduce_t dx0 = inter_utils::fastweight(x - (ix1 - 1));
-        reduce_t dx2 = inter_utils::fastweight((ix1 + 1) - x);
-        reduce_t dx3 = inter_utils::fastweight((ix1 + 2) - x);
+        reduce_t dx1 = spline_utils::fastweight(x - ix1);
+        reduce_t dx0 = spline_utils::fastweight(x - (ix1 - 1));
+        reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
+        reduce_t dx3 = spline_utils::fastweight((ix1 + 2) - x);
         signed char  sx0 = bound_utils::sign(ix1-1, nw);
         signed char  sx2 = bound_utils::sign(ix1+1, nw);
         signed char  sx3 = bound_utils::sign(ix1+2, nw);
@@ -142,10 +142,10 @@ template <bound::type B> struct Multiscale<one, C, B, C, B, C, B> {
 };
 
 /***                             ANY                                ***/
-template <interpolation::type IX, bound::type BX>
-struct Multiscale<three, IX, BX, IX, BX, IX, BX> {
+template <spline::type IX, bound::type BX>
+struct Multiscale<one, IX, BX> {
     using bound_utils_x = bound::utils<BX>;
-    using inter_utils_x = interpolation::utils<IX>;
+    using spline_utils_x = spline::utils<IX>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -156,18 +156,18 @@ struct Multiscale<three, IX, BX, IX, BX, IX, BX> {
         // Precompute weights and indices
         scalar_t x = wscl * (w + shift) - shift;
         offset_t bx0, bx1;
-        inter_utils_x::bounds(x, bx0, bx1);
+        spline_utils_x::bounds(x, bx0, bx1);
         offset_t dbx = bx1-bx0;
         scalar_t    wx[8];
         offset_t    ix[8];
         signed char sx[8];
         {
-            scalar_t    *owx = static_cast<scalar_t*>(wx);
-            offset_t    *oix = static_cast<offset_t*>(ix);
-            signed char *osx = static_cast<signed char *>(sx);
+            scalar_t    *owx = wx;
+            offset_t    *oix = ix;
+            signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
                 scalar_t dx = x - bx;
-                *(owx++)  = inter_utils_x::fastweight(dx);
+                *(owx++)  = spline_utils_x::fastweight(dx);
                 *(osx++)  = bound_utils_x::sign(bx, nw);
                 *(oix++)  = bound_utils_x::index(bx, nw);
             }
@@ -178,7 +178,6 @@ struct Multiscale<three, IX, BX, IX, BX, IX, BX> {
         for (offset_t i = 0; i <= dbx; ++i)
             acc += bound::get(inp, ix[i] * sw, sx[i]) * wx[i];
         *out = acc;
-
     }
 };
 
@@ -190,10 +189,10 @@ struct Multiscale<three, IX, BX, IX, BX, IX, BX> {
 
 /***                           NEAREST                              ***/
 template <bound::type BX, bound::type BY>
-struct Multiscale<two, Z, BX, Z, BY, Z, BY> {
+struct Multiscale<two, Z, BX, Z, BY> {
     using bound_utils_x = bound::utils<BX>;
     using bound_utils_y = bound::utils<BY>;
-    using inter_utils = interpolation::utils<Z>;
+    using spline_utils = spline::utils<Z>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -206,20 +205,21 @@ struct Multiscale<two, Z, BX, Z, BY, Z, BY> {
         reduce_t y = (h + shift) * hscl - shift;
         offset_t ix = static_cast<offset_t>(round(x));
         offset_t iy = static_cast<offset_t>(round(y));
-        signed char  sx = bound_utils::sign(ix, nw);
-        signed char  sy = bound_utils::sign(iy, nh);
-        ix = bound_utils::index(ix, nw) * sw;
-        iy = bound_utils::index(iy, nh) * sh;
+        signed char  sx = bound_utils_x::sign(ix, nw);
+        signed char  sy = bound_utils_y::sign(iy, nh);
+        ix = bound_utils_x::index(ix, nw) * sw;
+        iy = bound_utils_y::index(iy, nh) * sh;
 
         *out = bound::get(inp, ix + iy, sx * sy);
+    }
 };
 
 /***                            LINEAR                              ***/
 template <bound::type BX, bound::type BY>
-struct Multiscale<two, L, BX, L, BY, L, BY> {
+struct Multiscale<two, L, BX, L, BY> {
     using bound_utils_x = bound::utils<BX>;
     using bound_utils_y = bound::utils<BY>;
-    using inter_utils = interpolation::utils<L>;
+    using spline_utils = spline::utils<L>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -235,17 +235,17 @@ struct Multiscale<two, L, BX, L, BY, L, BY> {
         offset_t ix1 = ix0 + 1;
         offset_t iy1 = iy0 + 1;
         reduce_t dx1 = x - ix0;
-        reduce_t dy1 = x - iy0;
+        reduce_t dy1 = y - iy0;
         reduce_t dx0 = 1 - dx1;
         reduce_t dy0 = 1 - dy1;
-        signed char  sx0 = bound_utils::sign(ix0, nw);
-        signed char  sy0 = bound_utils::sign(iy0, nh);
-        signed char  sx1 = bound_utils::sign(ix1, nw);
-        signed char  sy1 = bound_utils::sign(iy1, nh);
-        ix0 = bound_utils::index(ix0, nw) * sw;
-        iy0 = bound_utils::index(iy0, nh) * sh;
-        ix1 = bound_utils::index(ix1, nw) * sw;
-        iy1 = bound_utils::index(iy1, nh) * sh;
+        signed char  sx0 = bound_utils_x::sign(ix0, nw);
+        signed char  sy0 = bound_utils_y::sign(iy0, nh);
+        signed char  sx1 = bound_utils_x::sign(ix1, nw);
+        signed char  sy1 = bound_utils_y::sign(iy1, nh);
+        ix0 = bound_utils_x::index(ix0, nw) * sw;
+        iy0 = bound_utils_y::index(iy0, nh) * sh;
+        ix1 = bound_utils_x::index(ix1, nw) * sw;
+        iy1 = bound_utils_y::index(iy1, nh) * sh;
 
         auto accum1d = [ix0, ix1, dx0, dx1, sx0, sx1, inp]
                         (offset_t i, signed char s)
@@ -256,14 +256,15 @@ struct Multiscale<two, L, BX, L, BY, L, BY> {
 
         *out = static_cast<scalar_t>(accum1d(iy0, sy0) * dy0
                                    + accum1d(iy1, sy1) * dy1);
+    }
 };
 
 /***                          QUADRATIC                             ***/
 template <bound::type BX, bound::type BY>
-struct Multiscale<two, Q, BX, Q, BY, Q, BY> {
+struct Multiscale<two, Q, BX, Q, BY> {
     using bound_utils_x = bound::utils<BX>;
     using bound_utils_y = bound::utils<BY>;
-    using inter_utils = interpolation::utils<Q>;
+    using spline_utils = spline::utils<Q>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -276,12 +277,12 @@ struct Multiscale<two, Q, BX, Q, BY, Q, BY> {
         reduce_t y = (h + shift) * hscl - shift;
         offset_t ix1 = static_cast<offset_t>(floor(x+0.5));
         offset_t iy1 = static_cast<offset_t>(floor(y+0.5));
-        reduce_t dx1 = inter_utils::weight(x - ix1);
-        reduce_t dy1 = inter_utils::weight(y - iy1);
-        reduce_t dx0 = inter_utils::fastweight(x - (ix1 - 1));
-        reduce_t dy0 = inter_utils::fastweight(y - (iy1 - 1));
-        reduce_t dx2 = inter_utils::fastweight((ix1 + 1) - x);
-        reduce_t dy2 = inter_utils::fastweight((iy1 + 1) - y);
+        reduce_t dx1 = spline_utils::weight(x - ix1);
+        reduce_t dy1 = spline_utils::weight(y - iy1);
+        reduce_t dx0 = spline_utils::fastweight(x - (ix1 - 1));
+        reduce_t dy0 = spline_utils::fastweight(y - (iy1 - 1));
+        reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
+        reduce_t dy2 = spline_utils::fastweight((iy1 + 1) - y);
         signed char sx0 = bound_utils_x::sign(ix1-1, nw);
         signed char sy0 = bound_utils_y::sign(iy1-1, nh);
         signed char sx2 = bound_utils_x::sign(ix1+1, nw);
@@ -307,14 +308,15 @@ struct Multiscale<two, Q, BX, Q, BY, Q, BY> {
         *out = static_cast<scalar_t>(accum1d(iy0, sy0) * dy0
                                    + accum1d(iy1, sy1) * dy1
                                    + accum1d(iy2, sy2) * dy2);
+    }
 };
 
 /***                            CUBIC                               ***/
 template <bound::type BX, bound::type BY>
-struct Multiscale<two, C, BX, C, BY, C, BY> {
+struct Multiscale<two, C, BX, C, BY> {
     using bound_utils_x = bound::utils<BX>;
     using bound_utils_y = bound::utils<BY>;
-    using inter_utils = interpolation::utils<C>;
+    using spline_utils = spline::utils<C>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -327,14 +329,14 @@ struct Multiscale<two, C, BX, C, BY, C, BY> {
         reduce_t y = (h + shift) * hscl - shift;
         offset_t ix1 = static_cast<offset_t>(floor(x));
         offset_t iy1 = static_cast<offset_t>(floor(y));
-        reduce_t dx1 = inter_utils::fastweight(x - ix1);
-        reduce_t dy1 = inter_utils::fastweight(y - iy1);
-        reduce_t dx0 = inter_utils::fastweight(x - (ix1 - 1));
-        reduce_t dy0 = inter_utils::fastweight(y - (iy1 - 1));
-        reduce_t dx2 = inter_utils::fastweight((ix1 + 1) - x);
-        reduce_t dy2 = inter_utils::fastweight((iy1 + 1) - y);
-        reduce_t dx3 = inter_utils::fastweight((ix1 + 2) - x);
-        reduce_t dy3 = inter_utils::fastweight((iy1 + 2) - y);
+        reduce_t dx1 = spline_utils::fastweight(x - ix1);
+        reduce_t dy1 = spline_utils::fastweight(y - iy1);
+        reduce_t dx0 = spline_utils::fastweight(x - (ix1 - 1));
+        reduce_t dy0 = spline_utils::fastweight(y - (iy1 - 1));
+        reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
+        reduce_t dy2 = spline_utils::fastweight((iy1 + 1) - y);
+        reduce_t dx3 = spline_utils::fastweight((ix1 + 2) - x);
+        reduce_t dy3 = spline_utils::fastweight((iy1 + 2) - y);
         signed char  sx0 = bound_utils_x::sign(ix1-1, nw);
         signed char  sy0 = bound_utils_y::sign(iy1-1, nh);
         signed char  sx2 = bound_utils_x::sign(ix1+1, nw);
@@ -367,16 +369,17 @@ struct Multiscale<two, C, BX, C, BY, C, BY> {
                                    + accum1d(iy1, sy1) * dy1
                                    + accum1d(iy2, sy2) * dy2
                                    + accum1d(iy3, sy3) * dy3);
+    }
 };
 
 /***                             ANY                                ***/
-template <interpolation::type IX, bound::type BX,
-          interpolation::type IY, bound::type BY>
-struct Multiscale<three, IX, BX, IY, BY, IY, BY> {
+template <spline::type IX, bound::type BX,
+          spline::type IY, bound::type BY>
+struct Multiscale<two, IX, BX, IY, BY> {
     using bound_utils_x = bound::utils<BX>;
     using bound_utils_y = bound::utils<BY>;
-    using inter_utils_x = interpolation::utils<IX>;
-    using inter_utils_y = interpolation::utils<IY>;
+    using spline_utils_x = spline::utils<IX>;
+    using spline_utils_y = spline::utils<IY>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -389,31 +392,31 @@ struct Multiscale<three, IX, BX, IY, BY, IY, BY> {
         scalar_t x = wscl * (w + shift) - shift;
         scalar_t y = hscl * (h + shift) - shift;
         offset_t bx0, bx1, by0, by1;
-        inter_utils_x::bounds(x, bx0, bx1);
-        inter_utils_y::bounds(y, by0, by1);
+        spline_utils_x::bounds(x, bx0, bx1);
+        spline_utils_y::bounds(y, by0, by1);
         offset_t dbx = bx1-bx0;
         offset_t dby = by1-by0;
         scalar_t    wx[8],  wy[8];
         offset_t    ix[8],  iy[8];
         signed char sx[8],  sy[8];
         {
-            scalar_t    *owy = static_cast<scalar_t*>(wy);
-            offset_t    *oiy = static_cast<offset_t*>(iy);
-            signed char *osy = static_cast<signed char *>(sy);
+            scalar_t    *owy = wy;
+            offset_t    *oiy = iy;
+            signed char *osy = sy;
             for (offset_t by = by0; by <= by1; ++by) {
                 scalar_t dy = y - by;
-                *(owy++)  = inter_utils_y::fastweight(dy);
+                *(owy++)  = spline_utils_y::fastweight(dy);
                 *(osy++)  = bound_utils_y::sign(by, nh);
                 *(oiy++)  = bound_utils_y::index(by, nh);
             }
         }
         {
-            scalar_t    *owx = static_cast<scalar_t*>(wx);
-            offset_t    *oix = static_cast<offset_t*>(ix);
-            signed char *osx = static_cast<signed char *>(sx);
+            scalar_t    *owx = wx;
+            offset_t    *oix = ix;
+            signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
                 scalar_t dx = x - bx;
-                *(owx++)  = inter_utils_x::fastweight(dx);
+                *(owx++)  = spline_utils_x::fastweight(dx);
                 *(osx++)  = bound_utils_x::sign(bx, nw);
                 *(oix++)  = bound_utils_x::index(bx, nw);
             }
@@ -422,18 +425,17 @@ struct Multiscale<three, IX, BX, IY, BY, IY, BY> {
         // Convolve coefficients with basis functions
         scalar_t acc = static_cast<scalar_t>(0);
         for (offset_t j = 0; j <= dby; ++j) {
-            offset_t    osy = iy[j] * sh;
+            offset_t    oyy = iy[j] * sh;
             signed char syy = sy[j];
             scalar_t    wyy = wy[j];
             for (offset_t i = 0; i <= dbx; ++i) {
-                offset_t    osxy = osyy + ix[i] * sw;
-                signed char sxy  = syy  * sx[i];
-                scalar_t    wxy  = wyy  * wx[i];
-                acc += bound::get(inp, osxy, sxy) * wxy;
+                offset_t    oxy = oyy + ix[i] * sw;
+                signed char sxy = syy * sx[i];
+                scalar_t    wxy = wyy * wx[i];
+                acc += bound::get(inp, oxy, sxy) * wxy;
             }
         }
         *out = acc;
-
     }
 };
 
@@ -443,13 +445,109 @@ struct Multiscale<three, IX, BX, IY, BY, IY, BY> {
  *
  **********************************************************************/
 
+/***                           NEAREST                              ***/
+template <bound::type BX, bound::type BY, bound::type BZ>
+struct Multiscale<two, Z, BX, Z, BY, Z, BZ> {
+    using bound_utils_x = bound::utils<BX>;
+    using bound_utils_y = bound::utils<BY>;
+    using bound_utils_z = bound::utils<BZ>;
+    using spline_utils = spline::utils<Z>;
+
+    template <typename scalar_t, typename offset_t, typename reduce_t>
+    static __device__
+    void resize(scalar_t * out, scalar_t * inp,
+                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
+                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
+                reduce_t shift)
+    {
+        reduce_t x = (w + shift) * wscl - shift;
+        reduce_t y = (h + shift) * hscl - shift;
+        reduce_t z = (d + shift) * dscl - shift;
+        offset_t ix = static_cast<offset_t>(round(x));
+        offset_t iy = static_cast<offset_t>(round(y));
+        offset_t iz = static_cast<offset_t>(round(z));
+        signed char  sx = bound_utils_x::sign(ix, nw);
+        signed char  sy = bound_utils_y::sign(iy, nh);
+        signed char  sz = bound_utils_z::sign(iz, nd);
+        ix = bound_utils_x::index(ix, nw) * sw;
+        iy = bound_utils_y::index(iy, nh) * sh;
+        iz = bound_utils_z::index(iz, nd) * sd;
+
+        *out = bound::get(inp, ix + iy + iz, sx * sy * sz);
+    }
+};
+
+/***                            LINEAR                              ***/
+template <bound::type BX, bound::type BY, bound::type BZ>
+struct Multiscale<three, L, BX, L, BY, L, BZ> {
+    using bound_utils_x = bound::utils<BX>;
+    using bound_utils_y = bound::utils<BY>;
+    using bound_utils_z = bound::utils<BZ>;
+    using spline_utils = spline::utils<L>;
+
+    template <typename scalar_t, typename offset_t, typename reduce_t>
+    static __device__
+    void resize(scalar_t * out, scalar_t * inp,
+                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
+                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
+                reduce_t shift)
+    {
+        reduce_t x = (w + shift) * wscl - shift;
+        reduce_t y = (h + shift) * hscl - shift;
+        reduce_t z = (d + shift) * dscl - shift;
+        offset_t ix0 = static_cast<offset_t>(floor(x));
+        offset_t iy0 = static_cast<offset_t>(floor(y));
+        offset_t iz0 = static_cast<offset_t>(floor(z));
+        offset_t ix1 = ix0 + 1;
+        offset_t iy1 = iy0 + 1;
+        offset_t iz1 = iz0 + 1;
+        reduce_t dx1 = x - ix0;
+        reduce_t dy1 = y - iy0;
+        reduce_t dz1 = z - iz0;
+        reduce_t dx0 = 1 - dx1;
+        reduce_t dy0 = 1 - dy1;
+        reduce_t dz0 = 1 - dz1;
+        signed char  sx0 = bound_utils_x::sign(ix0, nw);
+        signed char  sy0 = bound_utils_y::sign(iy0, nh);
+        signed char  sz0 = bound_utils_z::sign(iz0, nd);
+        signed char  sx1 = bound_utils_x::sign(ix1, nw);
+        signed char  sy1 = bound_utils_y::sign(iy1, nh);
+        signed char  sz1 = bound_utils_z::sign(iz1, nd);
+        ix0 = bound_utils_x::index(ix0, nw) * sw;
+        iy0 = bound_utils_y::index(iy0, nh) * sh;
+        iz0 = bound_utils_z::index(iz0, nd) * sd;
+        ix1 = bound_utils_x::index(ix1, nw) * sw;
+        iy1 = bound_utils_y::index(iy1, nh) * sh;
+        iz1 = bound_utils_z::index(iz1, nd) * sd;
+
+        auto accum1d = [ix0, ix1, dx0, dx1, sx0, sx1, inp]
+                        (offset_t i, signed char s)
+        {
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1;
+        };
+
+        auto accum2d = [iy0, iy1, dy0, dy1, sy0, sy1, accum1d]
+                        (offset_t i, signed char s)
+        {
+          return accum1d(iy0 + i, sy0 * s) * dy0
+               + accum1d(iy1 + i, sy1 * s) * dy1;
+        };
+
+        *out  = static_cast<scalar_t>(accum2d(iz0, sz0) * dz0
+                                    + accum2d(iz1, sz1) * dz1);
+    }
+};
+
 /***                          QUADRATIC                             ***/
 template <bound::type BX, bound::type BY, bound::type BZ>
 struct Multiscale<three, Q, BX, Q, BY, Q, BZ> {
     using bound_utils_x = bound::utils<BX>;
     using bound_utils_y = bound::utils<BY>;
     using bound_utils_z = bound::utils<BZ>;
-    using inter_utils = interpolation::utils<Q>;
+    using spline_utils = spline::utils<Q>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -465,15 +563,15 @@ struct Multiscale<three, Q, BX, Q, BY, Q, BZ> {
         offset_t ix1 = static_cast<offset_t>(floor(x+0.5));
         offset_t iy1 = static_cast<offset_t>(floor(y+0.5));
         offset_t iz1 = static_cast<offset_t>(floor(z+0.5));
-        reduce_t dx1 = inter_utils::weight(x - ix1);
-        reduce_t dy1 = inter_utils::weight(y - iy1);
-        reduce_t dz1 = inter_utils::weight(z - iz1);
-        reduce_t dx0 = inter_utils::fastweight(x - (ix1 - 1));
-        reduce_t dy0 = inter_utils::fastweight(y - (iy1 - 1));
-        reduce_t dz0 = inter_utils::fastweight(z - (iz1 - 1));
-        reduce_t dx2 = inter_utils::fastweight((ix1 + 1) - x);
-        reduce_t dy2 = inter_utils::fastweight((iy1 + 1) - y);
-        reduce_t dz2 = inter_utils::fastweight((iz1 + 1) - z);
+        reduce_t dx1 = spline_utils::weight(x - ix1);
+        reduce_t dy1 = spline_utils::weight(y - iy1);
+        reduce_t dz1 = spline_utils::weight(z - iz1);
+        reduce_t dx0 = spline_utils::fastweight(x - (ix1 - 1));
+        reduce_t dy0 = spline_utils::fastweight(y - (iy1 - 1));
+        reduce_t dz0 = spline_utils::fastweight(z - (iz1 - 1));
+        reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
+        reduce_t dy2 = spline_utils::fastweight((iy1 + 1) - y);
+        reduce_t dz2 = spline_utils::fastweight((iz1 + 1) - z);
         int8_t  sx0 = bound_utils_x::sign(ix1-1, nw);
         int8_t  sy0 = bound_utils_y::sign(iy1-1, nh);
         int8_t  sz0 = bound_utils_z::sign(iz1-1, nd);
@@ -513,19 +611,106 @@ struct Multiscale<three, Q, BX, Q, BY, Q, BZ> {
         *out  = static_cast<scalar_t>(accum2d(iz0, sz0) * dz0
                                     + accum2d(iz1, sz1) * dz1
                                     + accum2d(iz2, sz2) * dz2);
+    }
+};
+
+/***                            CUBIC                               ***/
+template <bound::type BX, bound::type BY, bound::type BZ>
+struct Multiscale<three, C, BX, C, BY, C, BZ> {
+    using bound_utils_x = bound::utils<BX>;
+    using bound_utils_y = bound::utils<BY>;
+    using bound_utils_z = bound::utils<BZ>;
+    using spline_utils = spline::utils<C>;
+
+    template <typename scalar_t, typename offset_t, typename reduce_t>
+    static __device__
+    void resize(scalar_t * out, scalar_t * inp,
+                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
+                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                reduce_t shift)
+    {
+        reduce_t x = (w + shift) * wscl - shift;
+        reduce_t y = (h + shift) * hscl - shift;
+        reduce_t z = (d + shift) * dscl - shift;
+        offset_t ix1 = static_cast<offset_t>(floor(x));
+        offset_t iy1 = static_cast<offset_t>(floor(y));
+        offset_t iz1 = static_cast<offset_t>(floor(z));
+        reduce_t dx1 = spline_utils::fastweight(x - ix1);
+        reduce_t dy1 = spline_utils::fastweight(y - iy1);
+        reduce_t dz1 = spline_utils::fastweight(z - iz1);
+        reduce_t dx0 = spline_utils::fastweight(x - (ix1 - 1));
+        reduce_t dy0 = spline_utils::fastweight(y - (iy1 - 1));
+        reduce_t dz0 = spline_utils::fastweight(z - (iz1 - 1));
+        reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
+        reduce_t dy2 = spline_utils::fastweight((iy1 + 1) - y);
+        reduce_t dz2 = spline_utils::fastweight((iz1 + 1) - z);
+        reduce_t dx3 = spline_utils::fastweight((ix1 + 2) - x);
+        reduce_t dy3 = spline_utils::fastweight((iy1 + 2) - y);
+        reduce_t dz3 = spline_utils::fastweight((iz1 + 2) - z);
+        signed char  sx0 = bound_utils_x::sign(ix1-1, nw);
+        signed char  sy0 = bound_utils_y::sign(iy1-1, nh);
+        signed char  sy0 = bound_utils_z::sign(iy1-1, nd);
+        signed char  sx2 = bound_utils_x::sign(ix1+1, nw);
+        signed char  sy2 = bound_utils_y::sign(iy1+1, nh);
+        signed char  sy2 = bound_utils_z::sign(iy1+1, nd);
+        signed char  sx3 = bound_utils_x::sign(ix1+2, nw);
+        signed char  sy3 = bound_utils_y::sign(iy1+2, nh);
+        signed char  sy3 = bound_utils_z::sign(iy1+2, nd);
+        signed char  sx1 = bound_utils_x::sign(ix1,   nw);
+        signed char  sy1 = bound_utils_y::sign(iy1,   nh);
+        signed char  sy1 = bound_utils_z::sign(iy1,   nd);
+        offset_t ix0, ix2, ix3, iy0, iy2, iy3, iz0, iz2, iz3;
+        ix0 = bound_utils_x::index(ix1-1, nw) * sw;
+        iy0 = bound_utils_y::index(iy1-1, nh) * sh;
+        iz0 = bound_utils_z::index(iz1-1, nd) * sd;
+        ix2 = bound_utils_x::index(ix1+1, nw) * sw;
+        iy2 = bound_utils_y::index(iy1+1, nh) * sh;
+        iz2 = bound_utils_z::index(iz1+1, nd) * sd;
+        ix3 = bound_utils_x::index(ix1+2, nw) * sw;
+        iy3 = bound_utils_y::index(iy1+2, nh) * sh;
+        iz3 = bound_utils_z::index(iz1+2, nd) * sd;
+        ix1 = bound_utils_x::index(ix1,   nw) * sw;
+        iy1 = bound_utils_y::index(iy1,   nh) * sh;
+        iz1 = bound_utils_z::index(iz1,   nd) * sd;
+
+        auto accum1d = [ix0, ix1, ix2, ix3, dx0, dx1, dx2, dx3,
+                        sx0, sx1, sx2, sx3, inp]
+                        (offset_t i, signed char s)
+        {
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1
+               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * sx2)) * dx2
+               + static_cast<reduce_t>(bound::get(inp, i + ix3, s * sx3)) * dx3;
+        };
+
+        auto accum2d = [iy0, iy1, iy2, iy3, dy0, dy1, dy2, dy3,
+                        sy0, sy1, sy2, sy3, accum1d]
+                        (offset_t i, signed char s)
+        {
+          return accum1d(iy0 + i, sy0 * s) * dy0
+               + accum1d(iy1 + i, sy1 * s) * dy1
+               + accum1d(iy2 + i, sy2 * s) * dy2
+               + accum1d(iy3 + i, sy3 * s) * dy3;
+        };
+
+        *out = static_cast<scalar_t>(accum2d(iz0, sz0) * dz0
+                                   + accum2d(iz1, sz1) * dz1
+                                   + accum2d(iz2, sz2) * dz2
+                                   + accum2d(iz3, sz3) * dz3);
+    }
 };
 
 /***                             ANY                                ***/
-template <interpolation::type IX, bound::type BX,
-          interpolation::type IY, bound::type BY,
-          interpolation::type IZ, bound::type BZ>
+template <spline::type IX, bound::type BX,
+          spline::type IY, bound::type BY,
+          spline::type IZ, bound::type BZ>
 struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
     using bound_utils_x = bound::utils<BX>;
     using bound_utils_y = bound::utils<BY>;
     using bound_utils_z = bound::utils<BZ>;
-    using inter_utils_x = interpolation::utils<IX>;
-    using inter_utils_y = interpolation::utils<IY>;
-    using inter_utils_z = interpolation::utils<IZ>;
+    using spline_utils_x = spline::utils<IX>;
+    using spline_utils_y = spline::utils<IY>;
+    using spline_utils_z = spline::utils<IZ>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
@@ -540,9 +725,9 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
         scalar_t y = hscl * (h + shift) - shift;
         scalar_t z = dscl * (d + shift) - shift;
         offset_t bx0, bx1, by0, by1, bz0, bz1;
-        inter_utils_x::bounds(x, bx0, bx1);
-        inter_utils_y::bounds(y, by0, by1);
-        inter_utils_z::bounds(z, bz0, bz1);
+        spline_utils_x::bounds(x, bx0, bx1);
+        spline_utils_y::bounds(y, by0, by1);
+        spline_utils_z::bounds(z, bz0, bz1);
         offset_t dbx = bx1-bx0;
         offset_t dby = by1-by0;
         offset_t dbz = bz1-bz0;
@@ -555,7 +740,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             signed char *osz = sz;
             for (offset_t bz = bz0; bz <= bz1; ++bz) {
                 scalar_t dz = z - bz;
-                *(owz++)  = inter_utils_z::fastweight(dz);
+                *(owz++)  = spline_utils_z::fastweight(dz);
                 *(osz++)  = bound_utils_z::sign(bz, nd);
                 *(oiz++)  = bound_utils_z::index(bz, nd);
             }
@@ -566,7 +751,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             signed char *osy = sy;
             for (offset_t by = by0; by <= by1; ++by) {
                 scalar_t dy = y - by;
-                *(owy++)  = inter_utils_y::fastweight(dy);
+                *(owy++)  = spline_utils_y::fastweight(dy);
                 *(osy++)  = bound_utils_y::sign(by, nh);
                 *(oiy++)  = bound_utils_y::index(by, nh);
             }
@@ -577,7 +762,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
                 scalar_t dx = x - bx;
-                *(owx++)  = inter_utils_x::fastweight(dx);
+                *(owx++)  = spline_utils_x::fastweight(dx);
                 *(osx++)  = bound_utils_x::sign(bx, nw);
                 *(oix++)  = bound_utils_x::index(bx, nw);
             }
@@ -586,23 +771,22 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
         // Convolve coefficients with basis functions
         scalar_t acc = static_cast<scalar_t>(0);
         for (offset_t k = 0; k <= dbz; ++k) {
-            offset_t    osz = iz[k] * sd;
+            offset_t    ozz = iz[k] * sd;
             signed char szz = sz[k];
             scalar_t    wzz = wz[k];
             for (offset_t j = 0; j <= dby; ++j) {
-                offset_t    osyz = osz + iy[j] * sh;
-                signed char syz  = szz * sy[j];
-                scalar_t    wyz  = wzz * wy[j];
+                offset_t    oyz = ozz + iy[j] * sh;
+                signed char syz = szz * sy[j];
+                scalar_t    wyz = wzz * wy[j];
                 for (offset_t i = 0; i <= dbx; ++i) {
-                    offset_t    osxyz = osyz + ix[i] * sw;
-                    signed char sxyz  = syz  * sx[i];
-                    scalar_t    wxyz  = wyz  * wx[i];
-                    acc += bound::get(inp, osxyz, sxyz) * wxyz;
+                    offset_t    oxyz = oyz + ix[i] * sw;
+                    signed char sxyz = syz * sx[i];
+                    scalar_t    wxyz = wyz * wx[i];
+                    acc += bound::get(inp, oxyz, sxyz) * wxyz;
                 }
             }
         }
         *out = acc;
-
     }
 };
 
@@ -613,13 +797,13 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
  **********************************************************************/
 
 template <int D>
-struct Multiscale<D, Z, B0, Z, B0, Z, B0> {
+struct Multiscale<D> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
                 const offset_t * coord, const offset_t * size, const offset_t * stride,
-                const interpolation::type * inter, const * bound::type bnd,
+                const spline::type * inter, const bound::type * bnd,
                 const reduce_t * scl, reduce_t shift)
     {
         // Precompute weights and indices
@@ -627,16 +811,16 @@ struct Multiscale<D, Z, B0, Z, B0, Z, B0> {
         offset_t    i[8*D];
         signed char s[8*D];
         offset_t    db[D];
-        for (offset_t d=0; d<D; ++d) {
+        for (int d=0; d<D; ++d) {
             scalar_t    *wd = w + 8*d;
             offset_t    *id = i + 8*d;
             signed char *sd = s + 8*d;
             scalar_t x = scl[d] * (coord[d] + shift) - shift;
             offset_t b0, b1;
-            interpolation::bounds(inter[d], x, b0, b1);
+            spline::bounds(inter[d], x, b0, b1);
             db[d] = b1-b0;
             for (offset_t b = b0; b <= b1; ++b) {
-                *(wd++) = interpolation::fastweight(inter[d], x - b);
+                *(wd++) = spline::fastweight(inter[d], x - b);
                 *(sd++) = bound::sign(bnd[d], b, size[d]);
                 *(id++) = bound::index(bnd[d], b, size[d]);
             }
@@ -647,7 +831,7 @@ struct Multiscale<D, Z, B0, Z, B0, Z, B0> {
         signed char signs[D];
         scalar_t    weights[D];
         scalar_t acc = static_cast<scalar_t>(0);
-        for (offset_t d=0; d<D; ++d) {
+        for (int d=0; d<D; ++d) {
             scalar_t    *wd = w + 8*d;
             offset_t    *id = i + 8*d;
             signed char *sd = s + 8*d;
@@ -666,14 +850,13 @@ struct Multiscale<D, Z, B0, Z, B0, Z, B0> {
     }
 };
 
-
 /***********************************************************************
  *
  *                              KERNELS
  *
  **********************************************************************/
 
-template <interpolation::type IX, bound::type BX,
+template <spline::type IX, bound::type BX,
           typename scalar_t, typename offset_t>
 __global__ void kernel1d(scalar_t * out, scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
@@ -698,8 +881,8 @@ __global__ void kernel1d(scalar_t * out, scalar_t * inp, int ndim,
     }
 }
 
-template <interpolation::type IX, bound::type BX,
-          interpolation::type IY, bound::type BY,
+template <spline::type IX, bound::type BX,
+          spline::type IY, bound::type BY,
           typename scalar_t, typename offset_t>
 __global__ void kernel2d(scalar_t * out, scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
@@ -718,7 +901,7 @@ __global__ void kernel2d(scalar_t * out, scalar_t * inp, int ndim,
         offset_t batch_offset = index2offset_2d(i, ndim, size_out, stride_inp, x, y);
         offset_t out_offset = index2offset(i, ndim, size_out, stride_out);
 
-        Multiscale<one, IX, BX, IY, BY>::resize(
+        Multiscale<two, IX, BX, IY, BY>::resize(
             out + out_offset, inp + batch_offset,
             x, size_inp[ndim-2], stride_inp[ndim-2], scale[ndim-2],
             y, size_inp[ndim-1], stride_inp[ndim-1], scale[ndim-1],
@@ -726,9 +909,9 @@ __global__ void kernel2d(scalar_t * out, scalar_t * inp, int ndim,
     }
 }
 
-template <interpolation::type IX, bound::type BX,
-          interpolation::type IY, bound::type BY,
-          interpolation::type IZ, bound::type BZ,
+template <spline::type IX, bound::type BX,
+          spline::type IY, bound::type BY,
+          spline::type IZ, bound::type BZ,
           typename scalar_t, typename offset_t>
 __global__ void kernel3d(scalar_t * out, scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
@@ -747,7 +930,7 @@ __global__ void kernel3d(scalar_t * out, scalar_t * inp, int ndim,
         offset_t batch_offset = index2offset_3d(i, ndim, size_out, stride_inp, x, y, z);
         offset_t out_offset = index2offset(i, ndim, size_out, stride_out);
 
-        Multiscale<one, IX, BX, IY, BY, IZ, BZ>::resize(
+        Multiscale<three, IX, BX, IY, BY, IZ, BZ>::resize(
             out + out_offset, inp + batch_offset,
             x, size_inp[ndim-3], stride_inp[ndim-3], scale[ndim-3],
             y, size_inp[ndim-2], stride_inp[ndim-2], scale[ndim-2],
@@ -759,7 +942,7 @@ __global__ void kernel3d(scalar_t * out, scalar_t * inp, int ndim,
 template <int D, typename scalar_t, typename offset_t>
 __global__ void kernelnd(scalar_t * out, scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
-                         const interpolation::type * order,
+                         const spline::type * order,
                          const bound::type * bnd,
                          const offset_t * size_out,
                          const offset_t * size_inp,
