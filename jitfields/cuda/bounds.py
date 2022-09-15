@@ -18,3 +18,6 @@ convert_bound = {
     'dft': 6, 'warp': 6, 'circular': 6,
     'nocheck': 7,
 }
+
+cnames = ['Zero', 'Replicate', 'DCT1', 'DCT2',
+          'DST1', 'DST2', 'DFT', 'NoCheck']
