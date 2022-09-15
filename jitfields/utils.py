@@ -1,4 +1,5 @@
 from typing import List, Sequence, TypeVar
+from types import GeneratorType as generator
 import math as pymath
 import torch
 T = TypeVar('T')
