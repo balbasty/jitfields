@@ -5,7 +5,6 @@
  */
 
 /* TODO
- * - try to use fma (fused multiply-add) throughout
  * - check if using an inner loop across batch elements is more efficient
  *   (we currently use an outer loop, so we recompute indices many times)
  */
@@ -154,19 +153,19 @@ struct Multiscale<one, IX, BX> {
                 reduce_t shift)
     {
         // Precompute weights and indices
-        scalar_t x = wscl * (w + shift) - shift;
+        reduce_t x = wscl * (w + shift) - shift;
         offset_t bx0, bx1;
         spline_utils_x::bounds(x, bx0, bx1);
         offset_t dbx = bx1-bx0;
-        scalar_t    wx[8];
+        reduce_t    wx[8];
         offset_t    ix[8];
         signed char sx[8];
         {
-            scalar_t    *owx = wx;
+            reduce_t    *owx = wx;
             offset_t    *oix = ix;
             signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
-                scalar_t dx = x - bx;
+                reduce_t dx = x - bx;
                 *(owx++)  = spline_utils_x::fastweight(dx);
                 *(osx++)  = bound_utils_x::sign(bx, nw);
                 *(oix++)  = bound_utils_x::index(bx, nw);
@@ -174,10 +173,10 @@ struct Multiscale<one, IX, BX> {
         }
 
         // Convolve coefficients with basis functions
-        scalar_t acc = static_cast<scalar_t>(0);
+        reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t i = 0; i <= dbx; ++i)
-            acc += bound::get(inp, ix[i] * sw, sx[i]) * wx[i];
-        *out = acc;
+            acc += static_cast<reduce_t>(bound::get(inp, ix[i] * sw, sx[i])) * wx[i];
+        *out = static_cast<scalar_t>(acc);
     }
 };
 
@@ -389,18 +388,18 @@ struct Multiscale<two, IX, BX, IY, BY> {
                 reduce_t shift)
     {
         // Precompute weights and indices
-        scalar_t x = wscl * (w + shift) - shift;
-        scalar_t y = hscl * (h + shift) - shift;
+        reduce_t x = wscl * (w + shift) - shift;
+        reduce_t y = hscl * (h + shift) - shift;
         offset_t bx0, bx1, by0, by1;
         spline_utils_x::bounds(x, bx0, bx1);
         spline_utils_y::bounds(y, by0, by1);
         offset_t dbx = bx1-bx0;
         offset_t dby = by1-by0;
-        scalar_t    wx[8],  wy[8];
+        reduce_t    wx[8],  wy[8];
         offset_t    ix[8],  iy[8];
         signed char sx[8],  sy[8];
         {
-            scalar_t    *owy = wy;
+            reduce_t    *owy = wy;
             offset_t    *oiy = iy;
             signed char *osy = sy;
             for (offset_t by = by0; by <= by1; ++by) {
@@ -411,7 +410,7 @@ struct Multiscale<two, IX, BX, IY, BY> {
             }
         }
         {
-            scalar_t    *owx = wx;
+            reduce_t    *owx = wx;
             offset_t    *oix = ix;
             signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
@@ -423,19 +422,19 @@ struct Multiscale<two, IX, BX, IY, BY> {
         }
 
         // Convolve coefficients with basis functions
-        scalar_t acc = static_cast<scalar_t>(0);
+        reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t j = 0; j <= dby; ++j) {
             offset_t    oyy = iy[j] * sh;
             signed char syy = sy[j];
-            scalar_t    wyy = wy[j];
+            reduce_t    wyy = wy[j];
             for (offset_t i = 0; i <= dbx; ++i) {
                 offset_t    oxy = oyy + ix[i] * sw;
                 signed char sxy = syy * sx[i];
-                scalar_t    wxy = wyy * wx[i];
-                acc += bound::get(inp, oxy, sxy) * wxy;
+                reduce_t    wxy = wyy * wx[i];
+                acc += static_cast<reduce_t>(bound::get(inp, oxy, sxy)) * wxy;
             }
         }
-        *out = acc;
+        *out = static_cast<scalar_t>(acc);
     }
 };
 
@@ -721,9 +720,9 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
                 reduce_t shift)
     {
         // Precompute weights and indices
-        scalar_t x = wscl * (w + shift) - shift;
-        scalar_t y = hscl * (h + shift) - shift;
-        scalar_t z = dscl * (d + shift) - shift;
+        reduce_t x = wscl * (w + shift) - shift;
+        reduce_t y = hscl * (h + shift) - shift;
+        reduce_t z = dscl * (d + shift) - shift;
         offset_t bx0, bx1, by0, by1, bz0, bz1;
         spline_utils_x::bounds(x, bx0, bx1);
         spline_utils_y::bounds(y, by0, by1);
@@ -731,11 +730,11 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
         offset_t dbx = bx1-bx0;
         offset_t dby = by1-by0;
         offset_t dbz = bz1-bz0;
-        scalar_t    wx[8],  wy[8],  wz[8];
+        reduce_t    wx[8],  wy[8],  wz[8];
         offset_t    ix[8],  iy[8],  iz[8];
         signed char sx[8],  sy[8],  sz[8];
         {
-            scalar_t    *owz = wz;
+            reduce_t    *owz = wz;
             offset_t    *oiz = iz;
             signed char *osz = sz;
             for (offset_t bz = bz0; bz <= bz1; ++bz) {
@@ -746,7 +745,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             }
         }
         {
-            scalar_t    *owy = wy;
+            reduce_t    *owy = wy;
             offset_t    *oiy = iy;
             signed char *osy = sy;
             for (offset_t by = by0; by <= by1; ++by) {
@@ -757,7 +756,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             }
         }
         {
-            scalar_t    *owx = wx;
+            reduce_t    *owx = wx;
             offset_t    *oix = ix;
             signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
@@ -769,24 +768,24 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
         }
 
         // Convolve coefficients with basis functions
-        scalar_t acc = static_cast<scalar_t>(0);
+        reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t k = 0; k <= dbz; ++k) {
             offset_t    ozz = iz[k] * sd;
             signed char szz = sz[k];
-            scalar_t    wzz = wz[k];
+            reduce_t    wzz = wz[k];
             for (offset_t j = 0; j <= dby; ++j) {
                 offset_t    oyz = ozz + iy[j] * sh;
                 signed char syz = szz * sy[j];
-                scalar_t    wyz = wzz * wy[j];
+                reduce_t    wyz = wzz * wy[j];
                 for (offset_t i = 0; i <= dbx; ++i) {
                     offset_t    oxyz = oyz + ix[i] * sw;
                     signed char sxyz = syz * sx[i];
-                    scalar_t    wxyz = wyz * wx[i];
-                    acc += bound::get(inp, oxyz, sxyz) * wxyz;
+                    reduce_t    wxyz = wyz * wx[i];
+                    acc += static_cast<reduce_t>(bound::get(inp, oxyz, sxyz)) * wxyz;
                 }
             }
         }
-        *out = acc;
+        *out = static_cast<scalar_t>(acc);
     }
 };
 
@@ -807,15 +806,15 @@ struct Multiscale<D> {
                 const reduce_t * scl, reduce_t shift)
     {
         // Precompute weights and indices
-        scalar_t    w[8*D];
+        reduce_t    w[8*D];
         offset_t    i[8*D];
         signed char s[8*D];
         offset_t    db[D];
         for (int d=0; d<D; ++d) {
-            scalar_t    *wd = w + 8*d;
+            reduce_t    *wd = w + 8*d;
             offset_t    *id = i + 8*d;
             signed char *sd = s + 8*d;
-            scalar_t x = scl[d] * (coord[d] + shift) - shift;
+            reduce_t x = scl[d] * (coord[d] + shift) - shift;
             offset_t b0, b1;
             spline::bounds(inter[d], x, b0, b1);
             db[d] = b1-b0;
@@ -830,9 +829,9 @@ struct Multiscale<D> {
         offset_t    offsets[D];
         signed char signs[D];
         scalar_t    weights[D];
-        scalar_t acc = static_cast<scalar_t>(0);
+        reduce_t acc = static_cast<reduce_t>(0);
         for (int d=0; d<D; ++d) {
-            scalar_t    *wd = w + 8*d;
+            reduce_t    *wd = w + 8*d;
             offset_t    *id = i + 8*d;
             signed char *sd = s + 8*d;
             for (offset_t k = 0; k <= db[d]; ++k) {
@@ -840,13 +839,13 @@ struct Multiscale<D> {
                            + id[k] * stride[d];
                 signs[d]   = (d > 0 ? signs[d-1]   : static_cast<signed char>(1))
                            * sd[k];
-                weights[d] = (d > 0 ? weights[d-1] : static_cast<scalar_t>(1))
+                weights[d] = (d > 0 ? weights[d-1] : static_cast<reduce_t>(1))
                            * wd[k];
                 if (d == D-1)
-                    acc += bound::get(inp, offsets[D-1], signs[D-1]) * weights[D-1];
+                    acc += static_cast<reduce_T>(bound::get(inp, offsets[D-1], signs[D-1])) * weights[D-1];
             }
         }
-        *out = acc;
+        *out = static_cast<scalar_t>(acc);
     }
 };
 

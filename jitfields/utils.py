@@ -2,7 +2,20 @@ from typing import List, Sequence, TypeVar
 from types import GeneratorType as generator
 import math as pymath
 import torch
+import importlib
 T = TypeVar('T')
+
+
+def try_import(module, key=None):
+    def try_import_module(path):
+        try:
+            return importlib.import_module(path)
+        except (ImportError, ModuleNotFoundError):
+            return None
+    module = try_import_module(module)
+    if not module:
+        return None
+    return getattr(module, key, None) if key else module
 
 
 def remainder(x, d):
