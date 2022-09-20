@@ -1,6 +1,5 @@
 import numba as nb
 import numpy as np
-import math as pymath
 import torch
 from . import utils as nbutils
 

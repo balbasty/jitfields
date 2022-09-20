@@ -1,18 +1,8 @@
-from .utils import get_cuda_num_threads, get_cuda_blocks
-from ..utils import make_vector
-from torch.utils.dlpack import to_dlpack
+from .utils import (get_cuda_num_threads, get_cuda_blocks,
+                    load_code, to_cupy)
 import cupy as cp
-import numpy as np
 import math as pymath
 import torch
-from .batch import code as batch_code
-import os
-
-l1dt_kernel_code = ''
-l1dt_kernel_code += batch_code
-this_folder = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(this_folder, 'distance_l1.cu'), 'rt') as f:
-    l1dt_kernel_code += f.read()
 
 l1dt_templates = (
     'kernel<half,int>',
@@ -23,7 +13,7 @@ l1dt_templates = (
     'kernel<double,long>',
 )
 
-l1dt_module = cp.RawModule(code=l1dt_kernel_code,
+l1dt_module = cp.RawModule(code=load_code('distance_l1.cu'),
                            options=('--std=c++11',),
                            name_expressions=l1dt_templates)
 l1dt_kernels = {
@@ -40,7 +30,7 @@ def l1dt_1d_(f, dim=-1, w=1):
     """in-place one-dimensional L1 distance"""
     f = f.movedim(dim, -1)
     n = pymath.prod(f.shape[:-1])
-    cuf = cp.from_dlpack(to_dlpack(f))
+    cuf = to_cupy(f)
     shape = cp.asarray(cuf.shape)
     stride = cp.asarray([s // cuf.dtype.itemsize for s in cuf.strides])
     offset_t = cp.int32 if n <= cp.iinfo('int32').max else cp.int64
@@ -61,13 +51,6 @@ def l1dt_1d(f, dim=-1, w=1):
     f = f.to(dtype, copy=True)
     return l1dt_1d_(f, dim, w)
 
-
-edt_kernel_code = ''
-edt_kernel_code += batch_code
-this_folder = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(this_folder, 'distance_euclidean.cu'), 'rt') as f:
-    edt_kernel_code += f.read()
-
 edt_templates = (
     'kernel<half,int>',
     'kernel<half,long>',
@@ -77,7 +60,7 @@ edt_templates = (
     'kernel<double,long>',
 )
 
-edt_module = cp.RawModule(code=edt_kernel_code,
+edt_module = cp.RawModule(code=load_code('distance_euclidean.cu'),
                           options=('--std=c++11',),
                           name_expressions=edt_templates)
 edt_kernels = {
@@ -94,7 +77,7 @@ def edt_1d_(f, dim=-1, w=1):
     """in-place one-dimensional Euclidean distance"""
     f = f.movedim(dim, -1)
     n = pymath.prod(f.shape[:-1])
-    cuf = cp.from_dlpack(to_dlpack(f))
+    cuf = to_cupy(f)
     shape = cp.asarray(cuf.shape)
     stride = cp.asarray([s // cuf.dtype.itemsize for s in cuf.strides])
     offset_t = cp.int32 if n <= cp.iinfo('int32').max else cp.int64

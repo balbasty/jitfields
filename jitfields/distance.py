@@ -3,7 +3,8 @@ try:
 except ImportError:
     cuda_dist = None
 try:
-    from .numba import distance as cpu_dist
+    # from .numba import distance as cpu_dist
+    from .cpp import distance as cpu_dist
 except ImportError:
     cpu_dist = None
 import torch
