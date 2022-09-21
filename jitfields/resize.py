@@ -1,10 +1,12 @@
 import torch
 from .utils import try_import, ensure_list, prod
 from .splinc import spline_coeff_nd
+import math as pymath
 cuda_resize = try_import('jitfields.cuda', 'resize')
-cpu_resize = try_import('jitfields.numba', 'resize')
+cpu_resize = try_import('jitfields.cpp', 'resize')
 cuda_restrict = try_import('jitfields.cuda', 'restrict')
-cpu_restricte = try_import('jitfields.numba', 'restrict')
+cpu_restrict = try_import('jitfields.cpp', 'restrict')
+from .cpp import resize as cpu_resize
 
 
 class _Resize(torch.autograd.Function):
@@ -16,17 +18,18 @@ class _Resize(torch.autograd.Function):
         else:
             _resize = cpu_resize.resize
         ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound)
-        return _resize(x, factor, shape, ndim, anchor, order, bound, out)
+        x = _resize(x, factor, shape, ndim, anchor, order, bound, out)
+        return x
 
     @staticmethod
     def backward(ctx, grad):
         inshape, factor, shape, ndim, anchor, order, bound = ctx.opt
-        if x.is_cuda:
+        if grad.is_cuda:
             _restrict = cuda_restrict.restrict
         else:
-            _restrict = cpu_retrict.restrict
+            _restrict = cpu_restrict.restrict
         grad = _restrict(grad, factor, inshape[-ndim:], ndim, anchor, order, bound)
-        return (grad,) + (None,) * 7
+        return (grad,) + (None,) * 8
 
 
 def resize(x, factor=None, shape=None, ndim=None,
@@ -95,23 +98,29 @@ def resize(x, factor=None, shape=None, ndim=None,
 class _Restrict(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, x, factor, shape, ndim, anchor, order, bound, out):
+    def forward(ctx, x, factor, shape, ndim, anchor, order, bound, reduce_sum, out):
         if x.is_cuda:
             _restrict = cuda_restrict.restrict
         else:
-            _restrict = cpu_retrict.restrict
-        ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound)
-        return _restrict(x, factor, shape, ndim, anchor, order, bound, out)
+            _restrict = cpu_restrict.restrict
+        x, scale = _restrict(x, factor, shape, ndim, anchor, order, bound, out)
+        scale = prod(scale)
+        ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound, reduce_sum, scale)
+        if not reduce_sum:
+            x /= scale
+        return x
 
     @staticmethod
-    def backward(ctx, grad):
-        inshape, factor, shape, ndim, anchor, order, bound = ctx.opt
-        if x.is_cuda:
+    def backward(ctx, grad, *args):
+        inshape, factor, shape, ndim, anchor, order, bound, reduce_sum, scale = ctx.opt
+        if not reduce_sum:
+            grad = grad / scale
+        if grad.is_cuda:
             _resize = cuda_resize.resize
         else:
             _resize = cpu_resize.resize
         grad = _resize(grad, factor, inshape[-ndim:], ndim, anchor, order, bound)
-        return (grad,) + (None,) * 7
+        return (grad,) + (None,) * 8
 
 
 def restrict(x, factor=None, shape=None, ndim=None,
@@ -168,8 +177,6 @@ def restrict(x, factor=None, shape=None, ndim=None,
         else:
             shape = [pymath.ceil(s/f) for s, f in zip(x.shape[-ndim:], factor)]
 
-    x, scale = _Restrict.apply(x, factor, shape, ndim, anchor, order, bound, out)
-    if not reduce_sum:
-        x /= prod(scale)
+    x = _Restrict.apply(x, factor, shape, ndim, anchor, order, bound, reduce_sum, out)
     return x
 

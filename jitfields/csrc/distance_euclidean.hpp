@@ -2,6 +2,7 @@
 #define JF_DISTANCE_E_LOOP
 #include "cuda_switch.h"
 #include "distance_euclidean.h"
+#include "batch.h"
 
 namespace jf {
 namespace distance_e {
@@ -26,8 +27,7 @@ void loop(scalar_t * f, unsigned char * buf, scalar_t w, int ndim,
     for (offset_t i=0; i < numel; ++i)
     {
         offset_t batch_offset = index2offset(i, ndim-1, size, stride);
-        algo(f + batch_offset, v + index, z + index, d + index, w,
-             n, stride[ndim-1], stride_buf);
+        algo(f + batch_offset, v, z, d, w, n, stride[ndim-1], stride_buf);
     }
 }
 

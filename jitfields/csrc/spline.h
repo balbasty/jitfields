@@ -573,6 +573,16 @@ namespace _spline {
     return x;
   }
 
+  template <typename scalar_t>
+  static inline __device__ scalar_t hess5(scalar_t x) {
+    return hess4(x);
+  }
+
+  template <typename scalar_t>
+  static inline __device__ scalar_t fasthess5(scalar_t x) {
+    return fasthess4(x);
+  }
+
   template <typename scalar_t, typename offset_t>
   static inline __device__ void bounds5(scalar_t x, offset_t & low, offset_t & upp) {
     low = static_cast<offset_t>(floor(x-2.));
@@ -703,6 +713,17 @@ namespace _spline {
     }
     if (neg) x = -x;
     return x;
+  }
+
+
+  template <typename scalar_t>
+  static inline __device__ scalar_t hess6(scalar_t x) {
+    return hess5(x);
+  }
+
+  template <typename scalar_t>
+  static inline __device__ scalar_t fasthess6(scalar_t x) {
+    return fasthess5(x);
   }
 
   template <typename scalar_t, typename offset_t>
@@ -839,6 +860,17 @@ namespace _spline {
     return x;
   }
 
+
+  template <typename scalar_t>
+  static inline __device__ scalar_t hess7(scalar_t x) {
+    return hess6(x);
+  }
+
+  template <typename scalar_t>
+  static inline __device__ scalar_t fasthess7(scalar_t x) {
+    return fasthess6(x);
+  }
+
   template <typename scalar_t, typename offset_t>
   static inline __device__ void bounds7(scalar_t x, offset_t & low, offset_t & upp) {
     low = static_cast<offset_t>(floor(x-3.));
@@ -851,7 +883,7 @@ namespace _spline {
 template <type I> struct utils {};
 
 #define INTERPOL_UTILS(NAME, ORDER) \
-template <> struct utils<type::##NAME> { \
+template <> struct utils<type::NAME> { \
     template <typename scalar_t> \
     static inline __device__ scalar_t \
     weight(scalar_t x) { return _spline::weight##ORDER(x); } \

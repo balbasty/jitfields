@@ -54,7 +54,7 @@ def load_code(filename):
         code = f.read()
     lines = code.split('\n')
 
-    pattern = re.compile(r'\s*#include\s+"(?P<filename>[\"]+)"')
+    pattern = re.compile(r'\s*#include\s+"(?P<filename>[\w\.]+)"')
 
     code = ''
     for line in lines:

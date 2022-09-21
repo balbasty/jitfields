@@ -1,33 +1,9 @@
 #ifndef JF_BATCH
 #define JF_BATCH
 #include "cuda_switch.h"
+#include "utils.h"
 
 namespace jf {
-
-template <typename T>
-inline __device__
-T square(T a) { return a*a; }
-
-template <typename T>
-inline __device__
-T min(T a, T b) { return (a < b ? a : b); }
-
-template <typename T>
-inline __device__
-T remainder(T x, T d)
-{
-    return (x - (x / d) * d);
-}
-
-template <typename T, typename size_t>
-inline __device__
-T prod(const T * x, size_t size)
-{
-    T tmp = x[0];
-    for (size_t d = 1; d < size; ++d)
-        tmp *= x[d];
-    return tmp;
-}
 
 template <typename offset_t>
 __device__

@@ -5,14 +5,10 @@ import os
 import ctypes
 import numpy as np
 
-
-cppyy.set_debug(False)
+# cppyy.set_debug(True)
 this_folder = os.path.abspath(os.path.dirname(__file__))
 cppyy.add_include_path(os.path.join(this_folder, '..', 'csrc'))
-cppyy.include('batch.h')
-cppyy.include('distance_l1.h')
 cppyy.include('distance_l1.hpp')
-cppyy.include('distance_euclidean.h')
 cppyy.include('distance_euclidean.hpp')
 
 

@@ -7,7 +7,7 @@
 #define JF_ATOMIC
 #include "cuda_switch.h"
 
-#ifndef __CUDA__
+#ifndef __CUDACC__
 // TODO: implement atomic on CPU (once thread pool implemented)
 
 namespace jf {

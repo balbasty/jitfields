@@ -3,6 +3,7 @@
  */
 #include "cuda_switch.h"
 #include "distance_euclidean.h"
+#include "batch.h"
 
 using namespace std;
 using namespace jf;
@@ -28,7 +29,7 @@ __global__ void kernel(scalar_t * f, char * buf, scalar_t w, int ndim,
     for (offset_t i=index; index < nthreads; index += stride_buf, i=index)
     {
         offset_t batch_offset = index2offset(i, ndim-1, size, stride);
-        algo(f + batch_offset, v + index, z + index, d + index, w,
+        algo(f + batch_offset, v + i, z + i, d + i, w,
              n, stride[ndim-1], stride_buf);
     }
 }

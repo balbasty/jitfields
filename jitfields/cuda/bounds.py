@@ -1,13 +1,3 @@
-import os
-from .atomic import code as atomic_code
-
-code = ''
-code += atomic_code + '\n'
-
-this_folder = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(this_folder, 'bounds.cuh'), 'rt') as f:
-    code += f.read() + '\n'
-
 convert_bound = {
     'zero': 0, 'zeros': 0,
     'repeat': 1, 'replicate': 1, 'nearest': 1,
@@ -19,5 +9,13 @@ convert_bound = {
     'nocheck': 7,
 }
 
-cnames = ['Zero', 'Replicate', 'DCT1', 'DCT2',
-          'DST1', 'DST2', 'DFT', 'NoCheck']
+cnames = [
+    'Zero',
+    'Replicate',
+    'DCT1',
+    'DCT2',
+    'DST1',
+    'DST2',
+    'DFT',
+    'NoCheck',
+]

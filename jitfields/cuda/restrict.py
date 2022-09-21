@@ -1,30 +1,15 @@
-import os
-from .bounds import code as bounds_code, cnames as bound_names, convert_bound
-from .spline import code as spline_code, cnames as order_names, convert_order
-from .batch import code as batch_code
+from .bounds import cnames as bound_names, convert_bound
+from .spline import cnames as order_names, convert_order
 from ..utils import ensure_list, prod
-from .utils import get_cuda_blocks, get_cuda_num_threads, get_offset_type
-import itertools
-import math as pymath
-from torch.utils.dlpack import to_dlpack
+from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
+                    load_code, to_cupy)
 import cupy as cp
 
-# ===
-# Build CUDA code
-# ===
-
-code = ''
-code += bounds_code + '\n'
-code += spline_code + '\n'
-code += batch_code + '\n'
-
-this_folder = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(this_folder, 'restrict.cu'), 'rt') as f:
-    code += f.read() + '\n'
 
 # ===
 # Load module + dispatch 1D/2D/3D
 # ===
+code = load_code('restrict.cu')
 kernels = {}
 
 
@@ -124,8 +109,8 @@ def restrict(x, factor=None, shape=None, ndim=None,
         out = x.new_empty(fullshape)
     else:
         out = out.view(fullshape)
-    cux = cp.from_dlpack(to_dlpack(x))
-    cuy = cp.from_dlpack(to_dlpack(out))
+    cux = to_cupy(x)
+    cuy = to_cupy(out)
     offset_t = get_offset_type(cux.shape, cuy.shape)
 
     inshape = cp.asarray(cux.shape, dtype=offset_t)

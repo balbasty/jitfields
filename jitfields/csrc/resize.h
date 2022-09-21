@@ -629,6 +629,7 @@ struct Multiscale<three, C, BX, C, BY, C, BZ> {
     void resize(scalar_t * out, scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -651,16 +652,16 @@ struct Multiscale<three, C, BX, C, BY, C, BZ> {
         reduce_t dz3 = spline_utils::fastweight((iz1 + 2) - z);
         signed char  sx0 = bound_utils_x::sign(ix1-1, nw);
         signed char  sy0 = bound_utils_y::sign(iy1-1, nh);
-        signed char  sy0 = bound_utils_z::sign(iy1-1, nd);
+        signed char  sz0 = bound_utils_z::sign(iz1-1, nd);
         signed char  sx2 = bound_utils_x::sign(ix1+1, nw);
         signed char  sy2 = bound_utils_y::sign(iy1+1, nh);
-        signed char  sy2 = bound_utils_z::sign(iy1+1, nd);
+        signed char  sz2 = bound_utils_z::sign(iz1+1, nd);
         signed char  sx3 = bound_utils_x::sign(ix1+2, nw);
         signed char  sy3 = bound_utils_y::sign(iy1+2, nh);
-        signed char  sy3 = bound_utils_z::sign(iy1+2, nd);
+        signed char  sz3 = bound_utils_z::sign(iz1+2, nd);
         signed char  sx1 = bound_utils_x::sign(ix1,   nw);
         signed char  sy1 = bound_utils_y::sign(iy1,   nh);
-        signed char  sy1 = bound_utils_z::sign(iy1,   nd);
+        signed char  sz1 = bound_utils_z::sign(iz1,   nd);
         offset_t ix0, ix2, ix3, iy0, iy2, iy3, iz0, iz2, iz3;
         ix0 = bound_utils_x::index(ix1-1, nw) * sw;
         iy0 = bound_utils_y::index(iy1-1, nh) * sh;
@@ -845,7 +846,7 @@ struct Multiscale<D> {
                 weights[d] = (d > 0 ? weights[d-1] : static_cast<reduce_t>(1))
                            * wd[k];
                 if (d == D-1)
-                    acc += static_cast<reduce_T>(bound::get(inp, offsets[D-1], signs[D-1])) * weights[D-1];
+                    acc += static_cast<reduce_t>(bound::get(inp, offsets[D-1], signs[D-1])) * weights[D-1];
             }
         }
         *out = static_cast<scalar_t>(acc);

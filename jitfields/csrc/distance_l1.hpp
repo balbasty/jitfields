@@ -2,6 +2,7 @@
 #define JF_DISTANCE_L1_LOOP
 #include "cuda_switch.h"
 #include "distance_l1.h"
+#include "batch.h"
 
 namespace jf {
 namespace distance_l1 {

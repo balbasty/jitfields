@@ -1,12 +1,9 @@
-import os
-from .bounds import code as bounds_code, cnames as bound_names, convert_bound
-from .spline import code as spline_code, cnames as order_names, convert_order
-from .batch import code as batch_code
+from .bounds import convert_bound, cnames as bound_names
+from .spline import convert_order
 from ..utils import ensure_list, prod
-from .utils import get_cuda_blocks, get_cuda_num_threads, get_offset_type
-import itertools
+from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
+                    load_code, to_cupy)
 import math as pymath
-from torch.utils.dlpack import to_dlpack
 import cupy as cp
 
 
@@ -38,16 +35,7 @@ def get_poles(order):
 # Build CUDA code
 # ===
 
-code = ''
-code += bounds_code + '\n'
-code += spline_code + '\n'
-code += batch_code + '\n'
-
-this_folder = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(this_folder, 'splinc.cuh'), 'rt') as f:
-    code += f.read() + '\n'
-with open(os.path.join(this_folder, 'splinc.cu'), 'rt') as f:
-    code += f.read() + '\n'
+code = load_code('splinc.cu')
 
 # ===
 # Load module + dispatch
@@ -90,7 +78,7 @@ def spline_coeff_(inp, order, bound, dim=-1):
     if order in (0, 1):
         return inp
 
-    cu = cp.from_dlpack(to_dlpack(inp.movedim(dim, -1)))
+    cu = to_cupy(inp.movedim(dim, -1))
     offset_t = get_offset_type(cu.shape)
     scalar_t = cu.dtype.type
 

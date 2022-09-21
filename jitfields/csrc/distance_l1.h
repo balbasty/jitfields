@@ -1,6 +1,7 @@
 #ifndef JF_DISTANCE_L1
 #define JF_DISTANCE_L1
 #include "cuda_switch.h"
+#include "utils.h"
 
 namespace jf {
 namespace distance_l1 {
