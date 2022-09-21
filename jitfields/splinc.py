@@ -1,11 +1,7 @@
-try:
-    from .cuda import splinc as cuda_splinc
-except ImportError:
-    cuda_splinc = None
-try:
-    from .numba import splinc as cpu_splinc
-except ImportError:
-    cpu_splinc = None
+from .utils import try_import
+cuda_splinc = try_import('jitfields.cuda', 'splinc')
+cpu_splinc = try_import('jitfields.cpp', 'splinc')
+from jitfields.cpp import splinc as cpu_splinc
 
 
 def spline_coeff_(inp, order, bound='dct2', dim=-1):

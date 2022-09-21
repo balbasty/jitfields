@@ -83,7 +83,6 @@ def edt_1d_(f, dim=-1, w=1):
             stride.ctypes.data_as(ctypes.POINTER(coffset_t)))
 
     else:
-
         cppyy.gbl.jf.distance_e.loop(
             npf.ctypes.data_as(ctypes.POINTER(cscalar_t)),
             buf.numpy().ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),

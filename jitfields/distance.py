@@ -1,14 +1,7 @@
-try:
-    from .cuda import distance as cuda_dist
-except ImportError:
-    cuda_dist = None
-try:
-    # from .numba import distance as cpu_dist
-    from .cpp import distance as cpu_dist
-except ImportError:
-    cpu_dist = None
 import torch
-from .utils import make_vector
+from .utils import make_vector, try_import
+cuda_dist = try_import('jitfields.cuda', 'distance')
+cpu_dist = try_import('jitfields.cpp', 'distance')
 
 
 def euclidean_distance_transform(x, dim=None, vx=1, dtype=None):

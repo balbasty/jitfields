@@ -24,10 +24,6 @@
 //        "Splines: A Perfect Fit for Signal and Image Processing,"
 //        IEEE Signal Processing Magazine 16(6):22-38 (1999).
 
-/* DEPENDENCIES:
- * #include "spline.cuh"
- * #include "bounds.cuh"
- */
 #ifndef JF_SPLINC
 #define JF_SPLINC
 #include "cuda_switch.h"

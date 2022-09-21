@@ -12,6 +12,10 @@ def try_import(module, key=None):
             return importlib.import_module(path)
         except (ImportError, ModuleNotFoundError):
             return None
+    if key:
+        fullmodule = try_import_module(module + '.' + key)
+        if fullmodule:
+            return fullmodule
     module = try_import_module(module)
     if not module:
         return None

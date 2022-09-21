@@ -1,16 +1,8 @@
-/* DEPENDENCIES:
- * #include "spline.h"
- * #include "bounds.h"
- * #include "batch.h"
- * #include "restrict.h"
- */
-
 /* TODO
  * - implement special case (order=1 + scale=2) for dim 2 and 3
  * - check if using an inner loop across batch elements is more efficient
  *   (we currently use an outer loop, so we recompute indices many times)
  */
-
 
 #include "cuda_switch.h"
 #include "spline.h"

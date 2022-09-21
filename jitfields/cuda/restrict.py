@@ -1,5 +1,5 @@
-from .bounds import cnames as bound_names, convert_bound
-from .spline import cnames as order_names, convert_order
+from jitfields.common.bounds import cnames as bound_names, convert_bound
+from jitfields.common.spline import cnames as order_names, convert_order
 from ..utils import ensure_list, prod
 from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
                     load_code, to_cupy)

@@ -6,7 +6,8 @@ cuda_resize = try_import('jitfields.cuda', 'resize')
 cpu_resize = try_import('jitfields.cpp', 'resize')
 cuda_restrict = try_import('jitfields.cuda', 'restrict')
 cpu_restrict = try_import('jitfields.cpp', 'restrict')
-from .cpp import resize as cpu_resize
+# from .cpp import restrict as cpu_restrict
+# from .cpp import resize as cpu_resize
 
 
 class _Resize(torch.autograd.Function):
@@ -75,7 +76,7 @@ def resize(x, factor=None, shape=None, ndim=None,
         if shape and hasattr(shape, '__len__'):
             ndim = len(shape)
         elif factor and hasattr(factor, '__len__'):
-            ndim = len(shape)
+            ndim = len(factor)
         else:
             ndim = x.dim()
     if shape:

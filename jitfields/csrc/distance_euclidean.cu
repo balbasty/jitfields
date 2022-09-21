@@ -1,6 +1,3 @@
-/*
- * #include "distance_e.h"
- */
 #include "cuda_switch.h"
 #include "distance_euclidean.h"
 #include "batch.h"

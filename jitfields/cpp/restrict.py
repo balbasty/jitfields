@@ -8,11 +8,11 @@ import os
 
 this_folder = os.path.abspath(os.path.dirname(__file__))
 cppyy.add_include_path(os.path.join(this_folder, '..', 'csrc'))
-cppyy.include('resize.hpp')
+cppyy.include('restrict.hpp')
 
 
-def resize(x, factor=None, shape=None, ndim=None,
-           anchor='e', order=2, bound='dct2', out=None):
+def restrict(x, factor=None, shape=None, ndim=None,
+             anchor='e', order=2, bound='dct2', out=None):
     order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
     bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
 
@@ -46,7 +46,7 @@ def resize(x, factor=None, shape=None, ndim=None,
 
     scalar_t = npx.dtype.type
     shift = scalar_t(shift)
-    scale = np.asarray(scale, dtype=scalar_t)
+    npscale = np.asarray(scale, dtype=scalar_t)
 
     cscalar_t = ctypes.c_float if scalar_t == np.float32 else ctypes.c_double
     coffset_t = ctypes.c_int32 if offset_t == np.int32 else ctypes.c_int64
@@ -55,33 +55,38 @@ def resize(x, factor=None, shape=None, ndim=None,
 
     # dispatch
     if ndim <= 3:
+        scale2 = all(1 < s <= 2 for s in scale)
         order = ['jf::spline::type::' + cnames_spline[o] for o in order]
         bound = ['jf::bound::type::' + cnames_bound[b] for b in bound]
-        if ndim <= 1:
-            func = cppyy.gbl.jf.resize.loop1d[f'{order[0]}, {bound[0]}']
-        elif ndim <= 2:
-            func = cppyy.gbl.jf.resize.loop2d[f'{order[0]}, {bound[0]}, '
-                                              f'{order[1]}, {bound[1]}']
+        if scale2:
+            func = getattr(cppyy.gbl.jf.restrict, f'loop2{ndim}d')
         else:
-            func = cppyy.gbl.jf.resize.loop3d[f'{order[0]}, {bound[0]}, '
-                                              f'{order[1]}, {bound[1]}, '
-                                              f'{order[2]}, {bound[2]}']
+            func = getattr(cppyy.gbl.jf.restrict, f'loop{ndim}d')
+        if ndim <= 1:
+            func = func[f'{order[0]}, {bound[0]}']
+        elif ndim <= 2:
+            func = func[f'{order[0]}, {bound[0]}, '
+                        f'{order[1]}, {bound[1]}']
+        else:
+            func = func[f'{order[0]}, {bound[0]}, '
+                        f'{order[1]}, {bound[1]}, '
+                        f'{order[2]}, {bound[2]}']
         func(npy.ctypes.data_as(ctypes.POINTER(cscalar_t)),
              npx.ctypes.data_as(ctypes.POINTER(cscalar_t)),
              int(nalldim), cscalar_t(shift),
-             scale.ctypes.data_as(ctypes.POINTER(cscalar_t)),
+             npscale.ctypes.data_as(ctypes.POINTER(cscalar_t)),
              outshape.ctypes.data_as(ctypes.POINTER(coffset_t)),
              inshape.ctypes.data_as(ctypes.POINTER(coffset_t)),
              outstride.ctypes.data_as(ctypes.POINTER(coffset_t)),
              instride.ctypes.data_as(ctypes.POINTER(coffset_t)))
     else:
-        func = cppyy.gbl.jf.resize.loopnd[f'{int(ndim)}']
+        func = cppyy.gbl.jf.restrict.loopnd[f'{int(ndim)}']
         order = np.asarray(order, dtype='uint8')
         bound = np.asarray(bound, dtype='uint8')
         func(npy.ctypes.data_as(ctypes.POINTER(cscalar_t)),
              npx.ctypes.data_as(ctypes.POINTER(cscalar_t)),
              int(nalldim), cscalar_t(shift),
-             scale.ctypes.data_as(ctypes.POINTER(cscalar_t)),
+             npscale.ctypes.data_as(ctypes.POINTER(cscalar_t)),
              order.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
              bound.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
              outshape.ctypes.data_as(ctypes.POINTER(coffset_t)),
@@ -89,4 +94,4 @@ def resize(x, factor=None, shape=None, ndim=None,
              outstride.ctypes.data_as(ctypes.POINTER(coffset_t)),
              instride.ctypes.data_as(ctypes.POINTER(coffset_t)))
 
-    return out
+    return out, scale

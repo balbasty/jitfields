@@ -1,10 +1,3 @@
-/* DEPENDENCIES:
- * #include "spline.h"
- * #include "bounds.h"
- * #include "batch.h"
- * #include "resize.h"
- */
-
 /* TODO
  * - check if using an inner loop across batch elements is more efficient
  *   (we currently use an outer loop, so we recompute indices many times)

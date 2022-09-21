@@ -1,6 +1,3 @@
-#ifndef JF_SPLINE
-#define JF_SPLINE
-
 // This file contains static functions for handling (0-7 order)
 // spline weights.
 // It also defines an enumerated types that encodes each boundary type.
@@ -28,6 +25,8 @@
 // . second order derivatives [5/6/7]
 // ? other types of basis functions (gauss, sinc)
 
+#ifndef JF_SPLINE
+#define JF_SPLINE
 #include "cuda_switch.h"
 
 namespace jf {

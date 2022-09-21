@@ -1,8 +1,3 @@
-/* DEPENDENCIES:
- * #include "splinc.h"
- * #include "batch.h"
- */
-
 #include "cuda_switch.h"
 #include "splinc.h"
 #include "batch.h"

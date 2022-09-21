@@ -1,7 +1,3 @@
-/* DEPENDENCIES:
- * #include "atomic.h"
- */
-
 #ifndef JF_BOUNDS
 #define JF_BOUNDS
 #include "cuda_switch.h"

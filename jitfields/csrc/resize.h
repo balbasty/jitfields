@@ -1,8 +1,3 @@
-/* DEPENDENCIES:
- * #include "spline.h"
- * #include "bounds.h"
- */
-
 #ifndef JF_RESIZE
 #define JF_RESIZE
 #include "cuda_switch.h"

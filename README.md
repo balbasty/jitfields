@@ -4,13 +4,19 @@ Fast functions for dense scalar and vector fields, implemented using just-in-tim
 **/!\ This is very experimental**
 
 - I am implementing the GPU version of the algorithms in pure CUDA, which is compiled just-in-time by `cupy`.
-- I am implementing the CPU version with `numba`, which also gets just-in-time compiled. 
+- I am implementing the CPU version of the algorithms in pure C++, which gets just-in-time compiled by `cppyy`. 
 
-I am not yet very happy with the performance of the numba code. `cython` with (simple) pre-compilation may be more efficient.
+Note that currently, the CPU implementation is single-threaded. 
+I do plan to implement a multi-threaded parallel loop in the near future.
 
-Here's what's implemented so far:
+## Implemented so far
 
-## CPU and GPU
+### Known bugs
+
+- `spline_coeff` segfaults when the input shape is too small compared 
+  to the spline order
+
+### CPU and GPU
 
 ```python
 euclidean_distance_transform(x, dim=None, vx=1, dtype=None)
@@ -69,8 +75,6 @@ References
       https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
     """
 ```
-
-## GPU only
 
 ```python
 resize(x, factor=None, shape=None, ndim=None,

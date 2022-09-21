@@ -1,8 +1,3 @@
-/* DEPENDENCIES:
- * #include "spline.h"
- * #include "bounds.h"
- */
-
 #ifndef JF_RESTRICT
 #define JF_RESTRICT
 #include "cuda_switch.h"
@@ -121,14 +116,14 @@ struct Multiscale<two, U, IX, BX, IY, BY> {
     {
         reduce_t x = (w + shift) * wscl - shift;
         offset_t ixlow = static_cast<offset_t>(ceil(x - 0.5 * (spline_order_x + 1 ) * wscl));
-        offset_t ixupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1 ) * wscl)));
+        offset_t ixupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1 ) * wscl));
         reduce_t y = (h + shift) * hscl - shift;
         offset_t iylow = static_cast<offset_t>(ceil(y - 0.5 * (spline_order_y + 1 ) * hscl));
-        offset_t iyupp = static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1 ) * hscl)));
+        offset_t iyupp = static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1 ) * hscl));
 
         reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t iy = iylow; iy <= iyupp; ++iy) {
-            reduce_t    dy = spline_utils_y::weight((y - ih) / hscl);
+            reduce_t    dy = spline_utils_y::weight((y - iy) / hscl);
             signed char sy = bound_utils_y::sign(iy, nh);
             offset_t    oy = bound_utils_y::index(iy, nh) * sh;
             for (offset_t ix = ixlow; ix <= ixupp; ++ix) {
@@ -155,9 +150,9 @@ template <int U,
           spline::type IZ, bound::type BZ>
 struct Multiscale<three, U, IX, BX, IY, BY, IZ, BZ> {
     using bound_utils_x = bound::utils<BX>;
-    using spline_utils_x = spline::utils<IX>;
-    using spline_utils_z = spline::utils<IZ>;
     using bound_utils_y = bound::utils<BY>;
+    using bound_utils_z = bound::utils<BZ>;
+    using spline_utils_x = spline::utils<IX>;
     using spline_utils_y = spline::utils<IY>;
     using spline_utils_z = spline::utils<IZ>;
     static const int spline_order_x = static_cast<int>(IX);
@@ -174,21 +169,21 @@ struct Multiscale<three, U, IX, BX, IY, BY, IZ, BZ> {
     {
         reduce_t x = (w + shift) * wscl - shift;
         offset_t ixlow = static_cast<offset_t>(ceil(x - 0.5 * (spline_order_x + 1 ) * wscl));
-        offset_t ixupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1 ) * wscl)));
+        offset_t ixupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1 ) * wscl));
         reduce_t y = (h + shift) * hscl - shift;
         offset_t iylow = static_cast<offset_t>(ceil(y - 0.5 * (spline_order_y + 1 ) * hscl));
-        offset_t iyupp = static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1 ) * hscl)));
+        offset_t iyupp = static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1 ) * hscl));
         reduce_t z = (d + shift) * dscl - shift;
         offset_t izlow = static_cast<offset_t>(ceil(z - 0.5 * (spline_order_z + 1 ) * dscl));
-        offset_t izupp = static_cast<offset_t>(floor(z + 0.5 * (spline_order_z + 1 ) * dscl)));
+        offset_t izupp = static_cast<offset_t>(floor(z + 0.5 * (spline_order_z + 1 ) * dscl));
 
         reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t iz = izlow; iz <= izupp; ++iz) {
-            reduce_t    dz = spline_utils_z::weight((z - id) / dscl);
+            reduce_t    dz = spline_utils_z::weight((z - iz) / dscl);
             signed char sz = bound_utils_z::sign(iz, nd);
             offset_t    oz = bound_utils_z::index(iz, nd) * sd;
             for (offset_t iy = iylow; iy <= iyupp; ++iy) {
-                reduce_t    dy = dz * spline_utils_y::weight((y - ih) / hscl);
+                reduce_t    dy = dz * spline_utils_y::weight((y - iy) / hscl);
                 signed char sy = sz * bound_utils_y::sign(iy, nh);
                 offset_t    oy = oz + bound_utils_y::index(iy, nh) * sh;
                 for (offset_t ix = ixlow; ix <= ixupp; ++ix) {
@@ -227,7 +222,7 @@ template <int D, int U> struct Multiscale<D, U> {
             reduce_t x = (coord[d] + shift) * scl[d] - shift;
             int spline_order = static_cast<int>(inter[d]);
             offset_t ilow = static_cast<offset_t>(ceil(x - 0.5 * (spline_order + 1 ) * scl[d]));
-            offset_t iupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order + 1 ) * scl[d])));
+            offset_t iupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order + 1 ) * scl[d]));
 
             for (offset_t i = ilow; i <= iupp; ++i) {
                 signs[d]   = (d > 0 ? signs[d-1]   : static_cast<signed char>(1))

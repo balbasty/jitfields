@@ -1,6 +1,3 @@
-/*
- * #include "distance_l1.h"
- */
 #include "cuda_switch.h"
 #include "distance_l1.h"
 #include "batch.h"
