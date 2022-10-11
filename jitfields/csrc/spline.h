@@ -21,9 +21,7 @@
 // I now use a slighlty less compact implementation that gets rid of
 // recursive calls.
 
-// TODO:
-// . second order derivatives [5/6/7]
-// ? other types of basis functions (gauss, sinc)
+// TODO? other types of basis functions (gauss, sinc)
 
 #ifndef JF_SPLINE
 #define JF_SPLINE
@@ -95,7 +93,7 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastweight1(scalar_t x) {
-    return static_cast<scalar_t>(1) - fabs(x);
+    return static_cast<scalar_t>(1) - x;
   }
 
   template <typename scalar_t>
@@ -106,8 +104,7 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastgrad1(scalar_t x) {
-    return x < static_cast<scalar_t>(0) ? static_cast<scalar_t>(1)
-                                        : static_cast<scalar_t>(-1);
+    return static_cast<scalar_t>(-1);
   }
 
   template <typename scalar_t>
@@ -148,7 +145,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastweight2(scalar_t x) {
-    x = fabs(x);
     if ( x < 0.5 )
     {
       return 0.75 - x * x;
@@ -163,6 +159,7 @@ namespace _spline {
   template <typename scalar_t>
   static inline __device__ scalar_t grad2(scalar_t x) {
     bool neg = x < 0;
+    if (neg) x = -x;
     if ( x < 0.5 )
     {
       x = -2. * x;
@@ -181,8 +178,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastgrad2(scalar_t x) {
-    bool neg = x < 0;
-    if (neg) x = -x;
     if ( x < 0.5 )
     {
       x = -2. * x;
@@ -191,7 +186,6 @@ namespace _spline {
     {
       x = x - 1.5;
     }
-    if (neg) x = -x;
     return x;
   }
 
@@ -214,7 +208,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fasthess2(scalar_t x) {
-    x = fabs(x);
     if ( x < 0.5 )
     {
       return static_cast<scalar_t>(-2.);
@@ -253,7 +246,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastweight3(scalar_t x) {
-    x = fabs(x);
     if ( x < 1. )
     {
       return ( x * x * (x - 2.) * 3. + 4. ) / 6.;
@@ -288,8 +280,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastgrad3(scalar_t x) {
-    bool neg = x < 0;
-    if (neg) x = -x;
     if ( x < 1. )
     {
       x = x * ( x * 1.5 - 2. );
@@ -299,7 +289,6 @@ namespace _spline {
       x = 2. - x;
       x = - ( x * x ) * 0.5;
     }
-    if (neg) x = -x;
     return x;
   }
 
@@ -322,7 +311,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fasthess3(scalar_t x) {
-    x = fabs(x);
     if ( x < 1. )
     {
       return x * 3. - 2.;
@@ -368,7 +356,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastweight4(scalar_t x) {
-    x = fabs(x);
     if ( x < 0.5 )
     {
       x *= x;
@@ -413,8 +400,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastgrad4(scalar_t x) {
-    bool neg = x < 0;
-    if (neg) x = -x;
     if ( x < 0.5 )
     {
       x = x * ( x * x - 1.25 );
@@ -428,7 +413,6 @@ namespace _spline {
       x = x * 2. - 5.;
       x = ( x * x * x ) / 48.;
     }
-    if (neg) x = -x;
     return x;
   }
 
@@ -456,7 +440,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fasthess4(scalar_t x) {
-    x = fabs(x);
     if ( x < 0.5 )
     {
       return ( x * x ) * 3. - 1.25;
@@ -505,7 +488,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastweight5(scalar_t x) {
-    x = fabs(x);
     if ( x < 1. )
     {
       scalar_t f = x * x;
@@ -552,8 +534,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastgrad5(scalar_t x) {
-    bool neg = x < 0;
-    if (neg) x = -x;
     if ( x < 1. )
     {
       x = x * ( x * ( x * ( x * ( -5. / 12. ) + 1. ) ) - 1. );
@@ -568,18 +548,26 @@ namespace _spline {
       x *= x;
       x = - ( x * x ) / 24.;
     }
-    if (neg) x = -x;
     return x;
   }
 
   template <typename scalar_t>
   static inline __device__ scalar_t hess5(scalar_t x) {
-    return hess4(x);
+    x = fabs(x);
+    if ( x >= 3. )
+        return static_cast<scalar_t>(0);
+    else
+        return fasthess5(x);
   }
 
   template <typename scalar_t>
   static inline __device__ scalar_t fasthess5(scalar_t x) {
-    return fasthess4(x);
+    if ( x < 1. )
+        return - (x * x) * (x * (5./3.) - 3.) - 1.;
+    else if ( x < 2. )
+        return x * (x * (x * (5./6.) - 9./2.) + 15./2.) - 7./2.;
+    else
+        return 9./2. - x * (x * (x/6. - 3./2.) + 9./2.);
   }
 
   template <typename scalar_t, typename offset_t>
@@ -623,7 +611,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastweight6(scalar_t x) {
-    x = fabs(x);
     if ( x < 0.5 )
     {
       x *= x;
@@ -686,8 +673,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastgrad6(scalar_t x) {
-    bool neg = x < 0;
-    if (neg) x = -x;
     if ( x < .5 )
     {
       scalar_t x2 = x * x;
@@ -710,19 +695,31 @@ namespace _spline {
       scalar_t x2 = x*x;
       x = (x2 * x2 * x ) / 3840.;
     }
-    if (neg) x = -x;
     return x;
   }
 
 
   template <typename scalar_t>
   static inline __device__ scalar_t hess6(scalar_t x) {
-    return hess5(x);
+    x = fabs(x);
+    if ( x >= 3.5 )
+        return static_cast<scalar_t>(0);
+    else
+        return fasthess6(x);
   }
 
   template <typename scalar_t>
   static inline __device__ scalar_t fasthess6(scalar_t x) {
-    return fasthess5(x);
+    if ( x < 0.5 ) {
+        x *= x;
+        return - x * (x * (5./6) - 7./4.) - 77./96.;
+    } else if ( x < 1.5 )
+        return (x * (x * (x * (x * (5./8.) - 35./12.) + 63./16.) - 35./48.) - 91./128.);
+    else if ( x < 2.5 )
+        return -(x * (x * (x * (x/4. - 7./3.) + 63./8.) - 133./12.) + 329./64.);
+    else
+        return (x * (x * (x * (x/24. - 7./12.) + 49./16.) - 343./48.) + 2401./384.);
+
   }
 
   template <typename scalar_t, typename offset_t>
@@ -766,7 +763,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastweight7(scalar_t x) {
-    x = fabs(x);
     if ( x < 1. )
     {
       scalar_t f = x * x;
@@ -830,8 +826,6 @@ namespace _spline {
 
   template <typename scalar_t>
   static inline __device__ scalar_t fastgrad7(scalar_t x) {
-    bool neg = x < 0;
-    if (neg) x = -x;
     if ( x < 1. )
     {
       scalar_t x2 = x * x;
@@ -855,19 +849,29 @@ namespace _spline {
       x *= x;
       x = - x / 720.;
     }
-    if (neg) x = -x;
     return x;
   }
 
-
   template <typename scalar_t>
   static inline __device__ scalar_t hess7(scalar_t x) {
-    return hess6(x);
+    x = fabs(x);
+    if ( x >= 4. )
+        return static_cast<scalar_t>(0);
+    else
+        return fasthess7(x);
   }
 
   template <typename scalar_t>
   static inline __device__ scalar_t fasthess7(scalar_t x) {
-    return fasthess6(x);
+    if ( x < 1. ) {
+        scalar_t x2 = x * x;
+        return x2 * (x2 * (x * (7./24.) - 5./6.) + 4./3.) - 2./3.;
+    } else if ( x < 2. )
+        return - (x * (x * (x * (x * (x * (7./40.) - 3./2.) + 14./3.) - 6.) + 7./3.) + 1./5.);
+    else if ( x < 3. )
+        return (x * (x * (x * (x * (x * (7./120.) - 5./6.) + 14./3.) - 38./3.) + 49./3.) - 23./3.);
+    else
+        return - (x * (x * (x * (x * (x/120. - 1./6.) + 4./3.) - 16./3.) + 32./3.) - 128./15.);
   }
 
   template <typename scalar_t, typename offset_t>

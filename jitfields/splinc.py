@@ -115,7 +115,8 @@ class SplineCoeff_(torch.autograd.Function):
             spline_coeff_ = cuda_splinc.spline_coeff_
         else:
             spline_coeff_ = cpu_splinc.spline_coeff_
-        return spline_coeff_(grad.clone(), *ctx.opt)
+        grad = spline_coeff_(grad.clone(), *ctx.opt)
+        return (grad,) + (None,) * 3
 
 
 class SplineCoeffND_(torch.autograd.Function):
@@ -135,4 +136,5 @@ class SplineCoeffND_(torch.autograd.Function):
             spline_coeff_nd_ = cuda_splinc.spline_coeff_nd_
         else:
             spline_coeff_nd_ = cpu_splinc.spline_coeff_nd_
-        return spline_coeff_nd_(grad.clone(), *ctx.opt)
+        grad = spline_coeff_nd_(grad.clone(), *ctx.opt)
+        return (grad,) + (None,) * 3

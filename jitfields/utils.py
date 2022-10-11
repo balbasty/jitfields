@@ -3,6 +3,7 @@ from types import GeneratorType as generator
 import math as pymath
 import torch
 import importlib
+import inspect
 T = TypeVar('T')
 
 
@@ -227,3 +228,155 @@ def make_vector(input, n=None, crop=True, *args,
         default = input[-1]
     default = input.new_full([n-len(input)], default)
     return torch.cat([input, default])
+
+
+if 'indexing' in inspect.signature(torch.meshgrid).parameters:
+    @torch.jit.script
+    def meshgrid_script_ij(x: List[torch.Tensor]) -> List[torch.Tensor]:
+        return torch.meshgrid(x, indexing='ij')
+    @torch.jit.script
+    def meshgrid_script_xy(x: List[torch.Tensor]) -> List[torch.Tensor]:
+        return torch.meshgrid(x, indexing='xy')
+    def meshgrid_ij(*x):
+        return torch.meshgrid(*x, indexing='ij')
+    def meshgrid_xy(*x):
+        return torch.meshgrid(*x, indexing='xy')
+else:
+    @torch.jit.script
+    def meshgrid_script_ij(x: List[torch.Tensor]) -> List[torch.Tensor]:
+        return torch.meshgrid(x)
+    @torch.jit.script
+    def meshgrid_script_xy(x: List[torch.Tensor]) -> List[torch.Tensor]:
+        grid = torch.meshgrid(x)
+        if len(grid) > 1:
+            grid[0] = grid[0].transpose(0, 1)
+            grid[1] = grid[1].transpose(0, 1)
+        return grid
+    def meshgrid_ij(*x):
+        return torch.meshgrid(*x)
+    def meshgrid_xy(*x):
+        grid = list(torch.meshgrid(*x))
+        if len(grid) > 1:
+            grid[0] = grid[0].transpose(0, 1)
+            grid[1] = grid[1].transpose(0, 1)
+        return grid
+
+
+def identity_grid(shape, dtype=None, device=None):
+    """Returns an identity deformation field.
+
+    Parameters
+    ----------
+    shape : (dim,) sequence of int
+        Spatial dimension of the field.
+    dtype : torch.dtype, default=`get_default_dtype()`
+        Data type.
+    device torch.device, optional
+        Device.
+
+    Returns
+    -------
+    grid : (*shape, dim) tensor
+        Transformation field
+
+    """
+    mesh1d = [torch.arange(float(s), dtype=dtype, device=device)
+              for s in shape]
+    grid = meshgrid_ij(*mesh1d)
+    grid = torch.stack(grid, dim=-1)
+    return grid
+
+
+@torch.jit.script
+def _movedim1(x, source: int, destination: int):
+    dim = x.dim()
+    source = dim + source if source < 0 else source
+    destination = dim + destination if destination < 0 else destination
+    permutation = [d for d in range(dim)]
+    permutation = permutation[:source] + permutation[source+1:]
+    permutation = permutation[:destination] + [source] + permutation[destination:]
+    return x.permute(permutation)
+
+
+@torch.jit.script
+def add_identity_grid_(disp):
+    """Adds the identity grid to a displacement field, inplace.
+
+    Parameters
+    ----------
+    disp : (..., *spatial, dim) tensor
+        Displacement field
+
+    Returns
+    -------
+    grid : (..., *spatial, dim) tensor
+        Transformation field
+
+    """
+    dim = disp.shape[-1]
+    spatial = disp.shape[-dim-1:-1]
+    mesh1d = [torch.arange(s, dtype=disp.dtype, device=disp.device)
+              for s in spatial]
+    grid = meshgrid_script_ij(mesh1d)
+    disp = _movedim1(disp, -1, 0)
+    for i, grid1 in enumerate(grid):
+        disp[i].add_(grid1)
+    disp = _movedim1(disp, 0, -1)
+    return disp
+
+
+@torch.jit.script
+def add_identity_grid(disp):
+    """Adds the identity grid to a displacement field.
+
+    Parameters
+    ----------
+    disp : (..., *spatial, dim) tensor
+        Displacement field
+
+    Returns
+    -------
+    grid : (..., *spatial, dim) tensor
+        Transformation field
+
+    """
+    return add_identity_grid_(disp.clone())
+
+
+def affine_grid(mat, shape):
+    """Create a dense transformation grid from an affine matrix.
+
+    Parameters
+    ----------
+    mat : (..., D[+1], D[+1]) tensor
+        Affine matrix (or matrices).
+    shape : (D,) sequence[int]
+        Shape of the grid, with length D.
+
+    Returns
+    -------
+    grid : (..., *shape, D) tensor
+        Dense transformation grid
+
+    """
+    mat = torch.as_tensor(mat)
+    shape = list(shape)
+    nb_dim = mat.shape[-1] - 1
+    if nb_dim != len(shape):
+        raise ValueError('Dimension of the affine matrix ({}) and shape ({}) '
+                         'are not the same.'.format(nb_dim, len(shape)))
+    if mat.shape[-2] not in (nb_dim, nb_dim+1):
+        raise ValueError('First argument should be matrces of shape '
+                         '(..., {0}, {1}) or (..., {1], {1}) but got {2}.'
+                         .format(nb_dim, nb_dim+1, mat.shape))
+    batch_shape = mat.shape[:-2]
+    grid = identity_grid(shape, mat.dtype, mat.device)
+    if batch_shape:
+        for _ in range(len(batch_shape)):
+            grid = grid[None]
+        for _ in range(nb_dim):
+            mat = mat[..., None, :, :]
+    lin = mat[..., :nb_dim, :nb_dim]
+    off = mat[..., :nb_dim, -1]
+    grid = lin.matmul(grid.unsqueeze(-1)).squeeze(-1) + off
+    return grid

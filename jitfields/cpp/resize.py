@@ -39,7 +39,7 @@ def resize(x, factor=None, shape=None, ndim=None,
     scalar_t = npx.dtype.type
     shift = scalar_t(shift)
     scale = np.asarray(scale, dtype=scalar_t)
-    nalldim = np.int32(npy.ndim)
+    nalldim = int(npy.ndim)
 
     # dispatch
     if ndim <= 3:

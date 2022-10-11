@@ -172,7 +172,7 @@ class Pull(torch.autograd.Function):
         _bwd = (cuda_pushpull.pull_backward if grad.is_cuda else
                 cpu_pushpull.pull_backward)
         inp, grid = ctx.saved_tensors
-        outgrad_inp = torch.empty_like(inp)
+        outgrad_inp = torch.zeros_like(inp)
         outgrad_grid = torch.empty_like(grid)
         _bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
         return (outgrad_inp, outgrad_grid) + (None,) * 4
@@ -242,7 +242,7 @@ class Grad(torch.autograd.Function):
         _bwd = (cuda_pushpull.grad_backward if grad.is_cuda else
                 cpu_pushpull.grad_backward)
         inp, grid = ctx.saved_tensors
-        outgrad_inp = torch.empty_like(inp)
+        outgrad_inp = torch.zeros_like(inp)
         outgrad_grid = torch.empty_like(grid)
         _bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
         return (outgrad_inp, outgrad_grid) + (None,) * 4

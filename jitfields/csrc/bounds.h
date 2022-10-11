@@ -161,12 +161,20 @@ get(const scalar_t * ptr, offset_t offset,
   else             return  static_cast<scalar_t>(0);
 }
 
-template <typename scalar_t, typename offset_t>
-static inline __device__ void
-add(scalar_t *ptr, offset_t offset, scalar_t val,
+template <typename val_t, typename scalar_t, typename offset_t>
+static inline __device__ scalar_t
+cget(const scalar_t * ptr, offset_t offset,
     signed char sign = static_cast<signed char>(1)) {
-  if (sign == -1)  anyAtomicAdd(ptr + offset, -val);
-  else if (sign)   anyAtomicAdd(ptr + offset,  val);
+  return static_cast<val_t>(get(ptr, offset, sign));
+}
+
+template <typename scalar_t, typename offset_t, typename val_t>
+static inline __device__ void
+add(scalar_t *ptr, offset_t offset, val_t val,
+    signed char sign = static_cast<signed char>(1)) {
+  scalar_t cval = static_cast<scalar_t>(val);
+  if (sign == -1)  anyAtomicAdd(ptr + offset, -cval);
+  else if (sign)   anyAtomicAdd(ptr + offset,  cval);
 }
 
 template <type B> struct utils {

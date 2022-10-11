@@ -20,7 +20,7 @@ def spline_coeff_(inp, order, bound, dim=-1):
     poles = np.asarray(get_poles(order), dtype='double')
 
     func = cwrap(cppyy.gbl.jf.splinc.loop[bound])
-    func(np_inp, np.int32(np_inp.ndim), shape, stride, poles, np.int32(len(poles)))
+    func(np_inp, int(np_inp.ndim), shape, stride, poles, int(len(poles)))
     return inp
 
 

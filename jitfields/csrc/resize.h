@@ -163,7 +163,7 @@ struct Multiscale<one, IX, BX> {
             offset_t    *oix = ix;
             signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
-                reduce_t dx = x - bx;
+                reduce_t dx = fabs(x - bx);
                 *(owx++)  = spline_utils_x::fastweight(dx);
                 *(osx++)  = bound_utils_x::sign(bx, nw);
                 *(oix++)  = bound_utils_x::index(bx, nw);
@@ -401,7 +401,7 @@ struct Multiscale<two, IX, BX, IY, BY> {
             offset_t    *oiy = iy;
             signed char *osy = sy;
             for (offset_t by = by0; by <= by1; ++by) {
-                scalar_t dy = y - by;
+                scalar_t dy = fabs(y - by);
                 *(owy++)  = spline_utils_y::fastweight(dy);
                 *(osy++)  = bound_utils_y::sign(by, nh);
                 *(oiy++)  = bound_utils_y::index(by, nh);
@@ -412,7 +412,7 @@ struct Multiscale<two, IX, BX, IY, BY> {
             offset_t    *oix = ix;
             signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
-                scalar_t dx = x - bx;
+                scalar_t dx = fabs(x - bx);
                 *(owx++)  = spline_utils_x::fastweight(dx);
                 *(osx++)  = bound_utils_x::sign(bx, nw);
                 *(oix++)  = bound_utils_x::index(bx, nw);
@@ -737,7 +737,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             offset_t    *oiz = iz;
             signed char *osz = sz;
             for (offset_t bz = bz0; bz <= bz1; ++bz) {
-                scalar_t dz = z - bz;
+                scalar_t dz = fabs(z - bz);
                 *(owz++)  = spline_utils_z::fastweight(dz);
                 *(osz++)  = bound_utils_z::sign(bz, nd);
                 *(oiz++)  = bound_utils_z::index(bz, nd);
@@ -748,7 +748,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             offset_t    *oiy = iy;
             signed char *osy = sy;
             for (offset_t by = by0; by <= by1; ++by) {
-                scalar_t dy = y - by;
+                scalar_t dy = fabs(y - by);
                 *(owy++)  = spline_utils_y::fastweight(dy);
                 *(osy++)  = bound_utils_y::sign(by, nh);
                 *(oiy++)  = bound_utils_y::index(by, nh);
@@ -759,7 +759,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
             offset_t    *oix = ix;
             signed char *osx = sx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
-                scalar_t dx = x - bx;
+                scalar_t dx = fabs(x - bx);
                 *(owx++)  = spline_utils_x::fastweight(dx);
                 *(osx++)  = bound_utils_x::sign(bx, nw);
                 *(oix++)  = bound_utils_x::index(bx, nw);
@@ -818,7 +818,7 @@ struct Multiscale<D> {
             spline::bounds(inter[d], x, b0, b1);
             db[d] = b1-b0;
             for (offset_t b = b0; b <= b1; ++b) {
-                *(wd++) = spline::fastweight(inter[d], x - b);
+                *(wd++) = spline::fastweight(inter[d], fabs(x - b));
                 *(sd++) = bound::sign(bnd[d], b, size[d]);
                 *(id++) = bound::index(bnd[d], b, size[d]);
             }

@@ -34,7 +34,7 @@ def pull(out, inp, grid, order, bound, extrapolate):
     splinc_shape, instride = cinfo(np_inp, dtype=offset_t)
     grid_shape, gridstride = cinfo(np_grid, dtype=offset_t)
     _, outstride = cinfo(np_out, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -81,7 +81,7 @@ def push(out, inp, grid, order, bound, extrapolate):
     splinc_shape, outstride = cinfo(np_out, dtype=offset_t)
     _, instride = cinfo(np_inp, dtype=offset_t)
     grid_shape, gridstride = cinfo(np_grid, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -125,7 +125,7 @@ def count(out, grid, order, bound, extrapolate):
     offset_t = np.int64
     splinc_shape, outstride = cinfo(np_out, dtype=offset_t)
     grid_shape, gridstride = cinfo(np_grid, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -172,7 +172,7 @@ def grad(out, inp, grid, order, bound, extrapolate):
     splinc_shape, instride = cinfo(np_inp, dtype=offset_t)
     grid_shape, gridstride = cinfo(np_grid, dtype=offset_t)
     _, outstride = cinfo(np_out, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -227,7 +227,7 @@ def pull_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
     _, inp_grad_stride = cinfo(np_inp_grad, dtype=offset_t)
     _, out_grad_inp_stride = cinfo(np_out_grad_inp, dtype=offset_t)
     _, out_grad_grid_stride = cinfo(np_out_grad_grid, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -238,7 +238,7 @@ def pull_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
         func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
              nalldim, grid_shape, splinc_shape,
              out_grad_inp_stride, out_grad_grid_stride,
-             out_grad_inp_stride, out_grad_grid_stride)
+             inp_stride, inp_grad_stride, grid_stride)
     else:
         template = f'{int(ndim)}, {int(extrapolate)}'
         template += ', ' + ctypename(np_inp.dtype)
@@ -248,7 +248,7 @@ def pull_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
         func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
              nalldim, order, bound, grid_shape, splinc_shape,
              out_grad_inp_stride, out_grad_grid_stride,
-             out_grad_inp_stride, out_grad_grid_stride)
+             inp_stride, inp_grad_stride, grid_stride)
 
     return out_grad_inp, out_grad_grid
 
@@ -286,7 +286,7 @@ def push_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
     _, inp_stride = cinfo(np_inp, dtype=offset_t)
     _, out_grad_inp_stride = cinfo(np_out_grad_inp, dtype=offset_t)
     _, out_grad_grid_stride = cinfo(np_out_grad_grid, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -297,7 +297,7 @@ def push_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
         func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
              nalldim, grid_shape, splinc_shape,
              out_grad_inp_stride, out_grad_grid_stride,
-             out_grad_inp_stride, out_grad_grid_stride)
+             inp_stride, inp_grad_stride, grid_stride)
     else:
         template = f'{int(ndim)}, {int(extrapolate)}'
         template += ', ' + ctypename(np_inp.dtype)
@@ -307,7 +307,7 @@ def push_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
         func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
              nalldim, order, bound, grid_shape, splinc_shape,
              out_grad_inp_stride, out_grad_grid_stride,
-             out_grad_inp_stride, out_grad_grid_stride)
+             inp_stride, inp_grad_stride, grid_stride)
 
     return out_grad_inp, out_grad_grid
 
@@ -338,7 +338,7 @@ def count_backward(out_grad_grid, inp_grad, grid,
     splinc_shape, inp_grad_stride = cinfo(np_inp_grad, dtype=offset_t)
     grid_shape, grid_stride = cinfo(np_grid, dtype=offset_t)
     _, out_grad_grid_stride = cinfo(np_out_grad_grid, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -348,7 +348,7 @@ def count_backward(out_grad_grid, inp_grad, grid,
         func = cwrap(getattr(cppyy.gbl.jf.pushpull, f'count{ndim}d_backward')[template])
         func(np_out_grad_grid, np_inp_grad, np_grid,
              nalldim, grid_shape, splinc_shape,
-             out_grad_grid_stride, out_grad_grid_stride)
+             out_grad_grid_stride, inp_grad_stride, grid_stride)
     else:
         template = f'{int(ndim)}, {int(extrapolate)}'
         template += ', ' + ctypename(np_grid.dtype)
@@ -357,7 +357,7 @@ def count_backward(out_grad_grid, inp_grad, grid,
         bound = np.asarray(bound, dtype='uint8')
         func(np_out_grad_grid, np_inp_grad, np_grid,
              nalldim, order, bound, grid_shape, splinc_shape,
-             out_grad_grid_stride, out_grad_grid_stride)
+             out_grad_grid_stride, inp_grad_stride, grid_stride)
 
     return out_grad_grid
 
@@ -395,7 +395,7 @@ def grad_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
     _, inp_grad_stride = cinfo(np_inp_grad, dtype=offset_t)
     _, out_grad_inp_stride = cinfo(np_out_grad_inp, dtype=offset_t)
     _, out_grad_grid_stride = cinfo(np_out_grad_grid, dtype=offset_t)
-    nalldim = np.int32(np_grid.ndim)
+    nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
@@ -406,7 +406,7 @@ def grad_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
         func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
              nalldim, grid_shape, splinc_shape,
              out_grad_inp_stride, out_grad_grid_stride,
-             out_grad_inp_stride, out_grad_grid_stride)
+             inp_stride, inp_grad_stride, grid_stride)
     else:
         template = f'{int(ndim)}, {int(extrapolate)}'
         template += ', ' + ctypename(np_inp.dtype)
@@ -416,6 +416,6 @@ def grad_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
         func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
              nalldim, order, bound, grid_shape, splinc_shape,
              out_grad_inp_stride, out_grad_grid_stride,
-             out_grad_inp_stride, out_grad_grid_stride)
+             inp_stride, inp_grad_stride, grid_stride)
 
     return out_grad_inp, out_grad_grid

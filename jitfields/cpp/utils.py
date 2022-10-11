@@ -71,10 +71,7 @@ def as_ctype(x):
 def cwrap(func):
     """Decorator to automatically cast inputs to a cppyy function"""
     def call(*args):
-        args = list(map(as_ctype, args))
-        args = [int(a.value) if isinstance(a, ctypes.c_int) else
-                float(a.value) if isinstance(a, ctypes.c_float) else a
-                for a in args]
+        args = list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
         return func(*args)
     return call
 

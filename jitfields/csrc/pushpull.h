@@ -195,8 +195,57 @@ struct PushPullAnyUtils {
         offset_t    *oi = i;
         signed char *os = s;
         for (offset_t b = b0; b <= b1; ++b) {
-            reduce_t d = x - b;
+            reduce_t d = fabs(x - b);
             *(ow++)  = spline_utils::fastweight(d);
+            *(os++)  = bound_utils::sign(b, size);
+            *(oi++)  = bound_utils::index(b, size);
+        }
+        return db;
+    }
+
+    template <typename reduce_t, typename offset_t>
+    static __device__ offset_t
+    gindex(reduce_t x, offset_t size, offset_t i[], reduce_t w[], reduce_t g[], signed char s[])
+    {
+        offset_t b0, b1;
+        spline_utils::bounds(x, b0, b1);
+        offset_t db = b1-b0;
+        reduce_t    *ow = w;
+        reduce_t    *og = g;
+        offset_t    *oi = i;
+        signed char *os = s;
+        for (offset_t b = b0; b <= b1; ++b) {
+            reduce_t d = x - b;
+            bool neg = d < 0;
+            if (neg) d = -d;
+            *(ow++)  = spline_utils::fastweight(d);
+            *(og++)  = spline_utils::fastgrad(d) * (neg ? -1 : 1);
+            *(os++)  = bound_utils::sign(b, size);
+            *(oi++)  = bound_utils::index(b, size);
+        }
+        return db;
+    }
+
+    template <typename reduce_t, typename offset_t>
+    static __device__ offset_t
+    hindex(reduce_t x, offset_t size, offset_t i[],
+           reduce_t w[], reduce_t g[], reduce_t h[], signed char s[])
+    {
+        offset_t b0, b1;
+        spline_utils::bounds(x, b0, b1);
+        offset_t db = b1-b0;
+        reduce_t    *ow = w;
+        reduce_t    *og = g;
+        reduce_t    *oh = h;
+        offset_t    *oi = i;
+        signed char *os = s;
+        for (offset_t b = b0; b <= b1; ++b) {
+            reduce_t d = x - b;
+            bool neg = d < 0;
+            if (neg) d = -d;
+            *(ow++)  = spline_utils::fastweight(d);
+            *(og++)  = spline_utils::fastgrad(d) * (neg ? -1 : 1);
+            *(oh++)  = spline_utils::fasthess(d);
             *(os++)  = bound_utils::sign(b, size);
             *(oi++)  = bound_utils::index(b, size);
         }
@@ -232,13 +281,13 @@ struct PushPullUtils<L,B> {
     index(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1,
           reduce_t & w0, reduce_t & w1,
-          signed char & s0, signed char & s1)
+          signed char & f0, signed char & f1)
     {
         ix0 = static_cast<offset_t>(floor(x));
         w1 = x - ix0;
         w0 = 1. - w1;
-        s1 = bound_utils::sign(ix0+1, size);
-        s0 = bound_utils::sign(ix0,   size);
+        f1 = bound_utils::sign(ix0+1, size);
+        f0 = bound_utils::sign(ix0,   size);
         ix1 = bound_utils::index(ix0+1, size);
         ix0 = bound_utils::index(ix0,   size);
     }
@@ -254,7 +303,7 @@ struct PushPullUtils<Q,B> {
     index(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2,
           reduce_t & w0, reduce_t & w1, reduce_t & w2,
-          signed char & s0, signed char & s1, signed char & s2)
+          signed char & f0, signed char & f1, signed char & f2)
     {
         ix1 = static_cast<offset_t>(round(x));
         ix0 = ix1 - 1;
@@ -262,9 +311,9 @@ struct PushPullUtils<Q,B> {
         w0 = spline_utils::fastweight(x - ix0);
         w1 = spline_utils::weight(x - ix1); // cannot use fast (sign unknown)
         w2 = spline_utils::fastweight(ix2 - x);
-        s0 = bound_utils::sign(ix0, size);
-        s1 = bound_utils::sign(ix1, size);
-        s2 = bound_utils::sign(ix2, size);
+        f0 = bound_utils::sign(ix0, size);
+        f1 = bound_utils::sign(ix1, size);
+        f2 = bound_utils::sign(ix2, size);
         ix0 = bound_utils::index(ix0, size);
         ix1 = bound_utils::index(ix1, size);
         ix2 = bound_utils::index(ix2, size);
@@ -276,7 +325,7 @@ struct PushPullUtils<Q,B> {
           offset_t & ix0, offset_t & ix1, offset_t & ix2,
           reduce_t & w0, reduce_t & w1, reduce_t & w2,
           reduce_t & g0, reduce_t & g1, reduce_t & g2,
-          signed char & s0, signed char & s1, signed char & s2)
+          signed char & f0, signed char & f1, signed char & f2)
     {
         ix1 = static_cast<offset_t>(round(x));
         ix0 = ix1 - 1;
@@ -286,10 +335,10 @@ struct PushPullUtils<Q,B> {
         w2 = spline_utils::fastweight(ix2 - x);
         g0 = spline_utils::fastgrad(x - ix0);
         g1 = spline_utils::grad(x - ix1); // cannot use fast (sign unknown)
-        g2 = spline_utils::fastgrad(ix2 - x);
-        s0 = bound_utils::sign(ix0, size);
-        s1 = bound_utils::sign(ix1, size);
-        s2 = bound_utils::sign(ix2, size);
+        g2 = -spline_utils::fastgrad(ix2 - x);
+        f0 = bound_utils::sign(ix0, size);
+        f1 = bound_utils::sign(ix1, size);
+        f2 = bound_utils::sign(ix2, size);
         ix0 = bound_utils::index(ix0, size);
         ix1 = bound_utils::index(ix1, size);
         ix2 = bound_utils::index(ix2, size);
@@ -302,7 +351,7 @@ struct PushPullUtils<Q,B> {
           reduce_t & w0, reduce_t & w1, reduce_t & w2,
           reduce_t & g0, reduce_t & g1, reduce_t & g2,
           reduce_t & h0, reduce_t & h1, reduce_t & h2,
-          signed char & s0, signed char & s1, signed char & s2)
+          signed char & f0, signed char & f1, signed char & f2)
     {
         ix1 = static_cast<offset_t>(round(x));
         ix0 = ix1 - 1;
@@ -312,13 +361,13 @@ struct PushPullUtils<Q,B> {
         w2 = spline_utils::fastweight(ix2 - x);
         g0 = spline_utils::fastgrad(x - ix0);
         g1 = spline_utils::grad(x - ix1); // cannot use fast (sign unknown)
-        g2 = spline_utils::fastgrad(ix2 - x);
+        g2 = -spline_utils::fastgrad(ix2 - x);
         h0 = spline_utils::fasthess(x - ix0);
         h1 = spline_utils::hess(x - ix1); // cannot use fast (sign unknown)
         h2 = spline_utils::fasthess(ix2 - x);
-        s0 = bound_utils::sign(ix0, size);
-        s1 = bound_utils::sign(ix1, size);
-        s2 = bound_utils::sign(ix2, size);
+        f0 = bound_utils::sign(ix0, size);
+        f1 = bound_utils::sign(ix1, size);
+        f2 = bound_utils::sign(ix2, size);
         ix0 = bound_utils::index(ix0, size);
         ix1 = bound_utils::index(ix1, size);
         ix2 = bound_utils::index(ix2, size);
@@ -335,7 +384,7 @@ struct PushPullUtils<C,B> {
     index(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2, offset_t & ix3,
           reduce_t & w0, reduce_t & w1, reduce_t & w2, reduce_t & w3,
-          signed char & s0, signed char & s1, signed char & s2, signed char & s3)
+          signed char & f0, signed char & f1, signed char & f2, signed char & f3)
     {
         ix1 = static_cast<offset_t>(floor(x));
         ix0 = ix1 - 1;
@@ -345,10 +394,10 @@ struct PushPullUtils<C,B> {
         w1 = spline_utils::fastweight(x - ix1);
         w2 = spline_utils::fastweight(ix2 - x);
         w3 = spline_utils::fastweight(ix3 - x);
-        s0 = bound_utils::sign(ix0, size);
-        s1 = bound_utils::sign(ix1, size);
-        s2 = bound_utils::sign(ix2, size);
-        s3 = bound_utils::sign(ix3, size);
+        f0 = bound_utils::sign(ix0, size);
+        f1 = bound_utils::sign(ix1, size);
+        f2 = bound_utils::sign(ix2, size);
+        f3 = bound_utils::sign(ix3, size);
         ix0 = bound_utils::index(ix0, size);
         ix1 = bound_utils::index(ix1, size);
         ix2 = bound_utils::index(ix2, size);
@@ -361,7 +410,7 @@ struct PushPullUtils<C,B> {
           offset_t & ix0, offset_t & ix1, offset_t & ix2, offset_t & ix3,
           reduce_t & w0, reduce_t & w1, reduce_t & w2, reduce_t & w3,
           reduce_t & g0, reduce_t & g1, reduce_t & g2, reduce_t & g3,
-          signed char & s0, signed char & s1, signed char & s2, signed char & s3)
+          signed char & f0, signed char & f1, signed char & f2, signed char & f3)
     {
         ix1 = static_cast<offset_t>(floor(x));
         ix0 = ix1 - 1;
@@ -373,12 +422,12 @@ struct PushPullUtils<C,B> {
         w3 = spline_utils::fastweight(ix3 - x);
         g0 = spline_utils::fastgrad(x - ix0);
         g1 = spline_utils::fastgrad(x - ix1);
-        g2 = spline_utils::fastgrad(ix2 - x);
-        g3 = spline_utils::fastgrad(ix3 - x);
-        s0 = bound_utils::sign(ix0, size);
-        s1 = bound_utils::sign(ix1, size);
-        s2 = bound_utils::sign(ix2, size);
-        s3 = bound_utils::sign(ix3, size);
+        g2 = -spline_utils::fastgrad(ix2 - x);
+        g3 = -spline_utils::fastgrad(ix3 - x);
+        f0 = bound_utils::sign(ix0, size);
+        f1 = bound_utils::sign(ix1, size);
+        f2 = bound_utils::sign(ix2, size);
+        f3 = bound_utils::sign(ix3, size);
         ix0 = bound_utils::index(ix0, size);
         ix1 = bound_utils::index(ix1, size);
         ix2 = bound_utils::index(ix2, size);
@@ -392,7 +441,7 @@ struct PushPullUtils<C,B> {
           reduce_t & w0, reduce_t & w1, reduce_t & w2, reduce_t & w3,
           reduce_t & g0, reduce_t & g1, reduce_t & g2, reduce_t & g3,
           reduce_t & h0, reduce_t & h1, reduce_t & h2, reduce_t & h3,
-          signed char & s0, signed char & s1, signed char & s2, signed char & s3)
+          signed char & f0, signed char & f1, signed char & f2, signed char & f3)
     {
         ix1 = static_cast<offset_t>(floor(x));
         ix0 = ix1 - 1;
@@ -404,16 +453,16 @@ struct PushPullUtils<C,B> {
         w3 = spline_utils::fastweight(ix3 - x);
         g0 = spline_utils::fastgrad(x - ix0);
         g1 = spline_utils::fastgrad(x - ix1);
-        g2 = spline_utils::fastgrad(ix2 - x);
-        g3 = spline_utils::fastgrad(ix3 - x);
+        g2 = -spline_utils::fastgrad(ix2 - x);
+        g3 = -spline_utils::fastgrad(ix3 - x);
         h0 = spline_utils::fasthess(x - ix0);
         h1 = spline_utils::fasthess(x - ix1);
         h2 = spline_utils::fasthess(ix2 - x);
         h3 = spline_utils::fasthess(ix3 - x);
-        s0 = bound_utils::sign(ix0, size);
-        s1 = bound_utils::sign(ix1, size);
-        s2 = bound_utils::sign(ix2, size);
-        s3 = bound_utils::sign(ix3, size);
+        f0 = bound_utils::sign(ix0, size);
+        f1 = bound_utils::sign(ix1, size);
+        f2 = bound_utils::sign(ix2, size);
+        f3 = bound_utils::sign(ix3, size);
         ix0 = bound_utils::index(ix0, size);
         ix1 = bound_utils::index(ix1, size);
         ix2 = bound_utils::index(ix2, size);
@@ -436,49 +485,49 @@ template <bound::type B> struct PushPull<one, Z, B> {
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         offset_t ix;
-        signed char sx;
-        utils::index(x, nw, ix, sx);
-        ix *= sw;
+        signed char fx;
+        utils::index(x, nx, ix, fx);
+        ix *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
-            *out = bound::get(inp, ix, sx);
+            *out = bound::get(inp, ix, fx);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         offset_t ix;
-        signed char sx;
-        utils::index(x, nw, ix, sx);
-        ix *= sw;
+        signed char fx;
+        utils::index(x, nx, ix, fx);
+        ix *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
-            bound::add(out, ix, *inp, sx);
+            bound::add(out, ix, *inp, fx);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
-    void count(scalar_t * out, reduce_t x, offset_t nw, offset_t sw)
+    void count(scalar_t * out, reduce_t x, offset_t nx, offset_t sx)
     {
         offset_t ix;
-        signed char sx;
-        utils::index(x, nw, ix, sx);
-        ix *= sw;
+        signed char fx;
+        utils::index(x, nx, ix, fx);
+        ix *= sx;
 
-        bound::add(out, ix, static_cast<scalar_t>(1), sx);
+        bound::add(out, ix, 1, fx);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void grad(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         for (offset_t c = 0; c < nc; ++c, out += osc)
@@ -487,29 +536,30 @@ template <bound::type B> struct PushPull<one, Z, B> {
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
-    void pull_backward(scalar_t * out, scalar_t * gout, scalar_t * inp,
-                       reduce_t x, offset_t nw, offset_t sw,
-                       offset_t nc, offset_t osc, offset_t isc)
+    void pull_backward(scalar_t * out, scalar_t * gout,
+                       scalar_t * inp, scalar_t * ginp,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
+                       offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         *gout = static_cast<scalar_t>(0);
-        self::push(out, inp, x, nw, sw, nc, osc, isc);
+        self::push(out, ginp, x, nx, isx, nc, osc, isc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t sw,
+                       reduce_t x, offset_t nx, offset_t sx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         *gout = static_cast<scalar_t>(0);
-        self::pull(out, inp, x, nw, sw, nc, osc, isc);
+        self::pull(out, ginp, x, nx, sx, nc, osc, isc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void count_backward(scalar_t * gout, scalar_t * inp,
-                        reduce_t x, offset_t nw, offset_t sw)
+                        reduce_t x, offset_t nx, offset_t sx)
     {
         *gout = static_cast<scalar_t>(0);
     }
@@ -518,7 +568,7 @@ template <bound::type B> struct PushPull<one, Z, B> {
     static __device__
     void grad_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t osw, offset_t isw,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         *gout = static_cast<scalar_t>(0);
@@ -536,146 +586,146 @@ template <bound::type B> struct PushPull<one, L, B> {
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         offset_t x0, x1;
         reduce_t w0, w1;
-        signed char   s0, s1;
-        utils::index(x, nw, x0, x1, w0, w1, s0, s1);
-        x0 *= sw;
-        x1 *= sw;
+        signed char f0, f1;
+        utils::index(x, nx, x0, x1, w0, w1, f0, f1);
+        x0 *= sx;
+        x1 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(inp, x0, s0)) * w0
-                    + static_cast<reduce_t>(bound::get(inp, x1, s1)) * w1);
+                      static_cast<reduce_t>(bound::get(inp, x0, f0)) * w0
+                    + static_cast<reduce_t>(bound::get(inp, x1, f1)) * w1);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
-        offset_t x0, x1;
-        reduce_t w0, w1;
-        signed char   s0, s1;
-        utils::index(x, nw, x0, x1, w0, w1, s0, s1);
-        x0 *= sw;
-        x1 *= sw;
+        offset_t    x0, x1;
+        reduce_t    w0, w1;
+        signed char f0, f1;
+        utils::index(x, nx, x0, x1, w0, w1, f0, f1);
+        x0 *= sx;
+        x1 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc) {
             reduce_t val = static_cast<reduce_t>(*inp);
-            bound::add(out, x0, static_cast<scalar_t>(val * w0), s0);
-            bound::add(out, x1, static_cast<scalar_t>(val * w1), s1);
+            bound::add(out, x0, val * w0, f0);
+            bound::add(out, x1, val * w1, f1);
         }
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
-    void count(scalar_t * out, reduce_t x, offset_t nw, offset_t sw)
+    void count(scalar_t * out, reduce_t x, offset_t nx, offset_t sx)
     {
-        offset_t x0, x1;
-        reduce_t w0, w1;
-        signed char   s0, s1;
-        utils::index(x, nw, x0, x1, w0, w1, s0, s1);
-        x0 *= sw;
-        x1 *= sw;
+        offset_t    x0, x1;
+        reduce_t    w0, w1;
+        signed char f0, f1;
+        utils::index(x, nx, x0, x1, w0, w1, f0, f1);
+        x0 *= sx;
+        x1 *= sx;
 
-        bound::add(out, x0, w0, s0);
-        bound::add(out, x1, w1, s1);
+        bound::add(out, x0, w0, f0);
+        bound::add(out, x1, w1, f1);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void grad(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
-        offset_t x0, x1;
-        reduce_t w0, w1;
-        signed char   s0, s1;
-        utils::index(x, nw, x0, x1, w0, w1, s0, s1);
-        x0 *= sw;
-        x1 *= sw;
+        offset_t    x0, x1;
+        reduce_t    w0, w1;
+        signed char f0, f1;
+        utils::index(x, nx, x0, x1, w0, w1, f0, f1);
+        x0 *= sx;
+        x1 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(inp, x1, s1))
-                    - static_cast<reduce_t>(bound::get(inp, x0, s0)));
+                      bound::cget<reduce_t>(inp, x1, f1)
+                    - bound::cget<reduce_t>(inp, x0, f0));
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t osw, offset_t isw,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
-        offset_t x0, x1;
-        reduce_t w0, w1;
-        signed char   s0, s1;
-        utils::index(x, nw, x0, x1, w0, w1, s0, s1);
+        offset_t    x0, x1;
+        reduce_t    w0, w1;
+        signed char f0, f1;
+        utils::index(x, nx, x0, x1, w0, w1, f0, f1);
 
-        reduce_t acc = 0;
+        reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
             // push incoming gradient
             reduce_t gval = static_cast<reduce_t>(*ginp);
-            bound::add(out, x0 * osw, static_cast<scalar_t>(gval * w0), s0);
-            bound::add(out, x1 * osw, static_cast<scalar_t>(gval * w1), s1);
+            bound::add(out, x0 * osx, gval * w0, f0);
+            bound::add(out, x1 * osx, gval * w1, f1);
             // compute input spatial gradient
-            acc += gval * (static_cast<reduce_t>(bound::get(inp, x1 * isw, s1))
-                         - static_cast<reduce_t>(bound::get(inp, x0 * isw, s0)));
+            acc += gval * (bound::cget<reduce_t>(inp, x1 * isx, f1)
+                         - bound::cget<reduce_t>(inp, x0 * isx, f0));
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t sw,
+                       reduce_t x, offset_t nx, offset_t sx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
-        offset_t x0, x1;
-        reduce_t w0, w1;
-        signed char   s0, s1;
-        utils::index(x, nw, x0, x1, w0, w1, s0, s1);
-        x0 *= sw;
-        x1 *= sw;
+        offset_t    x0, x1;
+        reduce_t    w0, w1;
+        signed char f0, f1;
+        utils::index(x, nx, x0, x1, w0, w1, f0, f1);
+        x0 *= sx;
+        x1 *= sx;
 
         reduce_t acc = 0;
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
-            // push incoming gradient
+            // pull incoming gradient
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(ginp, x0, s0)) * w0
-                    + static_cast<reduce_t>(bound::get(ginp, x1, s1)) * w1);
+                      bound::cget<reduce_t>(ginp, x0, f0) * w0
+                    + bound::cget<reduce_t>(ginp, x1, f1) * w1);
             // compute input spatial gradient
             reduce_t val = static_cast<reduce_t>(*inp);
-            acc += val * (static_cast<reduce_t>(bound::get(ginp, x1, s1))
-                        - static_cast<reduce_t>(bound::get(ginp, x0, s0)));
+            acc += val * (bound::cget<reduce_t>(ginp, x1, f1)
+                        - bound::cget<reduce_t>(ginp, x0, f0));
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void count_backward(scalar_t * gout, scalar_t * ginp,
-                        reduce_t x, offset_t nw, offset_t sw)
+                        reduce_t x, offset_t nx, offset_t sx)
     {
-        offset_t x0, x1;
-        reduce_t w0, w1;
-        signed char   s0, s1;
-        utils::index(x, nw, x0, x1, w0, w1, s0, s1);
-        x0 *= sw;
-        x1 *= sw;
+        offset_t    x0, x1;
+        reduce_t    w0, w1;
+        signed char f0, f1;
+        utils::index(x, nx, x0, x1, w0, w1, f0, f1);
+        x0 *= sx;
+        x1 *= sx;
 
         // compute input spatial gradient
-        *gout = static_cast<reduce_t>(bound::get(ginp, x1, s1))
-              - static_cast<reduce_t>(bound::get(ginp, x0, s0));
+        *gout = static_cast<scalar_t>(bound::cget<reduce_t>(ginp, x1, f1)
+                                    - bound::cget<reduce_t>(ginp, x0, f0));
     }
 
 
@@ -683,7 +733,7 @@ template <bound::type B> struct PushPull<one, L, B> {
     static __device__
     void grad_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t osw, offset_t isw,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         *gout = static_cast<scalar_t>(0);
@@ -701,165 +751,163 @@ template <bound::type B> struct PushPull<one, Q, B> {
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         offset_t x0, x1, x2;
         reduce_t w0, w1, w2;
-        signed char   s0, s1, s2;
-        utils::index(x, nw, x0, x1, x2, w0, w1, w2, s0, s1, s2);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
+        signed char   f0, f1, f2;
+        utils::index(x, nx, x0, x1, x2, w0, w1, w2, f0, f1, f2);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(inp, x0, s0)) * w0
-                    + static_cast<reduce_t>(bound::get(inp, x1, s1)) * w1
-                    + static_cast<reduce_t>(bound::get(inp, x2, s2)) * w2);
+                      bound::cget<reduce_t>(inp, x0, f0) * w0
+                    + bound::cget<reduce_t>(inp, x1, f1) * w1
+                    + bound::cget<reduce_t>(inp, x2, f2) * w2);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
-        offset_t x0, x1, x2;
-        reduce_t w0, w1, w2;
-        signed char   s0, s1, s2;
-        utils::index(x, nw, x0, x1, x2, w0, w1, w2, s0, s1, s2);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
+        offset_t    x0, x1, x2;
+        reduce_t    w0, w1, w2;
+        signed char f0, f1, f2;
+        utils::index(x, nx, x0, x1, x2, w0, w1, w2, f0, f1, f2);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc) {
             reduce_t val = static_cast<reduce_t>(*inp);
-            bound::add(out, x0, static_cast<scalar_t>(val * w0), s0);
-            bound::add(out, x1, static_cast<scalar_t>(val * w1), s1);
-            bound::add(out, x2, static_cast<scalar_t>(val * w2), s2);
+            bound::add(out, x0, val * w0, f0);
+            bound::add(out, x1, val * w1, f1);
+            bound::add(out, x2, val * w2, f2);
         }
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
-    void count(scalar_t * out, reduce_t x, offset_t nw, offset_t sw)
+    void count(scalar_t * out, reduce_t x, offset_t nx, offset_t sx)
     {
         offset_t x0, x1, x2;
         reduce_t w0, w1, w2;
-        signed char s0, s1, s2;
-        utils::index(x, nw, x0, x1, x2, w0, w1, w2, s0, s1, s2);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
+        signed char f0, f1, f2;
+        utils::index(x, nx, x0, x1, x2, w0, w1, w2, f0, f1, f2);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
 
-        bound::add(out, x0, w0, s0);
-        bound::add(out, x1, w1, s1);
-        bound::add(out, x2, w2, s2);
+        bound::add(out, x0, w0, f0);
+        bound::add(out, x1, w1, f1);
+        bound::add(out, x2, w2, f2);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void grad(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
-        offset_t x0, x1, x2;
-        reduce_t w0, w1, w2;
-        reduce_t g0, g1, g2;
-        signed char s0, s1, s2;
-        utils::gindex(x, nw, x0, x1, x2, w0, w1, w2, g0, g1, g2, s0, s1, s2);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
+        offset_t    x0, x1, x2;
+        reduce_t    w0, w1, w2;
+        reduce_t    g0, g1, g2;
+        signed char f0, f1, f2;
+        utils::gindex(x, nx, x0, x1, x2, w0, w1, w2, g0, g1, g2, f0, f1, f2);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(inp, x0, s0)) * g0
-                    + static_cast<reduce_t>(bound::get(inp, x1, s1)) * g1
-                    + static_cast<reduce_t>(bound::get(inp, x2, s2)) * g2);
+                      bound::cget<reduce_t>(inp, x0, f0) * g0
+                    + bound::cget<reduce_t>(inp, x1, f1) * g1
+                    + bound::cget<reduce_t>(inp, x2, f2) * g2);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t osw, offset_t isw,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
-        offset_t x0, x1, x2;
-        reduce_t w0, w1, w2;
-        reduce_t g0, g1, g2;
-        signed char s0, s1, s2;
-        utils::gindex(x, nw, x0, x1, x2, w0, w1, w2, g0, g1, g2, s0, s1, s2);
+        offset_t    x0, x1, x2;
+        reduce_t    w0, w1, w2;
+        reduce_t    g0, g1, g2;
+        signed char f0, f1, f2;
+        utils::gindex(x, nx, x0, x1, x2, w0, w1, w2, g0, g1, g2, f0, f1, f2);
 
         reduce_t acc = 0;
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
             // push incoming gradient
             reduce_t gval = static_cast<reduce_t>(*ginp);
-            bound::add(out, x0 * osw, static_cast<scalar_t>(gval * w0), s0);
-            bound::add(out, x1 * osw, static_cast<scalar_t>(gval * w1), s1);
-            bound::add(out, x2 * osw, static_cast<scalar_t>(gval * w2), s2);
+            bound::add(out, x0 * osx, gval * w0, f0);
+            bound::add(out, x1 * osx, gval * w1, f1);
+            bound::add(out, x2 * osx, gval * w2, f2);
             // compute input spatial gradient
-            acc += gval * (static_cast<reduce_t>(bound::get(inp, x0 * isw, s0)) * g0
-                         + static_cast<reduce_t>(bound::get(inp, x1 * isw, s1)) * g1
-                         + static_cast<reduce_t>(bound::get(inp, x2 * isw, s2)) * g2);
+            acc += gval * (bound::cget<reduce_t>(inp, x0 * isx, f0) * g0
+                         + bound::cget<reduce_t>(inp, x1 * isx, f1) * g1
+                         + bound::cget<reduce_t>(inp, x2 * isx, f2) * g2);
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t sw,
+                       reduce_t x, offset_t nx, offset_t sx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
-        offset_t x0, x1, x2;
-        reduce_t w0, w1, w2;
-        reduce_t g0, g1, g2;
-        signed char s0, s1, s2;
-        utils::gindex(x, nw, x0, x1, x2, w0, w1, w2, g0, g1, g2, s0, s1, s2);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
+        offset_t    x0, x1, x2;
+        reduce_t    w0, w1, w2;
+        reduce_t    g0, g1, g2;
+        signed char f0, f1, f2;
+        utils::gindex(x, nx, x0, x1, x2, w0, w1, w2, g0, g1, g2, f0, f1, f2);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
 
         reduce_t acc = 0;
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
+            reduce_t ginp0 = bound::cget<reduce_t>(ginp, x0, f0);
+            reduce_t ginp1 = bound::cget<reduce_t>(ginp, x1, f1);
+            reduce_t ginp2 = bound::cget<reduce_t>(ginp, x2, f2);
             // pull incoming gradient
-            *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(ginp, x0, s0)) * w0
-                    + static_cast<reduce_t>(bound::get(ginp, x1, s1)) * w1
-                    + static_cast<reduce_t>(bound::get(ginp, x2, s2)) * w2);
+            *out = static_cast<scalar_t>(ginp0 * w0 + ginp1 * w1 + ginp2 * w2);
             // compute incoming gradient spatial gradient
             reduce_t val = static_cast<reduce_t>(*inp);
-            acc += val * (static_cast<reduce_t>(bound::get(ginp, x0, s0)) * g0
-                        + static_cast<reduce_t>(bound::get(ginp, x1, s1)) * g1
-                        + static_cast<reduce_t>(bound::get(ginp, x2, s2)) * g2);
+            acc += val * (ginp0 * g0 + ginp1 * g1 + ginp2 * g2);
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void count_backward(scalar_t * gout, scalar_t * ginp,
-                        reduce_t x, offset_t nw, offset_t sw)
+                        reduce_t x, offset_t nx, offset_t sx)
     {
         offset_t x0, x1, x2;
         reduce_t w0, w1, w2;
         reduce_t g0, g1, g2;
-        signed char s0, s1, s2;
-        utils::gindex(x, nw, x0, x1, x2, w0, w1, w2, g0, g1, g2, s0, s1, s2);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
+        signed char f0, f1, f2;
+        utils::gindex(x, nx, x0, x1, x2, w0, w1, w2, g0, g1, g2, f0, f1, f2);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
 
         // compute input spatial gradient
-        *gout = static_cast<reduce_t>(bound::get(ginp, x0, s0)) * g0
-              + static_cast<reduce_t>(bound::get(ginp, x1, s1)) * g1
-              + static_cast<reduce_t>(bound::get(ginp, x2, s2)) * g2;
+        *gout = bound::cget<reduce_t>(ginp, x0, f0) * g0
+              + bound::cget<reduce_t>(ginp, x1, f1) * g1
+              + bound::cget<reduce_t>(ginp, x2, f2) * g2;
     }
 
 
@@ -867,31 +915,31 @@ template <bound::type B> struct PushPull<one, Q, B> {
     static __device__
     void grad_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t osw, offset_t isw,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         offset_t x0, x1, x2;
         reduce_t w0, w1, w2;
         reduce_t g0, g1, g2;
         reduce_t h0, h1, h2;
-        signed char s0, s1, s2;
-        utils::hindex(x, nw, x0, x1, x2, w0, w1, w2, g0, g1, g2, h0, h1, h2,
-                      s0, s1, s2);
+        signed char f0, f1, f2;
+        utils::hindex(x, nx, x0, x1, x2, w0, w1, w2, g0, g1, g2, h0, h1, h2,
+                      f0, f1, f2);
 
         reduce_t acc = 0;
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
             // push incoming gradient
             reduce_t gval = static_cast<reduce_t>(*ginp);
-            bound::add(out, x0 * osw, static_cast<scalar_t>(gval * g0), s0);
-            bound::add(out, x1 * osw, static_cast<scalar_t>(gval * g1), s1);
-            bound::add(out, x2 * osw, static_cast<scalar_t>(gval * g2), s2);
+            bound::add(out, x0 * osx, static_cast<scalar_t>(gval * g0), f0);
+            bound::add(out, x1 * osx, static_cast<scalar_t>(gval * g1), f1);
+            bound::add(out, x2 * osx, static_cast<scalar_t>(gval * g2), f2);
             // compute input spatial hessian
-            acc += gval * (static_cast<reduce_t>(bound::get(inp, x0 * isw, s0)) * h0
-                         + static_cast<reduce_t>(bound::get(inp, x1 * isw, s1)) * h1
-                         + static_cast<reduce_t>(bound::get(inp, x2 * isw, s2)) * h2);
+            acc += gval * (static_cast<reduce_t>(bound::get(inp, x0 * isx, f0)) * h0
+                         + static_cast<reduce_t>(bound::get(inp, x1 * isx, f1)) * h1
+                         + static_cast<reduce_t>(bound::get(inp, x2 * isx, f2)) * h2);
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 };
 
@@ -904,184 +952,182 @@ template <bound::type B> struct PushPull<one, C, B> {
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
-        signed char   s0, s1, s2, s3;
-        utils::index(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, s0, s1, s2, s3);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
-        x3 *= sw;
+        signed char   f0, f1, f2, f3;
+        utils::index(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, f0, f1, f2, f3);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
+        x3 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(inp, x0, s0)) * w0
-                    + static_cast<reduce_t>(bound::get(inp, x1, s1)) * w1
-                    + static_cast<reduce_t>(bound::get(inp, x2, s2)) * w2
-                    + static_cast<reduce_t>(bound::get(inp, x3, s3)) * w3);
+                      bound::cget<reduce_t>(inp, x0, f0) * w0
+                    + bound::cget<reduce_t>(inp, x1, f1) * w1
+                    + bound::cget<reduce_t>(inp, x2, f2) * w2
+                    + bound::cget<reduce_t>(inp, x3, f3) * w3);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
-        signed char   s0, s1, s2, s3;
-        utils::index(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, s0, s1, s2, s3);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
-        x3 *= sw;
+        signed char   f0, f1, f2, f3;
+        utils::index(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, f0, f1, f2, f3);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
+        x3 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc) {
             reduce_t val = static_cast<reduce_t>(*inp);
-            bound::add(out, x0, static_cast<scalar_t>(val * w0), s0);
-            bound::add(out, x1, static_cast<scalar_t>(val * w1), s1);
-            bound::add(out, x2, static_cast<scalar_t>(val * w2), s2);
-            bound::add(out, x3, static_cast<scalar_t>(val * w3), s3);
+            bound::add(out, x0, val * w0, f0);
+            bound::add(out, x1, val * w1, f1);
+            bound::add(out, x2, val * w2, f2);
+            bound::add(out, x3, val * w3, f3);
         }
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
-    void count(scalar_t * out, reduce_t x, offset_t nw, offset_t sw)
+    void count(scalar_t * out, reduce_t x, offset_t nx, offset_t sx)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
-        signed char   s0, s1, s2, s3;
-        utils::index(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, s0, s1, s2, s3);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
-        x3 *= sw;
+        signed char   f0, f1, f2, f3;
+        utils::index(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, f0, f1, f2, f3);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
+        x3 *= sx;
 
-        bound::add(out, x0, w0, s0);
-        bound::add(out, x1, w1, s1);
-        bound::add(out, x2, w2, s2);
-        bound::add(out, x3, w3, s3);
+        bound::add(out, x0, w0, f0);
+        bound::add(out, x1, w1, f1);
+        bound::add(out, x2, w2, f2);
+        bound::add(out, x3, w3, f3);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void grad(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
         reduce_t g0, g1, g2, g3;
-        signed char s0, s1, s2, s3;
-        utils::gindex(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
-                      s0, s1, s2, s3);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
-        x3 *= sw;
+        signed char f0, f1, f2, f3;
+        utils::gindex(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
+                      f0, f1, f2, f3);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
+        x3 *= sx;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(inp, x0, s0)) * g0
-                    + static_cast<reduce_t>(bound::get(inp, x1, s1)) * g1
-                    + static_cast<reduce_t>(bound::get(inp, x2, s2)) * g2
-                    + static_cast<reduce_t>(bound::get(inp, x3, s3)) * g3);
+                      bound::cget<reduce_t>(inp, x0, f0) * g0
+                    + bound::cget<reduce_t>(inp, x1, f1) * g1
+                    + bound::cget<reduce_t>(inp, x2, f2) * g2
+                    + bound::cget<reduce_t>(inp, x3, f3) * g3);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t osw, offset_t isw,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
         reduce_t g0, g1, g2, g3;
-        signed char s0, s1, s2, s3;
-        utils::gindex(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
-                      s0, s1, s2, s3);
+        signed char f0, f1, f2, f3;
+        utils::gindex(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
+                      f0, f1, f2, f3);
 
-        reduce_t acc = 0;
+        reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
             // push incoming gradient
             reduce_t gval = static_cast<reduce_t>(*ginp);
-            bound::add(out, x0 * osw, static_cast<scalar_t>(gval * w0), s0);
-            bound::add(out, x1 * osw, static_cast<scalar_t>(gval * w1), s1);
-            bound::add(out, x2 * osw, static_cast<scalar_t>(gval * w2), s2);
-            bound::add(out, x3 * osw, static_cast<scalar_t>(gval * w3), s3);
+            bound::add(out, x0 * osx, gval * w0, f0);
+            bound::add(out, x1 * osx, gval * w1, f1);
+            bound::add(out, x2 * osx, gval * w2, f2);
+            bound::add(out, x3 * osx, gval * w3, f3);
             // compute input spatial gradient
-            acc += gval * (static_cast<reduce_t>(bound::get(inp, x0 * isw, s0)) * g0
-                         + static_cast<reduce_t>(bound::get(inp, x1 * isw, s1)) * g1
-                         + static_cast<reduce_t>(bound::get(inp, x2 * isw, s2)) * g2
-                         + static_cast<reduce_t>(bound::get(inp, x3 * isw, s3)) * g3);
+            acc += gval * (bound::cget<reduce_t>(inp, x0 * isx, f0) * g0
+                         + bound::cget<reduce_t>(inp, x1 * isx, f1) * g1
+                         + bound::cget<reduce_t>(inp, x2 * isx, f2) * g2
+                         + bound::cget<reduce_t>(inp, x3 * isx, f3) * g3);
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void push_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t sw,
+                       reduce_t x, offset_t nx, offset_t sx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
         reduce_t g0, g1, g2, g3;
-        signed char s0, s1, s2, s3;
-        utils::gindex(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
-                      s0, s1, s2, s3);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
-        x3 *= sw;
+        signed char f0, f1, f2, f3;
+        utils::gindex(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
+                      f0, f1, f2, f3);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
+        x3 *= sx;
 
-        reduce_t acc = 0;
+        reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
+            reduce_t ginp0 = bound::cget<reduce_t>(ginp, x0, f0);
+            reduce_t ginp1 = bound::cget<reduce_t>(ginp, x1, f1);
+            reduce_t ginp2 = bound::cget<reduce_t>(ginp, x2, f2);
+            reduce_t ginp3 = bound::cget<reduce_t>(ginp, x3, f3);
             // pull incoming gradient
-            *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(ginp, x0, s0)) * w0
-                    + static_cast<reduce_t>(bound::get(ginp, x1, s1)) * w1
-                    + static_cast<reduce_t>(bound::get(ginp, x2, s2)) * w2
-                    + static_cast<reduce_t>(bound::get(ginp, x3, s3)) * w3);
+            *out = static_cast<scalar_t>(ginp0 * w0 + ginp1 * w1 +
+                                         ginp2 * w2 + ginp3 * w3);
             // compute incoming gradient spatial gradient
             reduce_t val = static_cast<reduce_t>(*inp);
-            acc += val * (static_cast<reduce_t>(bound::get(ginp, x0, s0)) * g0
-                        + static_cast<reduce_t>(bound::get(ginp, x1, s1)) * g1
-                        + static_cast<reduce_t>(bound::get(ginp, x2, s2)) * g2
-                        + static_cast<reduce_t>(bound::get(ginp, x3, s3)) * g3);
+            acc += val * (ginp0 * g0 + ginp1 * g1 + ginp2 * g2 + ginp3 * g3);
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void count_backward(scalar_t * gout, scalar_t * ginp,
-                        reduce_t x, offset_t nw, offset_t sw)
+                        reduce_t x, offset_t nx, offset_t sx)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
         reduce_t g0, g1, g2, g3;
-        signed char s0, s1, s2, s3;
-        utils::gindex(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
-                      s0, s1, s2, s3);
-        x0 *= sw;
-        x1 *= sw;
-        x2 *= sw;
-        x3 *= sw;
+        signed char f0, f1, f2, f3;
+        utils::gindex(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
+                      f0, f1, f2, f3);
+        x0 *= sx;
+        x1 *= sx;
+        x2 *= sx;
+        x3 *= sx;
 
         // compute input spatial gradient
-        *gout = static_cast<reduce_t>(bound::get(ginp, x0, s0)) * g0
-              + static_cast<reduce_t>(bound::get(ginp, x1, s1)) * g1
-              + static_cast<reduce_t>(bound::get(ginp, x2, s2)) * g2
-              + static_cast<reduce_t>(bound::get(ginp, x3, s3)) * g3;
+        *gout = bound::cget<reduce_t>(ginp, x0, f0) * g0
+              + bound::cget<reduce_t>(ginp, x1, f1) * g1
+              + bound::cget<reduce_t>(ginp, x2, f2) * g2
+              + bound::cget<reduce_t>(ginp, x3, f3) * g3;
     }
 
 
@@ -1089,33 +1135,33 @@ template <bound::type B> struct PushPull<one, C, B> {
     static __device__
     void grad_backward(scalar_t * out, scalar_t * gout,
                        scalar_t * inp, scalar_t * ginp,
-                       reduce_t x, offset_t nw, offset_t osw, offset_t isw,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
     {
         offset_t x0, x1, x2, x3;
         reduce_t w0, w1, w2, w3;
         reduce_t g0, g1, g2, g3;
         reduce_t h0, h1, h2, h3;
-        signed char s0, s1, s2, s3;
-        utils::hindex(x, nw, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
-                      h0, h1, h2, h3, s0, s1, s2, s3);
+        signed char f0, f1, f2, f3;
+        utils::hindex(x, nx, x0, x1, x2, x3, w0, w1, w2, w3, g0, g1, g2, g3,
+                      h0, h1, h2, h3, f0, f1, f2, f3);
 
-        reduce_t acc = 0;
+        reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
             // push incoming gradient
             reduce_t gval = static_cast<reduce_t>(*ginp);
-            bound::add(out, x0 * osw, static_cast<scalar_t>(gval * g0), s0);
-            bound::add(out, x1 * osw, static_cast<scalar_t>(gval * g1), s1);
-            bound::add(out, x2 * osw, static_cast<scalar_t>(gval * g2), s2);
-            bound::add(out, x3 * osw, static_cast<scalar_t>(gval * g3), s3);
+            bound::add(out, x0 * osx, gval * g0, f0);
+            bound::add(out, x1 * osx, gval * g1, f1);
+            bound::add(out, x2 * osx, gval * g2, f2);
+            bound::add(out, x3 * osx, gval * g3, f3);
             // compute input spatial hessian
-            acc += gval * (static_cast<reduce_t>(bound::get(inp, x0 * isw, s0)) * h0
-                         + static_cast<reduce_t>(bound::get(inp, x1 * isw, s1)) * h1
-                         + static_cast<reduce_t>(bound::get(inp, x2 * isw, s2)) * h2
-                         + static_cast<reduce_t>(bound::get(inp, x3 * isw, s3)) * h3);
+            acc += gval * (bound::cget<reduce_t>(inp, x0 * isx, f0) * h0
+                         + bound::cget<reduce_t>(inp, x1 * isx, f1) * h1
+                         + bound::cget<reduce_t>(inp, x2 * isx, f2) * h2
+                         + bound::cget<reduce_t>(inp, x3 * isx, f3) * h3);
         }
-        *gout = static_cast<offset_t>(acc);
+        *gout = static_cast<scalar_t>(acc);
     }
 };
 
@@ -1129,60 +1175,329 @@ struct PushPull<one, I, B> {
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
     void pull(scalar_t * out, scalar_t * inp,
-              reduce_t x, offset_t nw, offset_t sw,
+              reduce_t x, offset_t nx, offset_t sx,
               offset_t nc, offset_t osc, offset_t isc)
     {
         // Precompute weights and indices
         offset_t    ix[8];
         reduce_t    wx[8];
-        signed char sx[8];
-        offset_t length = utils::index(x, nw, ix, wx, sx);
+        signed char fx[8];
+        offset_t length = utils::index(x, nx, ix, wx, fx);
+        for (offset_t i = 0; i <= length; ++i)
+            ix[i] *= sx;
 
         // Convolve coefficients with basis functions
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
         {
             reduce_t acc = static_cast<reduce_t>(0);
             for (offset_t i = 0; i <= length; ++i)
-                acc += static_cast<reduce_t>(bound::get(inp, ix[i] * sw, sx[i])) * wx[i];
+                acc += bound::cget<reduce_t>(inp, ix[i], fx[i]) * wx[i];
             *out = static_cast<scalar_t>(acc);
         }
     }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void push(scalar_t * out, scalar_t * inp,
+              reduce_t x, offset_t nx, offset_t sx,
+              offset_t nc, offset_t osc, offset_t isc)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        offset_t length = utils::index(x, nx, ix, wx, fx);
+        for (offset_t i = 0; i <= length; ++i)
+            ix[i] *= sx;
+
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc) {
+            reduce_t val = static_cast<reduce_t>(*inp);
+            for (offset_t i = 0; i <= length; ++i)
+                bound::add(out, ix[i], val * wx[i], fx[i]);
+        }
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void count(scalar_t * out, reduce_t x, offset_t nx, offset_t sx)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        offset_t length = utils::index(x, nx, ix, wx, fx);
+
+        for (offset_t i = 0; i <= length; ++i)
+            bound::add(out, ix[i] * sx, static_cast<scalar_t>(wx[i]), fx[i]);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void grad(scalar_t * out, scalar_t * inp,
+              reduce_t x, offset_t nx, offset_t sx,
+              offset_t nc, offset_t osc, offset_t isc)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        reduce_t    gx[8];
+        offset_t length = utils::gindex(x, nx, ix, wx, gx, fx);
+        for (offset_t i = 0; i <= length; ++i)
+            ix[i] *= sx;
+
+        // Convolve coefficients with basis functions
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+        {
+            reduce_t acc = static_cast<reduce_t>(0);
+            for (offset_t i = 0; i <= length; ++i)
+                acc += static_cast<reduce_t>(bound::get(inp, ix[i], fx[i])) * gx[i];
+            *out = static_cast<scalar_t>(acc);
+        }
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void pull_backward(scalar_t * out, scalar_t * gout,
+                       scalar_t * inp, scalar_t * ginp,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
+                       offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        reduce_t    gx[8];
+        offset_t length = utils::gindex(x, nx, ix, wx, gx, fx);
+
+        reduce_t acc = static_cast<reduce_t>(0);
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
+        {
+            reduce_t gval = static_cast<reduce_t>(*ginp);
+            reduce_t acc1 = static_cast<reduce_t>(0);
+            for (offset_t i = 0; i <= length; ++i) {
+                // push incoming gradient
+                bound::add(out, ix[i] * osx, gval * wx[i], fx[i]);
+                // compute input spatial gradient
+                acc1 += bound::cget<reduce_t>(inp, ix[i] * isx, fx[i]) * gx[i];
+            }
+            acc += gval * acc1;
+        }
+        *gout = static_cast<scalar_t>(acc);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void push_backward(scalar_t * out, scalar_t * gout,
+                       scalar_t * inp, scalar_t * ginp,
+                       reduce_t x, offset_t nx, offset_t sx,
+                       offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        reduce_t    gx[8];
+        offset_t length = utils::gindex(x, nx, ix, wx, gx, fx);
+        for (offset_t i = 0; i <= length; ++i)
+            ix[i] *= sx;
+
+        reduce_t acc = static_cast<reduce_t>(0);
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
+        {
+            reduce_t val = static_cast<reduce_t>(*inp);
+            reduce_t acc1 = static_cast<reduce_t>(0);
+            reduce_t acc2 = static_cast<reduce_t>(0);
+            for (offset_t i = 0; i <= length; ++i) {
+                reduce_t gval = bound::cget<reduce_t>(ginp, ix[i], fx[i]);
+                // pull incoming gradient
+                acc1 += gval * wx[i];
+                // compute incoming gradient spatial gradient
+                acc2 += gval * gx[i];
+            }
+            *out = static_cast<scalar_t>(acc1);
+            acc += val * acc2;
+        }
+        *gout = static_cast<scalar_t>(acc);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void count_backward(scalar_t * gout, scalar_t * ginp,
+                        reduce_t x, offset_t nx, offset_t sx)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        reduce_t    gx[8];
+        offset_t length = utils::gindex(x, nx, ix, wx, gx, fx);
+        for (offset_t i = 0; i <= length; ++i)
+            ix[i] *= sx;
+
+        // compute input spatial gradient
+        reduce_t acc = static_cast<reduce_t>(0);
+        for (offset_t i = 0; i <= length; ++i)
+            acc += static_cast<reduce_t>(bound::get(ginp, ix[i], fx[i])) * gx[i];
+        *gout = static_cast<scalar_t>(acc);
+    }
+
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void grad_backward(scalar_t * out, scalar_t * gout,
+                       scalar_t * inp, scalar_t * ginp,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
+                       offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        reduce_t    gx[8];
+        reduce_t    hx[8];
+        offset_t length = utils::hindex(x, nx, ix, wx, gx, hx, fx);
+
+        reduce_t acc = static_cast<reduce_t>(0);
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
+        {
+            reduce_t gval = static_cast<reduce_t>(*ginp);
+            reduce_t acc1 = static_cast<reduce_t>(0);
+            for (offset_t i = 0; i <= length; ++i) {
+                // push incoming gradient
+                bound::add(out, ix[i] * osx, gval * gx[i], fx[i]);
+                // compute input spatial hessian
+                acc1 += bound::cget<reduce_t>(inp, ix[i] * isx, fx[i]) * hx[i];
+            }
+            acc += gval * acc1;
+        }
+        *gout = static_cast<scalar_t>(acc);
+    }
 };
 
-#if 0
 /***********************************************************************
  *
  *                                  2D
  *
  **********************************************************************/
 
-/***                           NEAREST                              ***/
+/***                            NEAREST                             ***/
 template <bound::type BX, bound::type BY>
 struct PushPull<two, Z, BX, Z, BY> {
-    using bound_utils_x = bound::utils<BX>;
-    using bound_utils_y = bound::utils<BY>;
-    using spline_utils = spline::utils<Z>;
+    using utils_x = PushPullUtils<Z, BX>;
+    using utils_y = PushPullUtils<Z, BY>;
+    using self = PushPull<two, Z, BX, Z, BY>;
 
-    template <typename scalar_t, typename offset_t, typename reduce_t>
+    template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                reduce_t shift)
+    void pull(scalar_t * out, scalar_t * inp,
+              reduce_t x, offset_t nx, offset_t sx,
+              reduce_t y, offset_t ny, offset_t sy,
+              offset_t nc, offset_t osc, offset_t isc)
     {
-        reduce_t x = (w + shift) * wscl - shift;
-        reduce_t y = (h + shift) * hscl - shift;
-        offset_t ix = static_cast<offset_t>(round(x));
-        offset_t iy = static_cast<offset_t>(round(y));
-        signed char  sx = bound_utils_x::sign(ix, nw);
-        signed char  sy = bound_utils_y::sign(iy, nh);
-        ix = bound_utils_x::index(ix, nw) * sw;
-        iy = bound_utils_y::index(iy, nh) * sh;
+        offset_t    ix, iy;
+        signed char fx, fy;
+        utils_x::index(x, nx, ix, fx);
+        utils_y::index(y, ny, iy, fy);
+        offset_t    i = ix * sx + iy * sy;
+        signed char f = fx * fy;
 
-        *out = bound::get(inp, ix + iy, sx * sy);
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+            *out = bound::get(inp, i, f);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void push(scalar_t * out, scalar_t * inp,
+              reduce_t x, offset_t nx, offset_t sx,
+              reduce_t y, offset_t ny, offset_t sy,
+              offset_t nc, offset_t osc, offset_t isc)
+    {
+        offset_t    ix, iy;
+        signed char fx, fy;
+        utils_x::index(x, nx, ix, fx);
+        utils_y::index(y, ny, iy, fy);
+        offset_t    i = ix * sx + iy * sy;
+        signed char f = fx * fy;
+
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+            bound::add(out, i, *inp, f);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void count(scalar_t * out,
+               reduce_t x, offset_t nx, offset_t sx,
+               reduce_t y, offset_t ny, offset_t sy)
+    {
+        offset_t    ix, iy;
+        signed char fx, fy;
+        utils_x::index(x, nx, ix, fx);
+        utils_y::index(y, ny, iy, fy);
+        offset_t    i = ix * sx + iy * sy;
+        signed char f = fx * fy;
+
+        bound::add(out, i, static_cast<scalar_t>(1), f);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void grad(scalar_t * out, scalar_t * inp,
+              reduce_t x, offset_t nx, offset_t sx,
+              reduce_t y, offset_t ny, offset_t sy,
+              offset_t nc, offset_t osc, offset_t isc)
+    {
+        for (offset_t c = 0; c < nc; ++c, out += osc)
+            *out = static_cast<scalar_t>(0);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void pull_backward(scalar_t * out, scalar_t * gout, scalar_t * inp,
+                       reduce_t x, offset_t nx, offset_t sx,
+                       reduce_t y, offset_t ny, offset_t sy,
+                       offset_t nc, offset_t osc, offset_t isc)
+    {
+        *gout = static_cast<scalar_t>(0);
+        self::push(out, inp, x, nx, sx, y, ny, sy, nc, osc, isc);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void push_backward(scalar_t * out, scalar_t * gout,
+                       scalar_t * inp, scalar_t * ginp,
+                       reduce_t x, offset_t nx, offset_t sx,
+                       reduce_t y, offset_t ny, offset_t sy,
+                       offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
+    {
+        *gout = static_cast<scalar_t>(0);
+        self::pull(out, inp, x, nx, sx, y, ny, sy, nc, osc, isc);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void count_backward(scalar_t * gout, scalar_t * inp,
+                        reduce_t x, offset_t nx, offset_t sx,
+                        reduce_t y, offset_t ny, offset_t sy)
+    {
+        *gout = static_cast<scalar_t>(0);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    static __device__
+    void grad_backward(scalar_t * out, scalar_t * gout,
+                       scalar_t * inp, scalar_t * ginp,
+                       reduce_t x, offset_t nx, offset_t osx, offset_t isx,
+                       reduce_t y, offset_t ny, offset_t osy, offset_t isy,
+                       offset_t nc, offset_t osc, offset_t isc, offset_t gsc)
+    {
+        *gout = static_cast<scalar_t>(0);
+        for (offset_t c = 0; c < nc; ++c, out += osc)
+            *out = static_cast<scalar_t>(0);
     }
 };
 
+#if 0
 /***                            LINEAR                              ***/
 template <bound::type BX, bound::type BY>
 struct PushPull<two, L, BX, L, BY> {
@@ -1193,8 +1508,8 @@ struct PushPull<two, L, BX, L, BY> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -1207,24 +1522,24 @@ struct PushPull<two, L, BX, L, BY> {
         reduce_t dy1 = y - iy0;
         reduce_t dx0 = 1 - dx1;
         reduce_t dy0 = 1 - dy1;
-        signed char  sx0 = bound_utils_x::sign(ix0, nw);
-        signed char  sy0 = bound_utils_y::sign(iy0, nh);
-        signed char  sx1 = bound_utils_x::sign(ix1, nw);
-        signed char  sy1 = bound_utils_y::sign(iy1, nh);
-        ix0 = bound_utils_x::index(ix0, nw) * sw;
-        iy0 = bound_utils_y::index(iy0, nh) * sh;
-        ix1 = bound_utils_x::index(ix1, nw) * sw;
-        iy1 = bound_utils_y::index(iy1, nh) * sh;
+        signed char  fx0 = bound_utils_x::sign(ix0, nx);
+        signed char  fy0 = bound_utils_y::sign(iy0, ny);
+        signed char  fx1 = bound_utils_x::sign(ix1, nx);
+        signed char  fy1 = bound_utils_y::sign(iy1, ny);
+        ix0 = bound_utils_x::index(ix0, nx) * sx;
+        iy0 = bound_utils_y::index(iy0, ny) * sy;
+        ix1 = bound_utils_x::index(ix1, nx) * sx;
+        iy1 = bound_utils_y::index(iy1, ny) * sy;
 
-        auto accum1d = [ix0, ix1, dx0, dx1, sx0, sx1, inp]
+        auto accum1d = [ix0, ix1, dx0, dx1, fx0, fx1, inp]
                         (offset_t i, signed char s)
         {
-          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
-               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1;
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * fx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * fx1)) * dx1;
         };
 
-        *out = static_cast<scalar_t>(accum1d(iy0, sy0) * dy0
-                                   + accum1d(iy1, sy1) * dy1);
+        *out = static_cast<scalar_t>(accum1d(iy0, fy0) * dy0
+                                   + accum1d(iy1, fy1) * dy1);
     }
 };
 
@@ -1238,8 +1553,8 @@ struct PushPull<two, Q, BX, Q, BY> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -1252,31 +1567,31 @@ struct PushPull<two, Q, BX, Q, BY> {
         reduce_t dy0 = spline_utils::fastweight(y - (iy1 - 1));
         reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
         reduce_t dy2 = spline_utils::fastweight((iy1 + 1) - y);
-        signed char sx0 = bound_utils_x::sign(ix1-1, nw);
-        signed char sy0 = bound_utils_y::sign(iy1-1, nh);
-        signed char sx2 = bound_utils_x::sign(ix1+1, nw);
-        signed char sy2 = bound_utils_y::sign(iy1+1, nh);
-        signed char sx1 = bound_utils_x::sign(ix1,   nw);
-        signed char sy1 = bound_utils_y::sign(iy1,   nh);
+        signed char fx0 = bound_utils_x::sign(ix1-1, nx);
+        signed char fy0 = bound_utils_y::sign(iy1-1, ny);
+        signed char fx2 = bound_utils_x::sign(ix1+1, nx);
+        signed char fy2 = bound_utils_y::sign(iy1+1, ny);
+        signed char fx1 = bound_utils_x::sign(ix1,   nx);
+        signed char fy1 = bound_utils_y::sign(iy1,   ny);
         offset_t ix0, iy0, ix2, iy2;
-        ix0 = bound_utils_x::index(ix1-1, nw) * sw;
-        iy0 = bound_utils_y::index(iy1-1, nh) * sh;
-        ix2 = bound_utils_x::index(ix1+1, nw) * sw;
-        iy2 = bound_utils_y::index(iy1+1, nh) * sh;
-        ix1 = bound_utils_x::index(ix1,   nw) * sw;
-        iy1 = bound_utils_y::index(iy1,   nh) * sh;
+        ix0 = bound_utils_x::index(ix1-1, nx) * sx;
+        iy0 = bound_utils_y::index(iy1-1, ny) * sy;
+        ix2 = bound_utils_x::index(ix1+1, nx) * sx;
+        iy2 = bound_utils_y::index(iy1+1, ny) * sy;
+        ix1 = bound_utils_x::index(ix1,   nx) * sx;
+        iy1 = bound_utils_y::index(iy1,   ny) * sy;
 
-        auto accum1d = [ix0, ix1, ix2, dx0, dx1, dx2, sx0, sx1, sx2, inp]
+        auto accum1d = [ix0, ix1, ix2, dx0, dx1, dx2, fx0, fx1, fx2, inp]
                         (offset_t i, signed char s)
         {
-          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
-               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1
-               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * sx2)) * dx2;
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * fx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * fx1)) * dx1
+               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * fx2)) * dx2;
         };
 
-        *out = static_cast<scalar_t>(accum1d(iy0, sy0) * dy0
-                                   + accum1d(iy1, sy1) * dy1
-                                   + accum1d(iy2, sy2) * dy2);
+        *out = static_cast<scalar_t>(accum1d(iy0, fy0) * dy0
+                                   + accum1d(iy1, fy1) * dy1
+                                   + accum1d(iy2, fy2) * dy2);
     }
 };
 
@@ -1290,8 +1605,8 @@ struct PushPull<two, C, BX, C, BY> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -1306,38 +1621,38 @@ struct PushPull<two, C, BX, C, BY> {
         reduce_t dy2 = spline_utils::fastweight((iy1 + 1) - y);
         reduce_t dx3 = spline_utils::fastweight((ix1 + 2) - x);
         reduce_t dy3 = spline_utils::fastweight((iy1 + 2) - y);
-        signed char  sx0 = bound_utils_x::sign(ix1-1, nw);
-        signed char  sy0 = bound_utils_y::sign(iy1-1, nh);
-        signed char  sx2 = bound_utils_x::sign(ix1+1, nw);
-        signed char  sy2 = bound_utils_y::sign(iy1+1, nh);
-        signed char  sx3 = bound_utils_x::sign(ix1+2, nw);
-        signed char  sy3 = bound_utils_y::sign(iy1+2, nh);
-        signed char  sx1 = bound_utils_x::sign(ix1,   nw);
-        signed char  sy1 = bound_utils_y::sign(iy1,   nh);
+        signed char  fx0 = bound_utils_x::sign(ix1-1, nx);
+        signed char  fy0 = bound_utils_y::sign(iy1-1, ny);
+        signed char  fx2 = bound_utils_x::sign(ix1+1, nx);
+        signed char  fy2 = bound_utils_y::sign(iy1+1, ny);
+        signed char  fx3 = bound_utils_x::sign(ix1+2, nx);
+        signed char  fy3 = bound_utils_y::sign(iy1+2, ny);
+        signed char  fx1 = bound_utils_x::sign(ix1,   nx);
+        signed char  fy1 = bound_utils_y::sign(iy1,   ny);
         offset_t ix0, ix2, ix3, iy0, iy2, iy3;
-        ix0 = bound_utils_x::index(ix1-1, nw) * sw;
-        iy0 = bound_utils_y::index(iy1-1, nh) * sh;
-        ix2 = bound_utils_x::index(ix1+1, nw) * sw;
-        iy2 = bound_utils_y::index(iy1+1, nh) * sh;
-        ix3 = bound_utils_x::index(ix1+2, nw) * sw;
-        iy3 = bound_utils_y::index(iy1+2, nh) * sh;
-        ix1 = bound_utils_x::index(ix1,   nw) * sw;
-        iy1 = bound_utils_y::index(iy1,   nh) * sh;
+        ix0 = bound_utils_x::index(ix1-1, nx) * sx;
+        iy0 = bound_utils_y::index(iy1-1, ny) * sy;
+        ix2 = bound_utils_x::index(ix1+1, nx) * sx;
+        iy2 = bound_utils_y::index(iy1+1, ny) * sy;
+        ix3 = bound_utils_x::index(ix1+2, nx) * sx;
+        iy3 = bound_utils_y::index(iy1+2, ny) * sy;
+        ix1 = bound_utils_x::index(ix1,   nx) * sx;
+        iy1 = bound_utils_y::index(iy1,   ny) * sy;
 
         auto accum1d = [ix0, ix1, ix2, ix3, dx0, dx1, dx2, dx3,
-                        sx0, sx1, sx2, sx3, inp]
+                        fx0, fx1, fx2, fx3, inp]
                         (offset_t i, signed char s)
         {
-          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
-               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1
-               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * sx2)) * dx2
-               + static_cast<reduce_t>(bound::get(inp, i + ix3, s * sx3)) * dx3;
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * fx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * fx1)) * dx1
+               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * fx2)) * dx2
+               + static_cast<reduce_t>(bound::get(inp, i + ix3, s * fx3)) * dx3;
         };
 
-        *out = static_cast<scalar_t>(accum1d(iy0, sy0) * dy0
-                                   + accum1d(iy1, sy1) * dy1
-                                   + accum1d(iy2, sy2) * dy2
-                                   + accum1d(iy3, sy3) * dy3);
+        *out = static_cast<scalar_t>(accum1d(iy0, fy0) * dy0
+                                   + accum1d(iy1, fy1) * dy1
+                                   + accum1d(iy2, fy2) * dy2
+                                   + accum1d(iy3, fy3) * dy3);
     }
 };
 
@@ -1353,8 +1668,8 @@ struct PushPull<two, IX, BX, IY, BY> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
                 reduce_t shift)
     {
         // Precompute weights and indices
@@ -1367,41 +1682,41 @@ struct PushPull<two, IX, BX, IY, BY> {
         offset_t dby = by1-by0;
         reduce_t    wx[8],  wy[8];
         offset_t    ix[8],  iy[8];
-        signed char sx[8],  sy[8];
+        signed char fx[8],  fy[8];
         {
             reduce_t    *owy = wy;
             offset_t    *oiy = iy;
-            signed char *osy = sy;
+            signed char *ofy = fy;
             for (offset_t by = by0; by <= by1; ++by) {
                 scalar_t dy = y - by;
                 *(owy++)  = spline_utils_y::fastweight(dy);
-                *(osy++)  = bound_utils_y::sign(by, nh);
-                *(oiy++)  = bound_utils_y::index(by, nh);
+                *(ofy++)  = bound_utils_y::sign(by, ny);
+                *(oiy++)  = bound_utils_y::index(by, ny);
             }
         }
         {
             reduce_t    *owx = wx;
             offset_t    *oix = ix;
-            signed char *osx = sx;
+            signed char *ofx = fx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
                 scalar_t dx = x - bx;
                 *(owx++)  = spline_utils_x::fastweight(dx);
-                *(osx++)  = bound_utils_x::sign(bx, nw);
-                *(oix++)  = bound_utils_x::index(bx, nw);
+                *(ofx++)  = bound_utils_x::sign(bx, nx);
+                *(oix++)  = bound_utils_x::index(bx, nx);
             }
         }
 
         // Convolve coefficients with basis functions
         reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t j = 0; j <= dby; ++j) {
-            offset_t    oyy = iy[j] * sh;
-            signed char syy = sy[j];
+            offset_t    oyy = iy[j] * sy;
+            signed char fyy = fy[j];
             reduce_t    wyy = wy[j];
             for (offset_t i = 0; i <= dbx; ++i) {
-                offset_t    oxy = oyy + ix[i] * sw;
-                signed char sxy = syy * sx[i];
+                offset_t    oxy = oyy + ix[i] * sx;
+                signed char fxy = fyy * fx[i];
                 reduce_t    wxy = wyy * wx[i];
-                acc += static_cast<reduce_t>(bound::get(inp, oxy, sxy)) * wxy;
+                acc += static_cast<reduce_t>(bound::get(inp, oxy, fxy)) * wxy;
             }
         }
         *out = static_cast<scalar_t>(acc);
@@ -1425,9 +1740,9 @@ struct PushPull<two, Z, BX, Z, BY, Z, BZ> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
+                offset_t d, offset_t nz, offset_t sz, reduce_t dscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -1436,14 +1751,14 @@ struct PushPull<two, Z, BX, Z, BY, Z, BZ> {
         offset_t ix = static_cast<offset_t>(round(x));
         offset_t iy = static_cast<offset_t>(round(y));
         offset_t iz = static_cast<offset_t>(round(z));
-        signed char  sx = bound_utils_x::sign(ix, nw);
-        signed char  sy = bound_utils_y::sign(iy, nh);
-        signed char  sz = bound_utils_z::sign(iz, nd);
-        ix = bound_utils_x::index(ix, nw) * sw;
-        iy = bound_utils_y::index(iy, nh) * sh;
-        iz = bound_utils_z::index(iz, nd) * sd;
+        signed char  fx = bound_utils_x::sign(ix, nx);
+        signed char  fy = bound_utils_y::sign(iy, ny);
+        signed char  fz = bound_utils_z::sign(iz, nz);
+        ix = bound_utils_x::index(ix, nx) * sx;
+        iy = bound_utils_y::index(iy, ny) * sy;
+        iz = bound_utils_z::index(iz, nz) * sz;
 
-        *out = bound::get(inp, ix + iy + iz, sx * sy * sz);
+        *out = bound::get(inp, ix + iy + iz, fx * fy * fz);
     }
 };
 
@@ -1458,9 +1773,9 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
+                offset_t d, offset_t nz, offset_t sz, reduce_t dscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -1478,35 +1793,35 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
         reduce_t dx0 = 1 - dx1;
         reduce_t dy0 = 1 - dy1;
         reduce_t dz0 = 1 - dz1;
-        signed char  sx0 = bound_utils_x::sign(ix0, nw);
-        signed char  sy0 = bound_utils_y::sign(iy0, nh);
-        signed char  sz0 = bound_utils_z::sign(iz0, nd);
-        signed char  sx1 = bound_utils_x::sign(ix1, nw);
-        signed char  sy1 = bound_utils_y::sign(iy1, nh);
-        signed char  sz1 = bound_utils_z::sign(iz1, nd);
-        ix0 = bound_utils_x::index(ix0, nw) * sw;
-        iy0 = bound_utils_y::index(iy0, nh) * sh;
-        iz0 = bound_utils_z::index(iz0, nd) * sd;
-        ix1 = bound_utils_x::index(ix1, nw) * sw;
-        iy1 = bound_utils_y::index(iy1, nh) * sh;
-        iz1 = bound_utils_z::index(iz1, nd) * sd;
+        signed char  fx0 = bound_utils_x::sign(ix0, nx);
+        signed char  fy0 = bound_utils_y::sign(iy0, ny);
+        signed char  fz0 = bound_utils_z::sign(iz0, nz);
+        signed char  fx1 = bound_utils_x::sign(ix1, nx);
+        signed char  fy1 = bound_utils_y::sign(iy1, ny);
+        signed char  fz1 = bound_utils_z::sign(iz1, nz);
+        ix0 = bound_utils_x::index(ix0, nx) * sx;
+        iy0 = bound_utils_y::index(iy0, ny) * sy;
+        iz0 = bound_utils_z::index(iz0, nz) * sz;
+        ix1 = bound_utils_x::index(ix1, nx) * sx;
+        iy1 = bound_utils_y::index(iy1, ny) * sy;
+        iz1 = bound_utils_z::index(iz1, nz) * sz;
 
-        auto accum1d = [ix0, ix1, dx0, dx1, sx0, sx1, inp]
+        auto accum1d = [ix0, ix1, dx0, dx1, fx0, fx1, inp]
                         (offset_t i, signed char s)
         {
-          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
-               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1;
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * fx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * fx1)) * dx1;
         };
 
-        auto accum2d = [iy0, iy1, dy0, dy1, sy0, sy1, accum1d]
+        auto accum2d = [iy0, iy1, dy0, dy1, fy0, fy1, accum1d]
                         (offset_t i, signed char s)
         {
-          return accum1d(iy0 + i, sy0 * s) * dy0
-               + accum1d(iy1 + i, sy1 * s) * dy1;
+          return accum1d(iy0 + i, fy0 * s) * dy0
+               + accum1d(iy1 + i, fy1 * s) * dy1;
         };
 
-        *out  = static_cast<scalar_t>(accum2d(iz0, sz0) * dz0
-                                    + accum2d(iz1, sz1) * dz1);
+        *out  = static_cast<scalar_t>(accum2d(iz0, fz0) * dz0
+                                    + accum2d(iz1, fz1) * dz1);
     }
 };
 
@@ -1521,9 +1836,9 @@ struct PushPull<three, Q, BX, Q, BY, Q, BZ> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
+                offset_t d, offset_t nz, offset_t sz, reduce_t dscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -1541,45 +1856,45 @@ struct PushPull<three, Q, BX, Q, BY, Q, BZ> {
         reduce_t dx2 = spline_utils::fastweight((ix1 + 1) - x);
         reduce_t dy2 = spline_utils::fastweight((iy1 + 1) - y);
         reduce_t dz2 = spline_utils::fastweight((iz1 + 1) - z);
-        signed char  sx0 = bound_utils_x::sign(ix1-1, nw);
-        signed char  sy0 = bound_utils_y::sign(iy1-1, nh);
-        signed char  sz0 = bound_utils_z::sign(iz1-1, nd);
-        signed char  sx2 = bound_utils_x::sign(ix1+1, nw);
-        signed char  sy2 = bound_utils_y::sign(iy1+1, nh);
-        signed char  sz2 = bound_utils_z::sign(iz1+1, nd);
-        signed char  sx1 = bound_utils_x::sign(ix1,   nw);
-        signed char  sy1 = bound_utils_y::sign(iy1,   nh);
-        signed char  sz1 = bound_utils_z::sign(iz1,   nd);
+        signed char  fx0 = bound_utils_x::sign(ix1-1, nx);
+        signed char  fy0 = bound_utils_y::sign(iy1-1, ny);
+        signed char  fz0 = bound_utils_z::sign(iz1-1, nz);
+        signed char  fx2 = bound_utils_x::sign(ix1+1, nx);
+        signed char  fy2 = bound_utils_y::sign(iy1+1, ny);
+        signed char  fz2 = bound_utils_z::sign(iz1+1, nz);
+        signed char  fx1 = bound_utils_x::sign(ix1,   nx);
+        signed char  fy1 = bound_utils_y::sign(iy1,   ny);
+        signed char  fz1 = bound_utils_z::sign(iz1,   nz);
         offset_t ix0, iy0, iz0, ix2, iy2, iz2;
-        ix0 = bound_utils_x::index(ix1-1, nw) * sw;
-        iy0 = bound_utils_y::index(iy1-1, nh) * sh;
-        iz0 = bound_utils_z::index(iz1-1, nd) * sd;
-        ix2 = bound_utils_x::index(ix1+1, nw) * sw;
-        iy2 = bound_utils_y::index(iy1+1, nh) * sh;
-        iz2 = bound_utils_z::index(iz1+1, nd) * sd;
-        ix1 = bound_utils_x::index(ix1,   nw) * sw;
-        iy1 = bound_utils_y::index(iy1,   nh) * sh;
-        iz1 = bound_utils_z::index(iz1,   nd) * sd;
+        ix0 = bound_utils_x::index(ix1-1, nx) * sx;
+        iy0 = bound_utils_y::index(iy1-1, ny) * sy;
+        iz0 = bound_utils_z::index(iz1-1, nz) * sz;
+        ix2 = bound_utils_x::index(ix1+1, nx) * sx;
+        iy2 = bound_utils_y::index(iy1+1, ny) * sy;
+        iz2 = bound_utils_z::index(iz1+1, nz) * sz;
+        ix1 = bound_utils_x::index(ix1,   nx) * sx;
+        iy1 = bound_utils_y::index(iy1,   ny) * sy;
+        iz1 = bound_utils_z::index(iz1,   nz) * sz;
 
-        auto accum1d = [ix0, ix1, ix2, dx0, dx1, dx2, sx0, sx1, sx2, inp]
+        auto accum1d = [ix0, ix1, ix2, dx0, dx1, dx2, fx0, fx1, fx2, inp]
                         (offset_t i, signed char s)
         {
-          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
-               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1
-               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * sx2)) * dx2;
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * fx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * fx1)) * dx1
+               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * fx2)) * dx2;
         };
 
-        auto accum2d = [iy0, iy1, iy2, dy0, dy1, dy2, sy0, sy1, sy2, accum1d]
+        auto accum2d = [iy0, iy1, iy2, dy0, dy1, dy2, fy0, fy1, fy2, accum1d]
                         (offset_t i, signed char s)
         {
-          return accum1d(iy0 + i, sy0 * s) * dy0
-               + accum1d(iy1 + i, sy1 * s) * dy1
-               + accum1d(iy2 + i, sy2 * s) * dy2;
+          return accum1d(iy0 + i, fy0 * s) * dy0
+               + accum1d(iy1 + i, fy1 * s) * dy1
+               + accum1d(iy2 + i, fy2 * s) * dy2;
         };
 
-        *out  = static_cast<scalar_t>(accum2d(iz0, sz0) * dz0
-                                    + accum2d(iz1, sz1) * dz1
-                                    + accum2d(iz2, sz2) * dz2);
+        *out  = static_cast<scalar_t>(accum2d(iz0, fz0) * dz0
+                                    + accum2d(iz1, fz1) * dz1
+                                    + accum2d(iz2, fz2) * dz2);
     }
 };
 
@@ -1594,9 +1909,9 @@ struct PushPull<three, C, BX, C, BY, C, BZ> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
+                offset_t d, offset_t nz, offset_t sz, reduce_t dscl,
                 reduce_t shift)
     {
         reduce_t x = (w + shift) * wscl - shift;
@@ -1617,56 +1932,56 @@ struct PushPull<three, C, BX, C, BY, C, BZ> {
         reduce_t dx3 = spline_utils::fastweight((ix1 + 2) - x);
         reduce_t dy3 = spline_utils::fastweight((iy1 + 2) - y);
         reduce_t dz3 = spline_utils::fastweight((iz1 + 2) - z);
-        signed char  sx0 = bound_utils_x::sign(ix1-1, nw);
-        signed char  sy0 = bound_utils_y::sign(iy1-1, nh);
-        signed char  sz0 = bound_utils_z::sign(iz1-1, nd);
-        signed char  sx2 = bound_utils_x::sign(ix1+1, nw);
-        signed char  sy2 = bound_utils_y::sign(iy1+1, nh);
-        signed char  sz2 = bound_utils_z::sign(iz1+1, nd);
-        signed char  sx3 = bound_utils_x::sign(ix1+2, nw);
-        signed char  sy3 = bound_utils_y::sign(iy1+2, nh);
-        signed char  sz3 = bound_utils_z::sign(iz1+2, nd);
-        signed char  sx1 = bound_utils_x::sign(ix1,   nw);
-        signed char  sy1 = bound_utils_y::sign(iy1,   nh);
-        signed char  sz1 = bound_utils_z::sign(iz1,   nd);
+        signed char  fx0 = bound_utils_x::sign(ix1-1, nx);
+        signed char  fy0 = bound_utils_y::sign(iy1-1, ny);
+        signed char  fz0 = bound_utils_z::sign(iz1-1, nz);
+        signed char  fx2 = bound_utils_x::sign(ix1+1, nx);
+        signed char  fy2 = bound_utils_y::sign(iy1+1, ny);
+        signed char  fz2 = bound_utils_z::sign(iz1+1, nz);
+        signed char  fx3 = bound_utils_x::sign(ix1+2, nx);
+        signed char  fy3 = bound_utils_y::sign(iy1+2, ny);
+        signed char  fz3 = bound_utils_z::sign(iz1+2, nz);
+        signed char  fx1 = bound_utils_x::sign(ix1,   nx);
+        signed char  fy1 = bound_utils_y::sign(iy1,   ny);
+        signed char  fz1 = bound_utils_z::sign(iz1,   nz);
         offset_t ix0, ix2, ix3, iy0, iy2, iy3, iz0, iz2, iz3;
-        ix0 = bound_utils_x::index(ix1-1, nw) * sw;
-        iy0 = bound_utils_y::index(iy1-1, nh) * sh;
-        iz0 = bound_utils_z::index(iz1-1, nd) * sd;
-        ix2 = bound_utils_x::index(ix1+1, nw) * sw;
-        iy2 = bound_utils_y::index(iy1+1, nh) * sh;
-        iz2 = bound_utils_z::index(iz1+1, nd) * sd;
-        ix3 = bound_utils_x::index(ix1+2, nw) * sw;
-        iy3 = bound_utils_y::index(iy1+2, nh) * sh;
-        iz3 = bound_utils_z::index(iz1+2, nd) * sd;
-        ix1 = bound_utils_x::index(ix1,   nw) * sw;
-        iy1 = bound_utils_y::index(iy1,   nh) * sh;
-        iz1 = bound_utils_z::index(iz1,   nd) * sd;
+        ix0 = bound_utils_x::index(ix1-1, nx) * sx;
+        iy0 = bound_utils_y::index(iy1-1, ny) * sy;
+        iz0 = bound_utils_z::index(iz1-1, nz) * sz;
+        ix2 = bound_utils_x::index(ix1+1, nx) * sx;
+        iy2 = bound_utils_y::index(iy1+1, ny) * sy;
+        iz2 = bound_utils_z::index(iz1+1, nz) * sz;
+        ix3 = bound_utils_x::index(ix1+2, nx) * sx;
+        iy3 = bound_utils_y::index(iy1+2, ny) * sy;
+        iz3 = bound_utils_z::index(iz1+2, nz) * sz;
+        ix1 = bound_utils_x::index(ix1,   nx) * sx;
+        iy1 = bound_utils_y::index(iy1,   ny) * sy;
+        iz1 = bound_utils_z::index(iz1,   nz) * sz;
 
         auto accum1d = [ix0, ix1, ix2, ix3, dx0, dx1, dx2, dx3,
-                        sx0, sx1, sx2, sx3, inp]
+                        fx0, fx1, fx2, fx3, inp]
                         (offset_t i, signed char s)
         {
-          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * sx0)) * dx0
-               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * sx1)) * dx1
-               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * sx2)) * dx2
-               + static_cast<reduce_t>(bound::get(inp, i + ix3, s * sx3)) * dx3;
+          return static_cast<reduce_t>(bound::get(inp, i + ix0, s * fx0)) * dx0
+               + static_cast<reduce_t>(bound::get(inp, i + ix1, s * fx1)) * dx1
+               + static_cast<reduce_t>(bound::get(inp, i + ix2, s * fx2)) * dx2
+               + static_cast<reduce_t>(bound::get(inp, i + ix3, s * fx3)) * dx3;
         };
 
         auto accum2d = [iy0, iy1, iy2, iy3, dy0, dy1, dy2, dy3,
-                        sy0, sy1, sy2, sy3, accum1d]
+                        fy0, fy1, fy2, fy3, accum1d]
                         (offset_t i, signed char s)
         {
-          return accum1d(iy0 + i, sy0 * s) * dy0
-               + accum1d(iy1 + i, sy1 * s) * dy1
-               + accum1d(iy2 + i, sy2 * s) * dy2
-               + accum1d(iy3 + i, sy3 * s) * dy3;
+          return accum1d(iy0 + i, fy0 * s) * dy0
+               + accum1d(iy1 + i, fy1 * s) * dy1
+               + accum1d(iy2 + i, fy2 * s) * dy2
+               + accum1d(iy3 + i, fy3 * s) * dy3;
         };
 
-        *out = static_cast<scalar_t>(accum2d(iz0, sz0) * dz0
-                                   + accum2d(iz1, sz1) * dz1
-                                   + accum2d(iz2, sz2) * dz2
-                                   + accum2d(iz3, sz3) * dz3);
+        *out = static_cast<scalar_t>(accum2d(iz0, fz0) * dz0
+                                   + accum2d(iz1, fz1) * dz1
+                                   + accum2d(iz2, fz2) * dz2
+                                   + accum2d(iz3, fz3) * dz3);
     }
 };
 
@@ -1685,9 +2000,9 @@ struct PushPull<three, IX, BX, IY, BY, IZ, BZ> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void resize(scalar_t * out, scalar_t * inp,
-                offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
+                offset_t w, offset_t nx, offset_t sx, reduce_t wscl,
+                offset_t h, offset_t ny, offset_t sy, reduce_t hscl,
+                offset_t d, offset_t nz, offset_t sz, reduce_t dscl,
                 reduce_t shift)
     {
         // Precompute weights and indices
@@ -1703,56 +2018,56 @@ struct PushPull<three, IX, BX, IY, BY, IZ, BZ> {
         offset_t dbz = bz1-bz0;
         reduce_t    wx[8],  wy[8],  wz[8];
         offset_t    ix[8],  iy[8],  iz[8];
-        signed char sx[8],  sy[8],  sz[8];
+        signed char fx[8],  fy[8],  fz[8];
         {
             reduce_t    *owz = wz;
             offset_t    *oiz = iz;
-            signed char *osz = sz;
+            signed char *ofz = fz;
             for (offset_t bz = bz0; bz <= bz1; ++bz) {
                 scalar_t dz = z - bz;
                 *(owz++)  = spline_utils_z::fastweight(dz);
-                *(osz++)  = bound_utils_z::sign(bz, nd);
-                *(oiz++)  = bound_utils_z::index(bz, nd);
+                *(ofz++)  = bound_utils_z::sign(bz, nz);
+                *(oiz++)  = bound_utils_z::index(bz, nz);
             }
         }
         {
             reduce_t    *owy = wy;
             offset_t    *oiy = iy;
-            signed char *osy = sy;
+            signed char *ofy = fy;
             for (offset_t by = by0; by <= by1; ++by) {
                 scalar_t dy = y - by;
                 *(owy++)  = spline_utils_y::fastweight(dy);
-                *(osy++)  = bound_utils_y::sign(by, nh);
-                *(oiy++)  = bound_utils_y::index(by, nh);
+                *(ofy++)  = bound_utils_y::sign(by, ny);
+                *(oiy++)  = bound_utils_y::index(by, ny);
             }
         }
         {
             reduce_t    *owx = wx;
             offset_t    *oix = ix;
-            signed char *osx = sx;
+            signed char *ofx = fx;
             for (offset_t bx = bx0; bx <= bx1; ++bx) {
                 scalar_t dx = x - bx;
                 *(owx++)  = spline_utils_x::fastweight(dx);
-                *(osx++)  = bound_utils_x::sign(bx, nw);
-                *(oix++)  = bound_utils_x::index(bx, nw);
+                *(ofx++)  = bound_utils_x::sign(bx, nx);
+                *(oix++)  = bound_utils_x::index(bx, nx);
             }
         }
 
         // Convolve coefficients with basis functions
         reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t k = 0; k <= dbz; ++k) {
-            offset_t    ozz = iz[k] * sd;
-            signed char szz = sz[k];
+            offset_t    ozz = iz[k] * sz;
+            signed char fzz = fz[k];
             reduce_t    wzz = wz[k];
             for (offset_t j = 0; j <= dby; ++j) {
-                offset_t    oyz = ozz + iy[j] * sh;
-                signed char syz = szz * sy[j];
+                offset_t    oyz = ozz + iy[j] * sy;
+                signed char fyz = fzz * fy[j];
                 reduce_t    wyz = wzz * wy[j];
                 for (offset_t i = 0; i <= dbx; ++i) {
-                    offset_t    oxyz = oyz + ix[i] * sw;
-                    signed char sxyz = syz * sx[i];
+                    offset_t    oxyz = oyz + ix[i] * sx;
+                    signed char fxyz = fyz * fx[i];
                     reduce_t    wxyz = wyz * wx[i];
-                    acc += static_cast<reduce_t>(bound::get(inp, oxyz, sxyz)) * wxyz;
+                    acc += static_cast<reduce_t>(bound::get(inp, oxyz, fxyz)) * wxyz;
                 }
             }
         }
@@ -1784,14 +2099,14 @@ struct PushPull<D> {
         for (int d=0; d<D; ++d) {
             reduce_t    *wd = w + 8*d;
             offset_t    *id = i + 8*d;
-            signed char *sd = s + 8*d;
+            signed char *sz = s + 8*d;
             reduce_t x = scl[d] * (coord[d] + shift) - shift;
             offset_t b0, b1;
             spline::bounds(inter[d], x, b0, b1);
             db[d] = b1-b0;
             for (offset_t b = b0; b <= b1; ++b) {
                 *(wd++) = spline::fastweight(inter[d], x - b);
-                *(sd++) = bound::sign(bnd[d], b, size[d]);
+                *(sz++) = bound::sign(bnd[d], b, size[d]);
                 *(id++) = bound::index(bnd[d], b, size[d]);
             }
         }
@@ -1804,12 +2119,12 @@ struct PushPull<D> {
         for (int d=0; d<D; ++d) {
             reduce_t    *wd = w + 8*d;
             offset_t    *id = i + 8*d;
-            signed char *sd = s + 8*d;
+            signed char *sz = s + 8*d;
             for (offset_t k = 0; k <= db[d]; ++k) {
                 offsets[d] = (d > 0 ? offsets[d-1] : static_cast<offset_t>(0))
                            + id[k] * stride[d];
                 signs[d]   = (d > 0 ? signs[d-1]   : static_cast<signed char>(1))
-                           * sd[k];
+                           * sz[k];
                 weights[d] = (d > 0 ? weights[d-1] : static_cast<reduce_t>(1))
                            * wd[k];
                 if (d == D-1)
