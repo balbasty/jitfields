@@ -92,7 +92,7 @@ def resize(x, factor=None, shape=None, ndim=None,
             shape = [pymath.ceil(s*f) for s, f in zip(x.shape[-ndim:], factor)]
 
     if prefilter:
-        spline_coeff_nd(x, order, bound, ndim)
+        x = spline_coeff_nd(x, order, bound, ndim)
     return _Resize.apply(x, factor, shape, ndim, anchor, order, bound, out)
 
 

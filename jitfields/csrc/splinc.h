@@ -29,6 +29,7 @@
 #include "cuda_switch.h"
 #include "spline.h"
 #include "bounds.h"
+#include "utils.h"
 
 namespace jf {
 namespace splinc {
@@ -281,12 +282,13 @@ inline __device__ void filter(scalar_t * inp, offset_t size, offset_t stride,
             prev = cur;
         }
 
+        cur -= stride;
         *cur = bound_utils::final(inp, pole, size, stride);
 
         prev = cur;
         cur = prev - stride;
         for (offset_t i = size-2; i >= 0; --i, cur -= stride) {
-            *cur += pole * ((*prev) - (*cur));
+            *cur = pole * ((*prev) - (*cur));
             prev = cur;
         }
     }

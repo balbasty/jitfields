@@ -1,7 +1,9 @@
-from .utils import try_import
+import torch.autograd
+from .common.bounds import convert_bound
+from .common.spline import convert_order
+from .utils import try_import, ensure_list
 cuda_splinc = try_import('jitfields.cuda', 'splinc')
 cpu_splinc = try_import('jitfields.cpp', 'splinc')
-from jitfields.cpp import splinc as cpu_splinc
 
 
 def spline_coeff_(inp, order, bound='dct2', dim=-1):
@@ -23,11 +25,9 @@ def spline_coeff_(inp, order, bound='dct2', dim=-1):
     coeff : tensor
         Spline coefficients
     """
-    if inp.is_cuda:
-        spline_coeff_ = cuda_splinc.spline_coeff_
-    else:
-        spline_coeff_ = cpu_splinc.spline_coeff_
-    return spline_coeff_(inp, order, bound, dim)
+    order = convert_order.get(order, order)
+    bound = convert_bound.get(bound, bound)
+    return SplineCoeff_.apply(inp, order, bound, dim)
 
 
 def spline_coeff(inp, order, bound='dct2', dim=-1):
@@ -71,11 +71,9 @@ def spline_coeff_nd_(inp, order, bound='dct2', ndim=None):
     coeff : (..., *spatial) tensor
         Spline coefficients
     """
-    if inp.is_cuda:
-        spline_coeff_nd_ = cuda_splinc.spline_coeff_nd_
-    else:
-        spline_coeff_nd_ = cpu_splinc.spline_coeff_nd_
-    return spline_coeff_nd_(inp, order, bound, ndim)
+    order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
+    bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
+    return SplineCoeffND_.apply(inp, order, bound, ndim)
 
 
 def spline_coeff_nd(inp, order, bound='dct2', ndim=None):
@@ -98,3 +96,43 @@ def spline_coeff_nd(inp, order, bound='dct2', ndim=None):
         Spline coefficients
     """
     return spline_coeff_nd_(inp.clone(), order, bound, ndim)
+
+
+class SplineCoeff_(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, inp, order, bound, dim):
+        if inp.is_cuda:
+            spline_coeff_ = cuda_splinc.spline_coeff_
+        else:
+            spline_coeff_ = cpu_splinc.spline_coeff_
+        ctx.opt = (order, bound, dim)
+        return spline_coeff_(inp, order, bound, dim)
+
+    @staticmethod
+    def backward(ctx, grad):
+        if grad.is_cuda:
+            spline_coeff_ = cuda_splinc.spline_coeff_
+        else:
+            spline_coeff_ = cpu_splinc.spline_coeff_
+        return spline_coeff_(grad.clone(), *ctx.opt)
+
+
+class SplineCoeffND_(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, inp, order, bound, ndim):
+        if inp.is_cuda:
+            spline_coeff_nd_ = cuda_splinc.spline_coeff_nd_
+        else:
+            spline_coeff_nd_ = cpu_splinc.spline_coeff_nd_
+        ctx.opt = (order, bound, ndim)
+        return spline_coeff_nd_(inp, order, bound, ndim)
+
+    @staticmethod
+    def backward(ctx, grad):
+        if grad.is_cuda:
+            spline_coeff_nd_ = cuda_splinc.spline_coeff_nd_
+        else:
+            spline_coeff_nd_ = cpu_splinc.spline_coeff_nd_
+        return spline_coeff_nd_(grad.clone(), *ctx.opt)

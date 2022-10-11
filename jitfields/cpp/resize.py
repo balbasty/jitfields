@@ -1,9 +1,9 @@
-from ..common.bounds import convert_bound, cnames as cnames_bound
-from ..common.spline import convert_order, cnames as cnames_spline
+from ..common.bounds import convert_bound
+from ..common.spline import convert_order
 from ..utils import ensure_list
+from .utils import boundspline_template, cwrap, cinfo
 import cppyy
 import numpy as np
-import ctypes
 import os
 
 this_folder = os.path.abspath(os.path.dirname(__file__))
@@ -28,65 +28,30 @@ def resize(x, factor=None, shape=None, ndim=None,
         scale = [1/f for f in factor]
 
     fullshape = list(x.shape[:-ndim]) + list(shape)
-    if out is None:
-        out = x.new_empty(fullshape)
-    else:
-        out = out.view(fullshape)
+    out = x.new_empty(fullshape) if out is None else out.view(fullshape)
     npx = x.numpy()
     npy = out.numpy()
+
     offset_t = np.int64
-
-    inshape = np.asarray(npx.shape, dtype=offset_t)
-    instride = [s // np.dtype(npx.dtype).itemsize for s in npx.strides]
-    instride = np.asarray(instride, dtype=offset_t)
-
-    outshape = np.asarray(npy.shape, dtype=offset_t)
-    outstride = [s // np.dtype(npy.dtype).itemsize for s in npy.strides]
-    outstride = np.asarray(outstride, dtype=offset_t)
+    inshape, instride = cinfo(npx, dtype=offset_t)
+    outshape, outstride = cinfo(npy, dtype=offset_t)
 
     scalar_t = npx.dtype.type
     shift = scalar_t(shift)
     scale = np.asarray(scale, dtype=scalar_t)
-
-    cscalar_t = ctypes.c_float if scalar_t == np.float32 else ctypes.c_double
-    coffset_t = ctypes.c_int32 if offset_t == np.int32 else ctypes.c_int64
-
-    nalldim = npy.ndim
+    nalldim = np.int32(npy.ndim)
 
     # dispatch
     if ndim <= 3:
-        order = ['jf::spline::type::' + cnames_spline[o] for o in order]
-        bound = ['jf::bound::type::' + cnames_bound[b] for b in bound]
-        if ndim <= 1:
-            func = cppyy.gbl.jf.resize.loop1d[f'{order[0]}, {bound[0]}']
-        elif ndim <= 2:
-            func = cppyy.gbl.jf.resize.loop2d[f'{order[0]}, {bound[0]}, '
-                                              f'{order[1]}, {bound[1]}']
-        else:
-            func = cppyy.gbl.jf.resize.loop3d[f'{order[0]}, {bound[0]}, '
-                                              f'{order[1]}, {bound[1]}, '
-                                              f'{order[2]}, {bound[2]}']
-        func(npy.ctypes.data_as(ctypes.POINTER(cscalar_t)),
-             npx.ctypes.data_as(ctypes.POINTER(cscalar_t)),
-             int(nalldim), cscalar_t(shift),
-             scale.ctypes.data_as(ctypes.POINTER(cscalar_t)),
-             outshape.ctypes.data_as(ctypes.POINTER(coffset_t)),
-             inshape.ctypes.data_as(ctypes.POINTER(coffset_t)),
-             outstride.ctypes.data_as(ctypes.POINTER(coffset_t)),
-             instride.ctypes.data_as(ctypes.POINTER(coffset_t)))
+        template = boundspline_template(bound, order)
+        func = cwrap(getattr(cppyy.gbl.jf.resize, f'loop{ndim}d')[template])
+        func(npy, npx, nalldim, shift, scale,
+             outshape, inshape, outstride, instride)
     else:
-        func = cppyy.gbl.jf.resize.loopnd[f'{int(ndim)}']
+        func = cwrap(cppyy.gbl.jf.resize.loopnd[f'{int(ndim)}'])
         order = np.asarray(order, dtype='uint8')
         bound = np.asarray(bound, dtype='uint8')
-        func(npy.ctypes.data_as(ctypes.POINTER(cscalar_t)),
-             npx.ctypes.data_as(ctypes.POINTER(cscalar_t)),
-             int(nalldim), cscalar_t(shift),
-             scale.ctypes.data_as(ctypes.POINTER(cscalar_t)),
-             order.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-             bound.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8)),
-             outshape.ctypes.data_as(ctypes.POINTER(coffset_t)),
-             inshape.ctypes.data_as(ctypes.POINTER(coffset_t)),
-             outstride.ctypes.data_as(ctypes.POINTER(coffset_t)),
-             instride.ctypes.data_as(ctypes.POINTER(coffset_t)))
+        func(npy, npx, nalldim, shift, scale,
+             order, bound, outshape, inshape, outstride, instride)
 
     return out
