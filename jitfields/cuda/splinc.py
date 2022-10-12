@@ -1,10 +1,9 @@
-from jitfields.common.bounds import convert_bound, cnames as bound_names
-from jitfields.common.spline import convert_order
+from ..common.bounds import convert_bound, cnames as bound_names
+from ..common.spline import convert_order
+from ..common.utils import cinfo
 from ..utils import ensure_list, prod
-from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
-                    load_code, to_cupy)
+from .utils import (culaunch, get_offset_type, load_code, to_cupy)
 from ..common.splinc import get_poles
-import math as pymath
 import cupy as cp
 
 
@@ -58,22 +57,15 @@ def spline_coeff_(inp, order, bound, dim=-1):
     cu = to_cupy(inp.movedim(dim, -1))
     offset_t = get_offset_type(cu.shape)
     scalar_t = cu.dtype.type
-
-    shape = cp.asarray(cu.shape, dtype=offset_t)
-    stride = [s // cp.dtype(cu.dtype).itemsize for s in cu.strides]
-    stride = cp.asarray(stride, dtype=offset_t)
+    shape, stride = cinfo(cu, dtype=offset_t, backend=cp)
 
     poles = cp.asarray(get_poles(order), dtype='double')
     npoles = cp.int(len(poles))
 
     # dispatch
     nvox = prod(cu.shape[:-1])
-    nblocks = get_cuda_blocks(nvox)
-    nthreads = get_cuda_num_threads()
-    nthreads = min(nthreads, int(pymath.ceil(nvox / nblocks)))
     kernel = get_kernel(bound, scalar_t, offset_t)
-    kernel((nblocks,), (nthreads,),
-           (cu, cp.int(cu.ndim), shape, stride, poles, npoles))
+    culaunch(kernel, nvox, (cu, cp.int(cu.ndim), shape, stride, poles, npoles))
 
     return inp
 

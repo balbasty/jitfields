@@ -2,8 +2,7 @@ from ..common.bounds import cnames as bound_names, convert_bound
 from ..common.spline import cnames as order_names, convert_order
 from ..common.utils import cinfo
 from ..utils import ensure_list, prod
-from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
-                    load_code, to_cupy)
+from .utils import (culaunch, get_offset_type, load_code, to_cupy)
 import cupy as cp
 import os
 
@@ -147,18 +146,14 @@ def pull(out, inp, grid, order, bound, extrapolate):
                           reduce_t, scalar_t, offset_t)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('pull', ndim, extrapolate, reduce_t, scalar_t, offset_t)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
-
-
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     return out
 
 
@@ -197,16 +192,14 @@ def push(out, inp, grid, order, bound, extrapolate):
                           reduce_t, scalar_t, offset_t)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('push', ndim, extrapolate, reduce_t, scalar_t, offset_t)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
 
     return out
 
@@ -243,16 +236,14 @@ def count(out, grid, order, bound, extrapolate):
                           reduce_t, scalar_t, offset_t)
         args = (np_out, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('count', ndim, extrapolate, reduce_t, scalar_t, offset_t)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_grid, nalldim, order, bound,
                 grid_shape, splinc_shape, outstride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
 
     return out
 
@@ -292,16 +283,14 @@ def grad(out, inp, grid, order, bound, extrapolate):
                           reduce_t, scalar_t, offset_t)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('grad', ndim, extrapolate, reduce_t, scalar_t, offset_t)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
 
     return out
 
@@ -351,8 +340,7 @@ def pull_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
                 nalldim, grid_shape, splinc_shape,
                 out_grad_inp_stride, out_grad_grid_stride,
                 inp_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('pull', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
         order = cp.asarray(order, dtype='uint8')
@@ -361,8 +349,7 @@ def pull_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
                 nalldim, order, bound, grid_shape, splinc_shape,
                 out_grad_inp_stride, out_grad_grid_stride,
                 inp_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
 
     return out_grad_inp, out_grad_grid
 
@@ -412,8 +399,7 @@ def push_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
                 nalldim, grid_shape, splinc_shape,
                 out_grad_inp_stride, out_grad_grid_stride,
                 inp_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('push', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
         order = cp.asarray(order, dtype='uint8')
@@ -422,8 +408,7 @@ def push_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
                 nalldim, order, bound, grid_shape, splinc_shape,
                 out_grad_inp_stride, out_grad_grid_stride,
                 inp_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
 
     return out_grad_inp, out_grad_grid
 
@@ -465,8 +450,7 @@ def count_backward(out_grad_grid, inp_grad, grid,
         args = (np_out_grad_grid, np_inp_grad, np_grid,
                 nalldim, grid_shape, splinc_shape,
                 out_grad_grid_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('count', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
         order = cp.asarray(order, dtype='uint8')
@@ -474,8 +458,7 @@ def count_backward(out_grad_grid, inp_grad, grid,
         args = (np_out_grad_grid, np_inp_grad, np_grid,
                 nalldim, order, bound, grid_shape, splinc_shape,
                 out_grad_grid_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
 
     return out_grad_grid
 
@@ -525,8 +508,7 @@ def grad_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
                 nalldim, grid_shape, splinc_shape,
                 out_grad_inp_stride, out_grad_grid_stride,
                 inp_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
         func = get_kernelnd('grad', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
         order = cp.asarray(order, dtype='uint8')
@@ -535,7 +517,6 @@ def grad_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
                 nalldim, order, bound, grid_shape, splinc_shape,
                 out_grad_inp_stride, out_grad_grid_stride,
                 inp_stride, inp_grad_stride, grid_stride)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
-                    (get_cuda_num_threads(),), args)
+        culaunch(func, prod(np_grid.shape[:-1]), args)
 
     return out_grad_inp, out_grad_grid

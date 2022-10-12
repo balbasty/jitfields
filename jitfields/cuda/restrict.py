@@ -1,8 +1,8 @@
-from jitfields.common.bounds import cnames as bound_names, convert_bound
-from jitfields.common.spline import cnames as order_names, convert_order
+from ..common.bounds import cnames as bound_names, convert_bound
+from ..common.spline import cnames as order_names, convert_order
+from ..common.utils import cinfo
 from ..utils import ensure_list, prod
-from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
-                    load_code, to_cupy)
+from .utils import (get_offset_type, load_code, to_cupy, culaunch)
 import cupy as cp
 
 
@@ -105,21 +105,13 @@ def restrict(x, factor=None, shape=None, ndim=None,
         scale = factor
 
     fullshape = list(x.shape[:-ndim]) + list(shape)
-    if out is None:
-        out = x.new_empty(fullshape)
-    else:
-        out = out.view(fullshape)
+    out = x.new_empty(fullshape) if out is None else out.view(fullshape)
     cux = to_cupy(x)
     cuy = to_cupy(out)
     offset_t = get_offset_type(cux.shape, cuy.shape)
 
-    inshape = cp.asarray(cux.shape, dtype=offset_t)
-    instride = [s // cp.dtype(cux.dtype).itemsize for s in cux.strides]
-    instride = cp.asarray(instride, dtype=offset_t)
-
-    outshape = cp.asarray(cuy.shape, dtype=offset_t)
-    outstride = [s // cp.dtype(cux.dtype).itemsize for s in cuy.strides]
-    outstride = cp.asarray(outstride, dtype=offset_t)
+    inshape, instride = cinfo(cux, dtype=offset_t, backend=cp)
+    outshape, outstride = cinfo(cuy, dtype=offset_t, backend=cp)
 
     scalar_t = cux.dtype.type
     shift = scalar_t(shift)
@@ -129,15 +121,15 @@ def restrict(x, factor=None, shape=None, ndim=None,
     if ndim <= 3:
         scale2 = all(1 < s <= 2 for s in scale)
         kernel = get_kernel(ndim, scale2, tuple(order), tuple(bound), scalar_t, offset_t)
-        kernel((get_cuda_blocks(prod(cuy.shape)),), (get_cuda_num_threads(),),
-               (cuy, cux, cp.int(cux.ndim), shift, cuscale,
-                outshape, inshape, outstride, instride))
+        culaunch(kernel, prod(cuy.shape),
+                 (cuy, cux, cp.int(cux.ndim), shift, cuscale,
+                  outshape, inshape, outstride, instride))
     else:
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         kernel = get_kernelnd(ndim, scalar_t, offset_t)
-        kernel((get_cuda_blocks(prod(cuy.shape)),), (get_cuda_num_threads(),),
-               (cuy, cux, cp.int(cux.ndim), shift, cuscale, order, bound,
-                outshape, inshape, outstride, instride))
+        culaunch(kernel, prod(cuy.shape),
+                 (cuy, cux, cp.int(cux.ndim), shift, cuscale, order, bound,
+                  outshape, inshape, outstride, instride))
 
     return out, scale

@@ -1,5 +1,4 @@
-from .utils import (get_cuda_num_threads, get_cuda_blocks,
-                    load_code, to_cupy)
+from .utils import (culaunch, load_code, to_cupy, get_cuda_num_threads, get_cuda_blocks)
 import cupy as cp
 import math as pymath
 import torch
@@ -37,8 +36,7 @@ def l1dt_1d_(f, dim=-1, w=1):
     kernel = l1dt_kernels[(cuf.dtype, offset_t)]
     shape = shape.astype(offset_t)
     stride = stride.astype(offset_t)
-    kernel((get_cuda_blocks(n),), (get_cuda_num_threads(),),
-           (cuf, cuf.dtype.type(w), cp.int(cuf.ndim), shape, stride))
+    culaunch(kernel, n, (cuf, cuf.dtype.type(w), cp.int(cuf.ndim), shape, stride))
     f = f.movedim(-1, dim)
     return f
 
@@ -50,6 +48,7 @@ def l1dt_1d(f, dim=-1, w=1):
         f = torch.get_default_dtype()
     f = f.to(dtype, copy=True)
     return l1dt_1d_(f, dim, w)
+
 
 edt_templates = (
     'kernel<half,int>',

@@ -2,8 +2,7 @@ from ..common.bounds import cnames as bound_names, convert_bound
 from ..common.spline import cnames as order_names, convert_order
 from ..common.utils import cinfo
 from ..utils import ensure_list, prod
-from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
-                    load_code, to_cupy)
+from .utils import (get_offset_type, load_code, to_cupy, culaunch)
 import cupy as cp
 
 # ===
@@ -108,8 +107,8 @@ def resize(x, factor=None, shape=None, ndim=None,
     cuy = to_cupy(out)
     offset_t = get_offset_type(cux.shape, cuy.shape)
 
-    inshape, instride = cinfo(cux, dtype=offset_t)
-    outshape, outstride = cinfo(cuy, dtype=offset_t)
+    inshape, instride = cinfo(cux, dtype=offset_t, backend=cp)
+    outshape, outstride = cinfo(cuy, dtype=offset_t, backend=cp)
 
     scalar_t = cux.dtype.type
     shift = scalar_t(shift)
@@ -118,15 +117,15 @@ def resize(x, factor=None, shape=None, ndim=None,
     # dispatch
     if ndim <= 3:
         kernel = get_kernel(ndim, tuple(order), tuple(bound), scalar_t, offset_t)
-        kernel((get_cuda_blocks(prod(cuy.shape)),), (get_cuda_num_threads(),),
-               (cuy, cux, cp.int(cux.ndim), shift, scale,
-                outshape, inshape, outstride, instride))
+        culaunch(kernel, prod(cuy.shape),
+                 (cuy, cux, cp.int(cux.ndim), shift, scale,
+                  outshape, inshape, outstride, instride))
     else:
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         kernel = get_kernelnd(ndim, scalar_t, offset_t)
-        kernel((get_cuda_blocks(prod(cuy.shape)),), (get_cuda_num_threads(),),
-               (cuy, cux, cp.int(cux.ndim), shift, scale, order, bound,
-                outshape, inshape, outstride, instride))
+        culaunch(kernel, prod(cuy.shape),
+                 (cuy, cux, cp.int(cux.ndim), shift, scale, order, bound,
+                  outshape, inshape, outstride, instride))
 
     return out

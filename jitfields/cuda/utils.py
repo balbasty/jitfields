@@ -5,6 +5,7 @@ from math import prod
 import re
 from torch.utils.dlpack import to_dlpack
 import cupy as cp
+from cupy_backends.cuda.api.driver import CUDADriverError
 
 _cuda_num_threads = None
 _num_threads = None
@@ -37,6 +38,19 @@ def get_num_threads():
 def get_cuda_blocks(n, max_threads_per_block=None):
     max_threads_per_block = max_threads_per_block or get_cuda_num_threads()
     return (n - 1) // max_threads_per_block + 1
+
+
+def culaunch(kernel, numel, args):
+    trials = 0
+    num_threads = get_cuda_num_threads()
+    e = None
+    while trials < 4 and num_threads >= 1:
+        num_blocks = get_cuda_blocks(numel, num_threads)
+        try:
+            return kernel((num_blocks,), (num_threads,), args)
+        except CUDADriverError as e:
+            num_threads = num_threads // 2
+    raise e
 
 
 def get_offset_type(*shapes):

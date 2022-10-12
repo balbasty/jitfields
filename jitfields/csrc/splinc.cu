@@ -1,6 +1,9 @@
 #include "cuda_switch.h"
 #include "splinc.h"
+#include "bounds.h"
 #include "batch.h"
+
+using namespace jf;
 
 template <bound::type B, typename scalar_t, typename offset_t>
 __global__ void kernel(scalar_t * inp, int ndim,
