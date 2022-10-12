@@ -1,4 +1,5 @@
-from .utils import bound_as_cname, cwrap, cinfo
+from .utils import bound_as_cname, cwrap
+from ..common.utils import cinfo
 from ..common.splinc import get_poles
 import numpy as np
 import cppyy

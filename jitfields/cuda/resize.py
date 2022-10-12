@@ -1,5 +1,6 @@
-from jitfields.common.bounds import cnames as bound_names, convert_bound
-from jitfields.common.spline import cnames as order_names, convert_order
+from ..common.bounds import cnames as bound_names, convert_bound
+from ..common.spline import cnames as order_names, convert_order
+from ..common.utils import cinfo
 from ..utils import ensure_list, prod
 from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
                     load_code, to_cupy)
@@ -101,21 +102,14 @@ def resize(x, factor=None, shape=None, ndim=None,
         scale = [1/f for f in factor]
 
     fullshape = list(x.shape[:-ndim]) + list(shape)
-    if out is None:
-        out = x.new_empty(fullshape)
-    else:
-        out = out.view(fullshape)
+
+    out = x.new_empty(fullshape) if out is None else out.view(fullshape)
     cux = to_cupy(x)
     cuy = to_cupy(out)
     offset_t = get_offset_type(cux.shape, cuy.shape)
 
-    inshape = cp.asarray(cux.shape, dtype=offset_t)
-    instride = [s // cp.dtype(cux.dtype).itemsize for s in cux.strides]
-    instride = cp.asarray(instride, dtype=offset_t)
-
-    outshape = cp.asarray(cuy.shape, dtype=offset_t)
-    outstride = [s // cp.dtype(cux.dtype).itemsize for s in cuy.strides]
-    outstride = cp.asarray(outstride, dtype=offset_t)
+    inshape, instride = cinfo(cux, dtype=offset_t)
+    outshape, outstride = cinfo(cuy, dtype=offset_t)
 
     scalar_t = cux.dtype.type
     shift = scalar_t(shift)

@@ -20,13 +20,6 @@ def as_pointer(array, dtype=None):
     return array.ctypes.data_as(ctypes.POINTER(dtype))
 
 
-def cstrides(array):
-    """Get C strides (in elements, not bytes) from numpy array"""
-    itemsize = np.dtype(array.dtype).itemsize
-    strides = [s // itemsize for s in array.strides]
-    return strides
-
-
 def bound_as_cname(bound):
     """Get C bound type"""
     if isinstance(bound, (list, tuple)):
@@ -74,13 +67,6 @@ def cwrap(func):
         args = list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
         return func(*args)
     return call
-
-
-def cinfo(array, dtype=None):
-    """Return shape and stride as numpy arrays"""
-    shape = np.asarray(array.shape, dtype=dtype)
-    stride = np.asarray(cstrides(array), dtype=dtype)
-    return shape, stride
 
 
 def ctypename(dtype):

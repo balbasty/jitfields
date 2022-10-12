@@ -1,7 +1,8 @@
 from ..common.bounds import convert_bound
 from ..common.spline import convert_order
 from ..utils import ensure_list
-from .utils import boundspline_template, cwrap, cinfo
+from .utils import boundspline_template, cwrap
+from ..common.utils import cinfo
 import cppyy
 import numpy as np
 import os

@@ -1,4 +1,5 @@
-from .utils import boundspline_template, cwrap, cinfo, ctypename
+from .utils import boundspline_template, cwrap, ctypename
+from ..common.utils import cinfo
 import cppyy
 import numpy as np
 import os
