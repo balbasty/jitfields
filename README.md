@@ -9,6 +9,20 @@ Fast functions for dense scalar and vector fields, implemented using just-in-tim
 Note that currently, the CPU implementation is single-threaded. 
 I do plan to implement a multi-threaded parallel loop in the near future.
 
+## Installation
+
+Installation through pip should work, although I don't know how robust the cupy/pytorch 
+interaction is in term of cuda version.
+```sh
+pip install git+https://github.com/balbasty/jitfields
+```
+
+Pre-installing dependencies from conda may be more robust:
+```sh
+conda install -c conda-forge numpy cupy ccpyy pytorch cudatoolkit=10.2
+pip install git+https://github.com/balbasty/jitfields
+```
+
 ## Implemented so far
 
 ### CPU and GPU
