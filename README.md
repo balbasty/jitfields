@@ -3,18 +3,13 @@ Fast functions for dense scalar and vector fields, implemented using just-in-tim
 
 **/!\ This is very experimental**
 
-- I am implementing the GPU version of the algorithms in pure CUDA, which is compiled just-in-time by `cupy`.
-- I am implementing the CPU version of the algorithms in pure C++, which gets just-in-time compiled by `cppyy`. 
+- GPU version of the algorithms are written in pure CUDA, and compiled just-in-time by `cupy`.
+- CPU version of the algorithms are written in pure C++, and compiled just-in-time by `cppyy`. 
 
 Note that currently, the CPU implementation is single-threaded. 
 I do plan to implement a multi-threaded parallel loop in the near future.
 
 ## Implemented so far
-
-### Known bugs
-
-- `spline_coeff` segfaults when the input shape is too small compared 
-  to the spline order
 
 ### CPU and GPU
 
@@ -231,6 +226,128 @@ Returns
 -------
 x : (..., *shape) tensor
     restricted tensor
+"""
+```
 
+```python
+pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+"""Sample a tensor using spline interpolation
+
+Parameters
+----------
+inp : (..., *inshape, channel) tensor
+    Input tensor
+grid : (..., *outshape, ndim) tensor
+    Tensor of coordinates into `inp`
+order : [sequence of] {0..7}, default=2
+    Interpolation order.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
+    How to deal with out-of-bound values.
+extrapolate : bool or {'center', 'edge'}
+    - True: use bound to extrapolate out-of-bound value
+    - False or 'center': do not extrapolate values that fall outside
+      of the centers of the first and last voxels.
+    - 'edge': do not extrapolate values that fall outside
+       of the edges of the first and last voxels.
+prefilter : bool, default=True
+    Whether to first compute interpolating coefficients.
+    Must be true for proper interpolation, otherwise this
+    function merely performs a non-interpolating "spline sampling".
+
+Returns
+-------
+out : (..., *outshape, channel) tensor
+    Pulled tensor
+
+"""
+```
+
+```python
+push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True, out=None)
+"""Splat a tensor using spline interpolation
+
+Parameters
+----------
+inp : (..., *inshape, channel) tensor
+    Input tensor
+grid : (..., *inshape, ndim) tensor
+    Tensor of coordinates into `inp`
+shape : sequence[int], default=inshape
+    Output spatial shape
+order : [sequence of] {0..7}, default=2
+    Interpolation order.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
+    How to deal with out-of-bound values.
+extrapolate : bool or {'center', 'edge'}
+    - True: use bound to extrapolate out-of-bound value
+    - False or 'center': do not extrapolate values that fall outside
+      of the centers of the first and last voxels.
+    - 'edge': do not extrapolate values that fall outside
+       of the edges of the first and last voxels.
+
+Returns
+-------
+out : (..., *shape, channel) tensor
+    Pulled tensor
+"""
+```
+
+```python
+count(grid, shape=None, order=2, bound='dct2', extrapolate=True, out=None)
+"""Splat ones using spline interpolation
+
+Parameters
+----------
+grid : (..., *inshape, ndim) tensor
+    Tensor of coordinates
+shape : sequence[int], default=inshape
+    Output spatial shape
+order : [sequence of] {0..7}, default=2
+    Interpolation order.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
+    How to deal with out-of-bound values.
+extrapolate : bool or {'center', 'edge'}
+    - True: use bound to extrapolate out-of-bound value
+    - False or 'center': do not extrapolate values that fall outside
+      of the centers of the first and last voxels.
+    - 'edge': do not extrapolate values that fall outside
+       of the edges of the first and last voxels.
+
+Returns
+-------
+out : (..., *shape) tensor
+    Pulled tensor
+"""
+```
+
+```python
+grad(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+"""Sample the spatial gradients of a tensor using spline interpolation
+
+Parameters
+----------
+inp : (..., *inshape, channel) tensor
+    Input tensor
+grid : (..., *outshape, ndim) tensor
+    Tensor of coordinates into `inp`
+order : [sequence of] {0..7}, default=2
+    Interpolation order.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
+    How to deal with out-of-bound values.
+extrapolate : bool or {'center', 'edge'}
+    - True: use bound to extrapolate out-of-bound value
+    - False or 'center': do not extrapolate values that fall outside
+      of the centers of the first and last voxels.
+    - 'edge': do not extrapolate values that fall outside
+       of the edges of the first and last voxels.
+prefilter : bool, default=True
+    Whether to first compute interpolating coefficients.
+    Must be true for proper interpolation, otherwise this
+    function merely performs a non-interpolating "spline sampling".
+
+Returns
+-------
+out : (..., *outshape, channel, ndim) tensor
+    Pulled gradients
 """
 ```

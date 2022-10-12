@@ -5,6 +5,7 @@ from ..utils import ensure_list, prod
 from .utils import (get_cuda_blocks, get_cuda_num_threads, get_offset_type,
                     load_code, to_cupy)
 import cupy as cp
+import os
 
 # ===
 # Load module + dispatch 1D/2D/3D
@@ -23,7 +24,7 @@ def get_kernel(func, ndim, order, bound, extrapolate, reduce_t, scalar_t, offset
         for o, b in zip(order, bound):
             template += f'spline::type::{order_names[o]}, '
             template += f'bound::type::{bound_names[b]}, '
-        template += f'{extrapolate}'
+        template += f'{extrapolate},'
         if reduce_t == cp.float32:
             template += 'float,'
         elif reduce_t == cp.float64:
@@ -49,7 +50,8 @@ def get_kernel(func, ndim, order, bound, extrapolate, reduce_t, scalar_t, offset
         module = cp.RawModule(code=code, options=('--std=c++14',),
                               name_expressions=(template,))
         kernel = module.get_function(template)
-        kernels[key] = kernel
+        if int(os.environ.get('JF_CACHE_KERNELS', '1')):
+            kernels[key] = kernel
     else:
         kernel = kernels[key]
 
@@ -71,7 +73,7 @@ def get_kernelnd(func, ndim, extrapolate, reduce_t, scalar_t, offset_t, backward
         if backward:
             template += '_backward'
         template += f'<{ndim},'
-        template += f'{extrapolate}'
+        template += f'{extrapolate},'
         if reduce_t == cp.float32:
             template += 'float,'
         elif reduce_t == cp.float64:
@@ -97,6 +99,7 @@ def get_kernelnd(func, ndim, extrapolate, reduce_t, scalar_t, offset_t, backward
         module = cp.RawModule(code=code, options=('--std=c++14',),
                               name_expressions=(template,))
         kernel = module.get_function(template)
+
         ndkernels[key] = kernel
     else:
         kernel = ndkernels[key]
@@ -140,18 +143,21 @@ def pull(out, inp, grid, order, bound, extrapolate):
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('pull', ndim, order, bound, extrapolate,
+        func = get_kernel('pull', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out, np_inp, np_grid, nalldim,
-             grid_shape, splinc_shape, outstride, instride, gridstride)
+        args = (np_out, np_inp, np_grid, nalldim,
+                grid_shape, splinc_shape, outstride, instride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('pull', ndim, extrapolate, reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func(np_out, np_inp, np_grid, nalldim, order, bound,
-             grid_shape, splinc_shape, outstride, instride, gridstride)
+        args = (np_out, np_inp, np_grid, nalldim, order, bound,
+                grid_shape, splinc_shape, outstride, instride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
+
 
     return out
 
@@ -187,18 +193,20 @@ def push(out, inp, grid, order, bound, extrapolate):
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('push', ndim, order, bound, extrapolate,
+        func = get_kernel('push', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out, np_inp, np_grid, nalldim,
-             grid_shape, splinc_shape, outstride, instride, gridstride)
+        args = (np_out, np_inp, np_grid, nalldim,
+                grid_shape, splinc_shape, outstride, instride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('push', ndim, extrapolate, reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func(np_out, np_inp, np_grid, nalldim, order, bound,
-             grid_shape, splinc_shape, outstride, instride, gridstride)
+        args = (np_out, np_inp, np_grid, nalldim, order, bound,
+                grid_shape, splinc_shape, outstride, instride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
 
     return out
 
@@ -231,18 +239,20 @@ def count(out, grid, order, bound, extrapolate):
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('count', ndim, order, bound, extrapolate,
+        func = get_kernel('count', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out, np_grid, nalldim,
-             grid_shape, splinc_shape, outstride, gridstride)
+        args = (np_out, np_grid, nalldim,
+                grid_shape, splinc_shape, outstride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('count', ndim, extrapolate, reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func(np_out, np_grid, nalldim, order, bound,
-             grid_shape, splinc_shape, outstride, gridstride)
+        args = (np_out, np_grid, nalldim, order, bound,
+                grid_shape, splinc_shape, outstride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
 
     return out
 
@@ -273,23 +283,25 @@ def grad(out, inp, grid, order, bound, extrapolate):
     offset_t = cp.int64
     splinc_shape, instride = cinfo(np_inp, dtype=offset_t, backend=cp)
     grid_shape, gridstride = cinfo(np_grid, dtype=offset_t, backend=cp)
-    _, outstride = cinfo(np_out, dtype=offset_t)
+    _, outstride = cinfo(np_out, dtype=offset_t, backend=cp)
     nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('grad', ndim, order, bound, extrapolate,
+        func = get_kernel('grad', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out, np_inp, np_grid, nalldim,
-             grid_shape, splinc_shape, outstride, instride, gridstride)
+        args = (np_out, np_inp, np_grid, nalldim,
+                grid_shape, splinc_shape, outstride, instride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('grad', ndim, extrapolate, reduce_t, scalar_t, offset_t)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func(np_out, np_inp, np_grid, nalldim, order, bound,
-             grid_shape, splinc_shape, outstride, instride, gridstride)
+        args = (np_out, np_inp, np_grid, nalldim, order, bound,
+                grid_shape, splinc_shape, outstride, instride, gridstride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
 
     return out
 
@@ -333,22 +345,24 @@ def pull_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('pull', ndim, order, bound, extrapolate,
+        func = get_kernel('pull', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t, True)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
-             nalldim, grid_shape, splinc_shape,
-             out_grad_inp_stride, out_grad_grid_stride,
-             inp_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
+                nalldim, grid_shape, splinc_shape,
+                out_grad_inp_stride, out_grad_grid_stride,
+                inp_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('pull', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
-             nalldim, order, bound, grid_shape, splinc_shape,
-             out_grad_inp_stride, out_grad_grid_stride,
-             inp_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
+                nalldim, order, bound, grid_shape, splinc_shape,
+                out_grad_inp_stride, out_grad_grid_stride,
+                inp_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
 
     return out_grad_inp, out_grad_grid
 
@@ -392,22 +406,24 @@ def push_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('push', ndim, order, bound, extrapolate,
+        func = get_kernel('push', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t, True)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
-             nalldim, grid_shape, splinc_shape,
-             out_grad_inp_stride, out_grad_grid_stride,
-             inp_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
+                nalldim, grid_shape, splinc_shape,
+                out_grad_inp_stride, out_grad_grid_stride,
+                inp_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('push', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
-             nalldim, order, bound, grid_shape, splinc_shape,
-             out_grad_inp_stride, out_grad_grid_stride,
-             inp_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
+                nalldim, order, bound, grid_shape, splinc_shape,
+                out_grad_inp_stride, out_grad_grid_stride,
+                inp_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
 
     return out_grad_inp, out_grad_grid
 
@@ -444,20 +460,22 @@ def count_backward(out_grad_grid, inp_grad, grid,
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('count', ndim, order, bound, extrapolate,
+        func = get_kernel('count', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t, True)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out_grad_grid, np_inp_grad, np_grid,
-             nalldim, grid_shape, splinc_shape,
-             out_grad_grid_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_grid, np_inp_grad, np_grid,
+                nalldim, grid_shape, splinc_shape,
+                out_grad_grid_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('count', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func(np_out_grad_grid, np_inp_grad, np_grid,
-             nalldim, order, bound, grid_shape, splinc_shape,
-             out_grad_grid_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_grid, np_inp_grad, np_grid,
+                nalldim, order, bound, grid_shape, splinc_shape,
+                out_grad_grid_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
 
     return out_grad_grid
 
@@ -501,21 +519,23 @@ def grad_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
 
     # dispatch
     if ndim <= 3:
-        func = get_kernel('grad', ndim, order, bound, extrapolate,
+        func = get_kernel('grad', ndim, tuple(order), tuple(bound), extrapolate,
                           reduce_t, scalar_t, offset_t, True)
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
-             nalldim, grid_shape, splinc_shape,
-             out_grad_inp_stride, out_grad_grid_stride,
-             inp_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
+                nalldim, grid_shape, splinc_shape,
+                out_grad_inp_stride, out_grad_grid_stride,
+                inp_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
     else:
         func = get_kernelnd('grad', ndim, extrapolate, reduce_t, scalar_t, offset_t, True)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
-        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),), (get_cuda_num_threads(),))
-        func(np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
-             nalldim, order, bound, grid_shape, splinc_shape,
-             out_grad_inp_stride, out_grad_grid_stride,
-             inp_stride, inp_grad_stride, grid_stride)
+        args = (np_out_grad_inp, np_out_grad_grid, np_inp, np_inp_grad, np_grid,
+                nalldim, order, bound, grid_shape, splinc_shape,
+                out_grad_inp_stride, out_grad_grid_stride,
+                inp_stride, inp_grad_stride, grid_stride)
+        func = func((get_cuda_blocks(prod(np_grid.shape[:-1])),),
+                    (get_cuda_num_threads(),), args)
 
     return out_grad_inp, out_grad_grid

@@ -6,8 +6,6 @@ cuda_resize = try_import('jitfields.cuda', 'resize')
 cpu_resize = try_import('jitfields.cpp', 'resize')
 cuda_restrict = try_import('jitfields.cuda', 'restrict')
 cpu_restrict = try_import('jitfields.cpp', 'restrict')
-# from .cpp import restrict as cpu_restrict
-# from .cpp import resize as cpu_resize
 
 
 class _Resize(torch.autograd.Function):

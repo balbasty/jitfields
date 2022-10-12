@@ -5,7 +5,6 @@ from .common.bounds import convert_bound
 from .common.spline import convert_order
 cuda_pushpull = try_import('jitfields.cuda', 'pushpull')
 cpu_pushpull = try_import('jitfields.cpp', 'pushpull')
-from .cpp import pushpull as cpu_pushpull
 
 
 def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
@@ -40,6 +39,8 @@ def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
 
     """
     ndim = grid.shape[-1]
+    if ndim > 3:
+        raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
         inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
@@ -77,6 +78,8 @@ def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True,
 
     """
     ndim = grid.shape[-1]
+    if ndim > 3:
+        raise NotImplementedError("Not implemented for spatial dim > 3")
     inp, grid = _broadcast_push(inp, grid)
     shape = list(shape or inp.shape[-ndim-1:-1])
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
@@ -111,6 +114,8 @@ def count(grid, shape=None, order=2, bound='dct2', extrapolate=True,
 
     """
     ndim = grid.shape[-1]
+    if ndim > 3:
+        raise NotImplementedError("Not implemented for spatial dim > 3")
     shape = list(shape or grid.shape[-ndim-1:-1])
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     return Count.apply(grid, shape, order, bound, extrapolate, out)
@@ -148,6 +153,8 @@ def grad(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
 
     """
     ndim = grid.shape[-1]
+    if ndim > 3:
+        raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
         inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)

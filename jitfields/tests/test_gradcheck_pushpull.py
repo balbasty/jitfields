@@ -3,6 +3,8 @@ from torch.autograd import gradcheck
 from jitfields.pushpull import pull, push, count, grad
 from jitfields.utils import add_identity_grid_
 import pytest
+import os
+os.environ['CUDA_NUM_THREADS'] = '64'
 
 # global parameters
 dtype = torch.double        # data type (double advised to check gradients)
@@ -19,7 +21,7 @@ if torch.backends.openmp.is_available() or torch.backends.mkl.is_available():
 if torch.cuda.is_available():
     print('cuda backend available')
     devices.append('cuda')
-dims = [1]  # [1, 2, 3]
+dims = [1, 2, 3]
 
 
 def make_data(shape, device, dtype):
@@ -60,7 +62,7 @@ def test_gradcheck_grad(device, dim, bound, interpolation):
     vol.requires_grad = True
     grid.requires_grad = True
     assert gradcheck(grad, (vol, grid, interpolation, bound, extrapolate),
-                     rtol=1., raise_exception=True)
+                     rtol=1., raise_exception=True, check_undefined_grad=False)
 
 
 @pytest.mark.parametrize("device", devices)
@@ -75,7 +77,7 @@ def test_gradcheck_pull(device, dim, bound, interpolation):
     vol.requires_grad = True
     grid.requires_grad = True
     assert gradcheck(pull, (vol, grid, interpolation, bound, extrapolate),
-                     rtol=1., raise_exception=True)
+                     rtol=1., raise_exception=True, check_undefined_grad=False)
 
 
 @pytest.mark.parametrize("device", devices)
@@ -90,7 +92,7 @@ def test_gradcheck_push(device, dim, bound, interpolation):
     vol.requires_grad = True
     grid.requires_grad = True
     assert gradcheck(push, (vol, grid, shape, interpolation, bound, extrapolate),
-                     rtol=1., raise_exception=True)
+                     rtol=1., raise_exception=True, check_undefined_grad=False)
 
 
 @pytest.mark.parametrize("device", devices)
@@ -104,4 +106,4 @@ def test_gradcheck_count(device, dim, bound, interpolation):
     _, grid = make_data(shape, device, dtype)
     grid.requires_grad = True
     assert gradcheck(count, (grid, shape, interpolation, bound, extrapolate),
-                     rtol=1., raise_exception=True)
+                     rtol=1., raise_exception=True, check_undefined_grad=False)
