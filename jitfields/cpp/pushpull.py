@@ -4,7 +4,6 @@ import cppyy
 import numpy as np
 import os
 
-cppyy.set_debug()
 this_folder = os.path.abspath(os.path.dirname(__file__))
 cppyy.add_include_path(os.path.join(this_folder, '..', 'csrc'))
 cppyy.include('pushpull.hpp')
