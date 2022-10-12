@@ -3,9 +3,6 @@ from torch.autograd import gradcheck
 from jitfields.pushpull import pull, push, count, grad
 from jitfields.utils import add_identity_grid_
 import pytest
-import cppyy
-
-cppyy.set_debug()
 
 # global parameters
 dtype = torch.double        # data type (double advised to check gradients)

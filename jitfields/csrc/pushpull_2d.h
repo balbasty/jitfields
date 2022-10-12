@@ -83,10 +83,12 @@ struct PushPull<two, Z, BX, Z, BY> {
     void grad(scalar_t * out, scalar_t * inp,
               reduce_t x, offset_t nx, offset_t sx,
               reduce_t y, offset_t ny, offset_t sy,
-              offset_t nc, offset_t osc, offset_t isc)
+              offset_t nc, offset_t osc, offset_t isc, offset_t osg)
     {
-        for (offset_t c = 0; c < nc; ++c, out += osc)
-            *out = static_cast<scalar_t>(0);
+        for (offset_t c = 0; c < nc; ++c, out += osc) {
+            *out     = static_cast<scalar_t>(0);
+            out[osg] = static_cast<scalar_t>(0);
+        }
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
@@ -134,7 +136,7 @@ struct PushPull<two, Z, BX, Z, BY> {
                        scalar_t * inp, scalar_t * ginp,
                        reduce_t x, offset_t nx, offset_t osx, offset_t isx,
                        reduce_t y, offset_t ny, offset_t osy, offset_t isy,
-                       offset_t nc, offset_t osc, offset_t isc,
+                       offset_t nc, offset_t osc, offset_t isc, offset_t gsc,
                        offset_t osg, offset_t isg)
     {
         gout[0]   = static_cast<scalar_t>(0);
@@ -167,10 +169,11 @@ struct PushPull<two, L, BX, L, BY> {
         signed char fx0, fx1, fy0, fy1;
         utils_x::index(x, nx, ix0, ix1, wx0, wx1, fx0, fx1);
         utils_y::index(y, ny, iy0, iy1, wy0, wy1, fy0, fy1);
-        offset_t i00 = ix0 * sx + iy0 * sy;
-        offset_t i01 = ix0 * sx + iy1 * sy;
-        offset_t i10 = ix1 * sx + iy0 * sy;
-        offset_t i11 = ix1 * sx + iy1 * sy;
+        ix0 *= sx; ix1 *= sx; iy0 *= sy; iy1 *= sy;
+        offset_t i00 = ix0 + iy0;
+        offset_t i01 = ix0 + iy1;
+        offset_t i10 = ix1 + iy0;
+        offset_t i11 = ix1 + iy1;
         reduce_t w00 = wx0 * wy0;
         reduce_t w01 = wx0 * wy1;
         reduce_t w10 = wx1 * wy0;
@@ -182,10 +185,10 @@ struct PushPull<two, L, BX, L, BY> {
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      static_cast<reduce_t>(bound::get(inp, i00, f00)) * w00
-                    + static_cast<reduce_t>(bound::get(inp, i01, f01)) * w01
-                    + static_cast<reduce_t>(bound::get(inp, i10, f10)) * w10
-                    + static_cast<reduce_t>(bound::get(inp, i11, f11)) * w11);
+                      bound::cget<reduce_t>(inp, i00, f00) * w00
+                    + bound::cget<reduce_t>(inp, i01, f01) * w01
+                    + bound::cget<reduce_t>(inp, i10, f10) * w10
+                    + bound::cget<reduce_t>(inp, i11, f11) * w11);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
@@ -200,10 +203,11 @@ struct PushPull<two, L, BX, L, BY> {
         signed char fx0, fx1, fy0, fy1;
         utils_x::index(x, nx, ix0, ix1, wx0, wx1, fx0, fx1);
         utils_y::index(y, ny, iy0, iy1, wy0, wy1, fy0, fy1);
-        offset_t i00 = ix0 * sx + iy0 * sy;
-        offset_t i01 = ix0 * sx + iy1 * sy;
-        offset_t i10 = ix1 * sx + iy0 * sy;
-        offset_t i11 = ix1 * sx + iy1 * sy;
+        ix0 *= sx; ix1 *= sx; iy0 *= sy; iy1 *= sy;
+        offset_t i00 = ix0 + iy0;
+        offset_t i01 = ix0 + iy1;
+        offset_t i10 = ix1 + iy0;
+        offset_t i11 = ix1 + iy1;
         reduce_t w00 = wx0 * wy0;
         reduce_t w01 = wx0 * wy1;
         reduce_t w10 = wx1 * wy0;
@@ -233,10 +237,11 @@ struct PushPull<two, L, BX, L, BY> {
         signed char fx0, fx1, fy0, fy1;
         utils_x::index(x, nx, ix0, ix1, wx0, wx1, fx0, fx1);
         utils_y::index(y, ny, iy0, iy1, wy0, wy1, fy0, fy1);
-        offset_t i00 = ix0 * sx + iy0 * sy;
-        offset_t i01 = ix0 * sx + iy1 * sy;
-        offset_t i10 = ix1 * sx + iy0 * sy;
-        offset_t i11 = ix1 * sx + iy1 * sy;
+        ix0 *= sx; ix1 *= sx; iy0 *= sy; iy1 *= sy;
+        offset_t i00 = ix0 + iy0;
+        offset_t i01 = ix0 + iy1;
+        offset_t i10 = ix1 + iy0;
+        offset_t i11 = ix1 + iy1;
         reduce_t w00 = wx0 * wy0;
         reduce_t w01 = wx0 * wy1;
         reduce_t w10 = wx1 * wy0;
@@ -265,26 +270,25 @@ struct PushPull<two, L, BX, L, BY> {
         signed char fx0, fx1, fy0, fy1;
         utils_x::index(x, nx, ix0, ix1, wx0, wx1, fx0, fx1);
         utils_y::index(y, ny, iy0, iy1, wy0, wy1, fy0, fy1);
-        offset_t i00 = ix0 * sx + iy0 * sy;
-        offset_t i01 = ix0 * sx + iy1 * sy;
-        offset_t i10 = ix1 * sx + iy0 * sy;
-        offset_t i11 = ix1 * sx + iy1 * sy;
+        ix0 *= sx; ix1 *= sx; iy0 *= sy; iy1 *= sy;
+        offset_t i00 = ix0 + iy0;
+        offset_t i01 = ix0 + iy1;
+        offset_t i10 = ix1 + iy0;
+        offset_t i11 = ix1 + iy1;
         reduce_t f00 = fx0 * fy0;
         reduce_t f01 = fx0 * fy1;
         reduce_t f10 = fx1 * fy0;
         reduce_t f11 = fx1 * fy1;
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc) {
+            reduce_t v00 = bound::cget<reduce_t>(inp, i00, f00);
+            reduce_t v01 = bound::cget<reduce_t>(inp, i01, f01);
+            reduce_t v10 = bound::cget<reduce_t>(inp, i10, f10);
+            reduce_t v11 = bound::cget<reduce_t>(inp, i11, f11);
             out[0] = static_cast<scalar_t>(
-                    - bound::cget<reduce_t>(inp, i00, f00) * wy0
-                    - bound::cget<reduce_t>(inp, i01, f01) * wy1
-                    + bound::cget<reduce_t>(inp, i10, f10) * wy0
-                    + bound::cget<reduce_t>(inp, i11, f11) * wy1);
+                    - v00 * wy0 - v01 * wy1 + v10 * wy0 + v11 * wy1);
             out[osg] = static_cast<scalar_t>(
-                    - bound::cget<reduce_t>(inp, i00, f00) * wx0
-                    + bound::cget<reduce_t>(inp, i01, f01) * wx0
-                    - bound::cget<reduce_t>(inp, i10, f10) * wx1
-                    + bound::cget<reduce_t>(inp, i11, f11) * wx1);
+                    - v00 * wx0 + v01 * wx0 - v10 * wx1 + v11 * wx1);
         }
     }
 
@@ -330,16 +334,12 @@ struct PushPull<two, L, BX, L, BY> {
             bound::add(out, o10, gval * w10, f10);
             bound::add(out, o11, gval * w11, f11);
             // compute input spatial gradient
-            accx = gval * (
-                    - bound::cget<reduce_t>(inp, i00, f00) * wy0
-                    - bound::cget<reduce_t>(inp, i01, f01) * wy1
-                    + bound::cget<reduce_t>(inp, i10, f10) * wy0
-                    + bound::cget<reduce_t>(inp, i11, f11) * wy1);
-            accy = gval * (
-                    - bound::cget<reduce_t>(inp, i00, f00) * wx0
-                    + bound::cget<reduce_t>(inp, i01, f01) * wx0
-                    - bound::cget<reduce_t>(inp, i10, f10) * wx1
-                    + bound::cget<reduce_t>(inp, i11, f11) * wx1);
+            reduce_t v00 = bound::cget<reduce_t>(inp, i00, f00);
+            reduce_t v01 = bound::cget<reduce_t>(inp, i01, f01);
+            reduce_t v10 = bound::cget<reduce_t>(inp, i10, f10);
+            reduce_t v11 = bound::cget<reduce_t>(inp, i11, f11);
+            accx += gval * (- v00 * wy0 - v01 * wy1 + v10 * wy0 + v11 * wy1);
+            accy += gval * (- v00 * wx0 + v01 * wx0 - v10 * wx1 + v11 * wx1);
         }
         gout[0]   = static_cast<scalar_t>(accx);
         gout[osg] = static_cast<scalar_t>(accy);
@@ -384,16 +384,12 @@ struct PushPull<two, L, BX, L, BY> {
                     + bound::cget<reduce_t>(ginp, i11, f11) * w11);
             // compute input spatial gradient
             reduce_t val = static_cast<reduce_t>(*inp);
-            accx = val * (
-                    - bound::cget<reduce_t>(ginp, i00, f00) * wy0
-                    - bound::cget<reduce_t>(ginp, i01, f01) * wy1
-                    + bound::cget<reduce_t>(ginp, i10, f10) * wy0
-                    + bound::cget<reduce_t>(ginp, i11, f11) * wy1);
-            accy = val * (
-                    - bound::cget<reduce_t>(ginp, i00, f00) * wx0
-                    + bound::cget<reduce_t>(ginp, i01, f01) * wx0
-                    - bound::cget<reduce_t>(ginp, i10, f10) * wx1
-                    + bound::cget<reduce_t>(ginp, i11, f11) * wx1);
+            reduce_t v00 = bound::cget<reduce_t>(ginp, i00, f00);
+            reduce_t v01 = bound::cget<reduce_t>(ginp, i01, f01);
+            reduce_t v10 = bound::cget<reduce_t>(ginp, i10, f10);
+            reduce_t v11 = bound::cget<reduce_t>(ginp, i11, f11);
+            accx += val * (- v00 * wy0 - v01 * wy1 + v10 * wy0 + v11 * wy1);
+            accy += val * (- v00 * wx0 + v01 * wx0 - v10 * wx1 + v11 * wx1);
         }
         gout[0]   = static_cast<scalar_t>(accx);
         gout[osg] = static_cast<scalar_t>(accy);
@@ -425,14 +421,14 @@ struct PushPull<two, L, BX, L, BY> {
         reduce_t f11 = fx1 * fy1;
 
         // compute input spatial gradient
-        gout[0]   = - bound::cget<reduce_t>(ginp, i00, f00) * wy0
-                    - bound::cget<reduce_t>(ginp, i01, f01) * wy1
-                    + bound::cget<reduce_t>(ginp, i10, f10) * wy0
-                    + bound::cget<reduce_t>(ginp, i11, f11) * wy1;
-        gout[osg] = - bound::cget<reduce_t>(ginp, i00, f00) * wx0
-                    + bound::cget<reduce_t>(ginp, i01, f01) * wx0
-                    - bound::cget<reduce_t>(ginp, i10, f10) * wx1
-                    + bound::cget<reduce_t>(ginp, i11, f11) * wx1;
+        reduce_t v00 = bound::cget<reduce_t>(ginp, i00, f00);
+        reduce_t v01 = bound::cget<reduce_t>(ginp, i01, f01);
+        reduce_t v10 = bound::cget<reduce_t>(ginp, i10, f10);
+        reduce_t v11 = bound::cget<reduce_t>(ginp, i11, f11);
+        gout[0]   = static_cast<scalar_t>(
+                  - v00 * wy0 - v01 * wy1 + v10 * wy0 + v11 * wy1);
+        gout[osg] = static_cast<scalar_t>(
+                  - v00 * wx0 + v01 * wx0 - v10 * wx1 + v11 * wx1);
     }
 
 
