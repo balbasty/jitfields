@@ -35,7 +35,7 @@ template <int U, spline::type I, bound::type B> struct Multiscale<one, U, I, B> 
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void restrict(scalar_t * out, scalar_t * inp,
+    void restrict(scalar_t * out, const scalar_t * inp,
                   offset_t w, offset_t nw, offset_t sw,
                   reduce_t wscl, reduce_t shift)
     {
@@ -61,7 +61,7 @@ template <bound::type B> struct Multiscale<one, two, L, B> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void restrict(scalar_t * out, scalar_t * inp,
+    void restrict(scalar_t * out, const scalar_t * inp,
                    offset_t w, offset_t nw, offset_t sw,
                    reduce_t wscl, reduce_t shift)
     {
@@ -109,7 +109,7 @@ struct Multiscale<two, U, IX, BX, IY, BY> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void restrict(scalar_t * out, scalar_t * inp,
+    void restrict(scalar_t * out, const scalar_t * inp,
                   offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                   offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                   reduce_t shift)
@@ -161,7 +161,7 @@ struct Multiscale<three, U, IX, BX, IY, BY, IZ, BZ> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void restrict(scalar_t * out, scalar_t * inp,
+    void restrict(scalar_t * out, const scalar_t * inp,
                   offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                   offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                   offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
@@ -209,7 +209,7 @@ template <int D, int U> struct Multiscale<D, U> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void restrict(scalar_t * out, scalar_t * inp,
+    void restrict(scalar_t * out, const scalar_t * inp,
                   const offset_t * coord, const offset_t * size, const offset_t * stride,
                   const spline::type * inter, const bound::type * bnd,
                   const reduce_t * scl,  reduce_t shift)

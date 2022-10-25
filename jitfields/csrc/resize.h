@@ -34,7 +34,7 @@ template <bound::type B> struct Multiscale<one, Z, B> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, // loc/size/stride
                 reduce_t wscl, reduce_t shift)
     {
@@ -52,7 +52,7 @@ template <bound::type B> struct Multiscale<one, L, B> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, // loc/size/stride
                 reduce_t wscl, reduce_t shift)
     {
@@ -79,7 +79,7 @@ template <bound::type B> struct Multiscale<one, Q, B> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, // loc/size/stride
                 reduce_t wscl, reduce_t shift)
     {
@@ -110,7 +110,7 @@ template <bound::type B> struct Multiscale<one, C, B> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, // loc/size/stride
                 reduce_t wscl, reduce_t shift)
     {
@@ -146,7 +146,7 @@ struct Multiscale<one, IX, BX> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 reduce_t shift)
     {
@@ -193,7 +193,7 @@ struct Multiscale<two, Z, BX, Z, BY> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 reduce_t shift)
@@ -220,7 +220,7 @@ struct Multiscale<two, L, BX, L, BY> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 reduce_t shift)
@@ -265,7 +265,7 @@ struct Multiscale<two, Q, BX, Q, BY> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 reduce_t shift)
@@ -317,7 +317,7 @@ struct Multiscale<two, C, BX, C, BY> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 reduce_t shift)
@@ -380,7 +380,7 @@ struct Multiscale<two, IX, BX, IY, BY> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 reduce_t shift)
@@ -452,7 +452,7 @@ struct Multiscale<two, Z, BX, Z, BY, Z, BZ> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
@@ -485,7 +485,7 @@ struct Multiscale<three, L, BX, L, BY, L, BZ> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
@@ -548,7 +548,7 @@ struct Multiscale<three, Q, BX, Q, BY, Q, BZ> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
@@ -621,7 +621,7 @@ struct Multiscale<three, C, BX, C, BY, C, BZ> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
@@ -712,7 +712,7 @@ struct Multiscale<three, IX, BX, IY, BY, IZ, BZ> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
                 offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
                 offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
@@ -799,7 +799,7 @@ struct Multiscale<D> {
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
-    void resize(scalar_t * out, scalar_t * inp,
+    void resize(scalar_t * out, const scalar_t * inp,
                 const offset_t * coord, const offset_t * size, const offset_t * stride,
                 const spline::type * inter, const bound::type * bnd,
                 const reduce_t * scl, reduce_t shift)

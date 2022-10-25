@@ -9,7 +9,7 @@ namespace restrict {
 
 template <spline::type IX, bound::type BX,
           typename scalar_t, typename offset_t>
-void loop1d(scalar_t * out, scalar_t * inp, int ndim,
+void loop1d(scalar_t * out, const scalar_t * inp, int ndim,
             scalar_t shift, const scalar_t * scale,
             const offset_t * size_out,
             const offset_t * size_inp,
@@ -34,7 +34,7 @@ void loop1d(scalar_t * out, scalar_t * inp, int ndim,
 template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           typename scalar_t, typename offset_t>
-void loop2d(scalar_t * out, scalar_t * inp, int ndim,
+void loop2d(scalar_t * out, const scalar_t * inp, int ndim,
             scalar_t shift, const scalar_t * scale,
             const offset_t * size_out,
             const offset_t * size_inp,
@@ -61,7 +61,7 @@ template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           spline::type IZ, bound::type BZ,
           typename scalar_t, typename offset_t>
-void loop3d(scalar_t * out, scalar_t * inp, int ndim,
+void loop3d(scalar_t * out, const scalar_t * inp, int ndim,
             scalar_t shift, const scalar_t * scale,
             const offset_t * size_out,
             const offset_t * size_inp,
@@ -86,7 +86,7 @@ void loop3d(scalar_t * out, scalar_t * inp, int ndim,
 }
 
 template <int D, typename scalar_t, typename offset_t>
-void loopnd(scalar_t * out, scalar_t * inp, int ndim,
+void loopnd(scalar_t * out, const scalar_t * inp, int ndim,
             scalar_t shift, const scalar_t * scale,
             const unsigned char * order,
             const unsigned char * bnd,
@@ -116,7 +116,7 @@ void loopnd(scalar_t * out, scalar_t * inp, int ndim,
 
 template <spline::type IX, bound::type BX,
           typename scalar_t, typename offset_t>
-void loop21d(scalar_t * out, scalar_t * inp, int ndim,
+void loop21d(scalar_t * out, const scalar_t * inp, int ndim,
              scalar_t shift, const scalar_t * scale,
              const offset_t * size_out,
              const offset_t * size_inp,
@@ -141,7 +141,7 @@ void loop21d(scalar_t * out, scalar_t * inp, int ndim,
 template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           typename scalar_t, typename offset_t>
-void loop22d(scalar_t * out, scalar_t * inp, int ndim,
+void loop22d(scalar_t * out, const scalar_t * inp, int ndim,
              scalar_t shift, const scalar_t * scale,
              const offset_t * size_out,
              const offset_t * size_inp,
@@ -168,7 +168,7 @@ template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           spline::type IZ, bound::type BZ,
           typename scalar_t, typename offset_t>
-void loop23d(scalar_t * out, scalar_t * inp, int ndim,
+void loop23d(scalar_t * out, const scalar_t * inp, int ndim,
              scalar_t shift, const scalar_t * scale,
              const offset_t * size_out,
              const offset_t * size_inp,

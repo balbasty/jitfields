@@ -15,7 +15,8 @@ namespace pushpull {
 
 template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-void pull1d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
+void pull1d(scalar_t * out,
+            const scalar_t * inp, const scalar_t * grid, int ndim,
             const offset_t * size_grid,
             const offset_t * size_splinc,
             const offset_t * stride_out,
@@ -48,7 +49,8 @@ void pull1d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
 
 template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-void push1d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
+void push1d(scalar_t * out,
+            const scalar_t * inp, const scalar_t * grid, int ndim,
             const offset_t * size_grid,
             const offset_t * size_splinc,
             const offset_t * stride_out,
@@ -79,7 +81,8 @@ void push1d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
 
 template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-void count1d(scalar_t * out, scalar_t * grid, int ndim,
+void count1d(scalar_t * out,
+             const scalar_t * grid, int ndim,
              const offset_t * size_grid,
              const offset_t * size_splinc,
              const offset_t * stride_out,
@@ -105,7 +108,8 @@ void count1d(scalar_t * out, scalar_t * grid, int ndim,
 
 template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-void grad1d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
+void grad1d(scalar_t * out,
+            const scalar_t * inp, const scalar_t * grid, int ndim,
             const offset_t * size_grid,
             const offset_t * size_splinc,
             const offset_t * stride_out,
@@ -140,8 +144,8 @@ template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
 void pull1d_backward(
     scalar_t * out, scalar_t * gout,
-    scalar_t * inp, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    const scalar_t * inp, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_out,
@@ -184,8 +188,8 @@ template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
 void push1d_backward(
     scalar_t * out, scalar_t * gout,
-    scalar_t * inp, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    const scalar_t * inp, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_out,
@@ -228,8 +232,8 @@ void push1d_backward(
 template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
 void count1d_backward(
-    scalar_t * gout, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    scalar_t * gout, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_gout,
@@ -261,8 +265,8 @@ template <spline::type IX, bound::type BX, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
 void grad1d_backward(
     scalar_t * out, scalar_t * gout,
-    scalar_t * inp, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    const scalar_t * inp, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_out,

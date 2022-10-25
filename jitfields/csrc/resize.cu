@@ -15,7 +15,7 @@ using namespace jf::resize;
 
 template <spline::type IX, bound::type BX,
           typename scalar_t, typename offset_t>
-__global__ void kernel1d(scalar_t * out, scalar_t * inp, int ndim,
+__global__ void kernel1d(scalar_t * out, const scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
                          const offset_t * size_out,
                          const offset_t * size_inp,
@@ -41,7 +41,7 @@ __global__ void kernel1d(scalar_t * out, scalar_t * inp, int ndim,
 template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           typename scalar_t, typename offset_t>
-__global__ void kernel2d(scalar_t * out, scalar_t * inp, int ndim,
+__global__ void kernel2d(scalar_t * out, const scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
                          const offset_t * size_out,
                          const offset_t * size_inp,
@@ -70,7 +70,7 @@ template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           spline::type IZ, bound::type BZ,
           typename scalar_t, typename offset_t>
-__global__ void kernel3d(scalar_t * out, scalar_t * inp, int ndim,
+__global__ void kernel3d(scalar_t * out, const scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
                          const offset_t * size_out,
                          const offset_t * size_inp,
@@ -97,7 +97,7 @@ __global__ void kernel3d(scalar_t * out, scalar_t * inp, int ndim,
 }
 
 template <int D, typename scalar_t, typename offset_t>
-__global__ void kernelnd(scalar_t * out, scalar_t * inp, int ndim,
+__global__ void kernelnd(scalar_t * out, const scalar_t * inp, int ndim,
                          scalar_t shift, const scalar_t * scale,
                          const spline::type * order,
                          const bound::type * bnd,

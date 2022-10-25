@@ -6,6 +6,9 @@
 #ifndef __device__
 #define __device__
 #endif
+#ifndef __host__
+#define __host__
+#endif
 #else
 #include <cuda_fp16.h>
 #endif

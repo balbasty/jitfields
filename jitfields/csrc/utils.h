@@ -12,6 +12,10 @@ template <typename T>
 inline __device__
 T min(T a, T b) { return (a < b ? a : b); }
 
+template <typename T>
+inline __device__
+T max(T a, T b) { return (a > b ? a : b); }
+
 #ifdef __CUDACC__
 template <>
 inline __device__
@@ -19,6 +23,13 @@ half min<>(half a, half b) {
     float af = static_cast<float>(a);
     float bf = static_cast<float>(b);
     return (a < b ? a : b);
+}
+template <>
+inline __device__
+half max<>(half a, half b) {
+    float af = static_cast<float>(a);
+    float bf = static_cast<float>(b);
+    return (a > b ? a : b);
 }
 #endif
 

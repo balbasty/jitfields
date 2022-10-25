@@ -21,12 +21,13 @@ template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           spline::type IZ, bound::type BZ, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-__global__ void pull3d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
-            const offset_t * size_grid,
-            const offset_t * size_splinc,
-            const offset_t * stride_out,
-            const offset_t * stride_inp,
-            const offset_t * stride_grid)
+__global__ void pull3d(
+    scalar_t * out, const scalar_t * inp, const scalar_t * grid, int ndim,
+    const offset_t * size_grid,
+    const offset_t * size_splinc,
+    const offset_t * stride_out,
+    const offset_t * stride_inp,
+    const offset_t * stride_grid)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t numel = prod(size_grid, ndim-1);  // no outer loop across channels
@@ -66,12 +67,13 @@ template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           spline::type IZ, bound::type BZ, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-__global__ void push3d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
-            const offset_t * size_grid,
-            const offset_t * size_splinc,
-            const offset_t * stride_out,
-            const offset_t * stride_inp,
-            const offset_t * stride_grid)
+__global__ void push3d(
+    scalar_t * out, const scalar_t * inp, const scalar_t * grid, int ndim,
+    const offset_t * size_grid,
+    const offset_t * size_splinc,
+    const offset_t * stride_out,
+    const offset_t * stride_inp,
+    const offset_t * stride_grid)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t numel = prod(size_grid, ndim-1);  // no outer loop across channels
@@ -109,11 +111,12 @@ template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           spline::type IZ, bound::type BZ, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-__global__ void count3d(scalar_t * out, scalar_t * grid, int ndim,
-             const offset_t * size_grid,
-             const offset_t * size_splinc,
-             const offset_t * stride_out,
-             const offset_t * stride_grid)
+__global__ void count3d(
+    scalar_t * out, const scalar_t * grid, int ndim,
+    const offset_t * size_grid,
+    const offset_t * size_splinc,
+    const offset_t * stride_out,
+    const offset_t * stride_grid)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t numel = prod(size_grid, ndim-1);  // no outer loop across channels
@@ -147,12 +150,13 @@ template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
           spline::type IZ, bound::type BZ, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
-__global__ void grad3d(scalar_t * out, scalar_t * inp, scalar_t * grid, int ndim,
-            const offset_t * size_grid,
-            const offset_t * size_splinc,
-            const offset_t * stride_out,
-            const offset_t * stride_inp,
-            const offset_t * stride_grid)
+__global__ void grad3d(
+    scalar_t * out, const scalar_t * inp, const scalar_t * grid, int ndim,
+    const offset_t * size_grid,
+    const offset_t * size_splinc,
+    const offset_t * stride_out,
+    const offset_t * stride_inp,
+    const offset_t * stride_grid)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t numel = prod(size_grid, ndim-1);  // no outer loop across channels
@@ -195,8 +199,8 @@ template <spline::type IX, bound::type BX,
           typename reduce_t, typename scalar_t, typename offset_t>
 __global__ void pull3d_backward(
     scalar_t * out, scalar_t * gout,
-    scalar_t * inp, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    const scalar_t * inp, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_out,
@@ -256,8 +260,8 @@ template <spline::type IX, bound::type BX,
           typename reduce_t, typename scalar_t, typename offset_t>
 __global__ void push3d_backward(
     scalar_t * out, scalar_t * gout,
-    scalar_t * inp, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    const scalar_t * inp, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_out,
@@ -315,8 +319,8 @@ template <spline::type IX, bound::type BX,
           spline::type IZ, bound::type BZ, int extrapolate,
           typename reduce_t, typename scalar_t, typename offset_t>
 __global__ void count3d_backward(
-    scalar_t * gout, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    scalar_t * gout, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_gout,
@@ -364,8 +368,8 @@ template <spline::type IX, bound::type BX,
           typename reduce_t, typename scalar_t, typename offset_t>
 __global__ void grad3d_backward(
     scalar_t * out, scalar_t * gout,
-    scalar_t * inp, scalar_t * ginp,
-    scalar_t * grid, int ndim,
+    const scalar_t * inp, const scalar_t * ginp,
+    const scalar_t * grid, int ndim,
     const offset_t * size_grid,
     const offset_t * size_splinc,
     const offset_t * stride_out,
