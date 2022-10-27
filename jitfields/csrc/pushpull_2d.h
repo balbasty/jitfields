@@ -598,15 +598,15 @@ struct PushPull<two, IX, BX, IY, BY> {
             reduce_t accx1 = static_cast<reduce_t>(0);
             reduce_t accy1 = static_cast<reduce_t>(0);
             for (offset_t i = 0; i <= lx; ++i) {
-                offset_t ixo = ix[i] * osx;
-                offset_t ixi = ix[i] * isx;
-                offset_t ffx  = fx[i];
-                offset_t wwx  = wx[i];
-                offset_t ggx  = gx[i];
+                offset_t    ixo = ix[i] * osx;
+                offset_t    ixi = ix[i] * isx;
+                signed char ffx  = fx[i];
+                reduce_t    wwx  = wx[i];
+                reduce_t    ggx  = gx[i];
                 for (offset_t j = 0; j <= ly; ++j) {
-                    offset_t iyo = ixo + iy[j] * osy;
-                    offset_t iyi = ixi + iy[j] * isy;
-                    offset_t  ff = ffx * fy[j];
+                    offset_t    iyo = ixo + iy[j] * osy;
+                    offset_t    iyi = ixi + iy[j] * isy;
+                    signed char ff = ffx * fy[j];
                     // push incoming gradient
                     bound::add(out, iyo, gval * (wwx * wy[j]), ff);
                     // compute input spatial gradient
