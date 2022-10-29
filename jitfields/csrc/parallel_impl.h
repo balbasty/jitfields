@@ -14,7 +14,6 @@
  * Most of the functions are adapted from PyTorch/ATen's ParallelNative
  * https://github.com/pytorch/pytorch/blob/master/LICENSE
  */
- */
 
 namespace jf {
 namespace internal {
