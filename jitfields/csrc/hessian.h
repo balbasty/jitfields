@@ -114,11 +114,12 @@ type guess_type(offset_t C, offset_t CC)
 template <typename Child>
 struct common
 {
-  /// Copy values into the flattened hessian
-  /// @param o      pointer to output array
-  /// @param so     output array stride
-  /// @param i      pointer to input array
-  /// @param si     input array stride
+  /// Copy values into a strided vector
+  /// @param C      vector length
+  /// @param o      pointer to output vector
+  /// @param so     output vector stride
+  /// @param i      pointer to input vector
+  /// @param si     input vector stride [default = 1]
   template <typename scalar_t, typename offset_t, typename reduce_t>
   static inline __device__
   void set(offset_t C, scalar_t * o, offset_t so,
@@ -128,11 +129,12 @@ struct common
       *o = i[c*si];
   }
 
-  /// Add values into the flattened hessian
-  /// @param o      pointer to output array
-  /// @param so     output array stride
-  /// @param i      pointer to input array
-  /// @param si     input array stride
+  /// Add values into a strided vector
+  /// @param C      vector length
+  /// @param o      pointer to output vector
+  /// @param so     output vector stride
+  /// @param i      pointer to input vector
+  /// @param si     input vector stride [default = 1]
   template <typename scalar_t, typename offset_t, typename reduce_t>
   static inline __device__
   void add(offset_t C, scalar_t * o, offset_t so,
@@ -162,9 +164,9 @@ struct common
               const reduce_t * w = static_cast<const reduce_t*>(nullptr),
               offset_t sw = static_cast<offset_t>(1))
   {
-    Child::get(C, h, sh, m, sm);
-    Child::invert_(C, m, sm, v, sv, w, sw);
-    set(C, x, sx, v, sv);
+    Child::get(C, h, sh, m, sm);                // M <- H
+    Child::invert_(C, m, sm, v, sv, w, sw);     // v <- (M + diag(w)) \ v
+    set(C, x, sx, v, sv);                       // x <- v
   }
 
   /// Solve the linear system and increment x += (H + diag(w))\v
@@ -187,10 +189,10 @@ struct common
                  const reduce_t * w = static_cast<const reduce_t*>(nullptr),
                  offset_t sw = static_cast<offset_t>(1))
   {
-    Child::get(C, h, sh, m, sm);
-    Child::submatvec_(C, x, sx, m, sm, v, sv);
-    Child::invert_(C, m, sm, v, sv, w, sw);
-    add(C, x, sx, v, sv);
+    Child::get(C, h, sh, m, sm);                    // M <- H
+    Child::submatvec_(C, x, sx, m, sm, v, sv);      // v <- v - H * x
+    Child::invert_(C, m, sm, v, sv, w, sw);         // v <- M \ v
+    add(C, x, sx, v, sv);                           // x <- x + v
   }
 };
 
@@ -218,12 +220,18 @@ struct utils<type::None>: common_none
 
   template <typename scalar_t, typename offset_t, typename reduce_t>
   static inline __device__ void
-  get(offset_t C, const scalar_t * i, offset_t s, reduce_t * o, offset_t so)
+  get(offset_t C, const scalar_t * i, offset_t si, reduce_t * o, offset_t so)
   {}
 
   template <typename scalar_t, typename offset_t, typename reduce_t>
   static inline __device__ void
-  submatvec_(offset_t C, const scalar_t * i, offset_t s,
+  addmatvec_(offset_t C, const scalar_t * i, offset_t si,
+             const reduce_t * h, offset_t sh, reduce_t * o, offset_t so)
+  {}
+
+  template <typename scalar_t, typename offset_t, typename reduce_t>
+  static inline __device__ void
+  submatvec_(offset_t C, const scalar_t * i, offset_t si,
              const reduce_t * h, offset_t sh, reduce_t * o, offset_t so)
   {}
 
@@ -282,6 +290,16 @@ struct utils<type::Eye>: common_eye
 
   template <typename scalar_t, typename offset_t, typename reduce_t>
   static inline __device__ void
+  addmatvec_(offset_t C, const scalar_t * i, offset_t si,
+             const reduce_t * h, offset_t sh, reduce_t * o, offset_t so)
+  {
+    reduce_t hh = *h;
+    for (offset_t c = 0; c < C; ++c, i += si, o += so)
+      (*o) += hh * (*i);
+  }
+
+  template <typename scalar_t, typename offset_t, typename reduce_t>
+  static inline __device__ void
   submatvec_(offset_t C, const scalar_t * i, offset_t si,
              const reduce_t * h, offset_t sh, reduce_t * o, offset_t so)
   {
@@ -317,6 +335,15 @@ struct utils<type::Diag>: common_diag
 
   template <typename scalar_t, typename offset_t, typename reduce_t>
   static inline __device__ void
+  addmatvec_(offset_t C, const scalar_t * i, offset_t si,
+             const reduce_t * h, offset_t sh, reduce_t * o, offset_t so)
+  {
+    for (offset_t c = 0; c < C; ++c, i += si, o += so, h += sh)
+      (*o) += (*h) * (*i);
+  }
+
+  template <typename scalar_t, typename offset_t, typename reduce_t>
+  static inline __device__ void
   submatvec_(offset_t C, const scalar_t * i, offset_t si,
              const reduce_t * h, offset_t sh, reduce_t * o, offset_t so)
   {
@@ -346,6 +373,21 @@ struct utils<type::ESTATICS>: common_estatics
   {
     for (offset_t c = 0; c < 2*C-1; ++c, i += si, o += so)
       *o = static_cast<reduce_t>(*i);
+  }
+
+  template <typename scalar_t, typename offset_t, typename reduce_t>
+  static inline __device__ void
+  addmatvec_(offset_t C, const scalar_t * i, offset_t si,
+             const reduce_t * h, offset_t sh, reduce_t * o, offset_t so)
+  {
+    const reduce_t * hh = h + C * sh;   // pointer to off-diagonal elements
+    reduce_t * oo = o + (C-1) * so;     // pointer to last output element
+    scalar_t r = i[(C-1)*si];
+    for (offset_t c = 0; c < C-1; ++c, i += si, o += so, h += sh, hh += sh) {
+      (*o) += (*h) * (*i) + (*hh) * r;
+      (*oo) += (*hh) * (*i);
+    }
+    (*o) += r * (*h);
   }
 
   template <typename scalar_t, typename offset_t, typename reduce_t>

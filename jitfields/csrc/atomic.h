@@ -1,5 +1,5 @@
 /***********************************************************************
- * copied from PyTorch/ATen
+ * CUDA portion copied from PyTorch/ATen
  * https://github.com/pytorch/pytorch/blob/master/LICENSE
  **********************************************************************/
 
@@ -7,25 +7,86 @@
 #define JF_ATOMIC
 #include "cuda_switch.h"
 
+/***********************************************************************
+ *                              CPU
+ **********************************************************************/
 #ifndef __CUDACC__
-// TODO: implement atomic on CPU (once thread pool implemented)
 
 namespace jf {
 
 template <typename T>
+class has_fetch_add
+{
+    // This class helps us check if atomic += is defined for
+    // floating point types.
+    // https://stackoverflow.com/questions/257288
+    typedef char one;
+    struct two { char x[2]; };
+
+    template <typename C> static one test( decltype(&C::fetch_add) ) ;
+    template <typename C> static two test(...);
+
+public:
+    enum { value = sizeof(test<T>(0)) == sizeof(char) };
+};
+
+template <typename scalar_t>
+struct has_atomic_add
+{
+    enum { value = has_fetch_add<std::atomic<scalar_t> >::value };
+};
+
+template <bool has_atom=false>
+struct AtomicAdd {
+    template <typename scalar_t>
+    static inline scalar_t atomicAdd(scalar_t * address, scalar_t val) {
+        val += *address;
+        *address = val;
+        return val;
+    }
+
+    template <typename scalar_t>
+    static inline scalar_t atomicAddNoReturn(scalar_t * address, scalar_t val) {
+        *address += val;
+    }
+};
+
+template <>
+struct AtomicAdd<true> {
+    // Implemented in c++ 11+ for integral types
+    // Implemented in c++ 20+ for floating types
+
+    template <typename scalar_t>
+    static inline void atomicAdd(scalar_t * address, scalar_t val) {
+        std::atomic<scalar_t> *aptr;
+        aptr->store(address);
+        return aptr->fetch_add(val);
+    }
+
+    template <typename scalar_t>
+    static inline void atomicAddNoReturn(scalar_t * address, scalar_t val) {
+        std::atomic<scalar_t> *aptr;
+        aptr->store(address);
+        aptr->fetch_add(val);
+        return;
+    }
+};
+
+template <typename T>
 static inline T anyAtomicAdd(T *address, T val) {
-  val += *address;
-  *address = val;
-  return val;
+    return AtomicAdd<has_atomic_add<T>::value>::atomicAdd(address, val);
 }
 
 template <typename T>
 static inline void anyAtomicAddNoReturn(T *address, T val) {
-  *address += val;
+    return AtomicAdd<has_atomic_add<T>::value>::atomicAddNoReturn(address, val);
 }
 
 } // namespace jf
 
+/***********************************************************************
+ *                              CUDA
+ **********************************************************************/
 #else
 
 template <typename T>

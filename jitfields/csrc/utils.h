@@ -44,6 +44,8 @@ template <typename T, typename size_t>
 inline __device__
 T prod(const T * x, size_t size)
 {
+    if (size == 0)
+        return static_cast<T>(1);
     T tmp = x[0];
     for (size_t d = 1; d < size; ++d)
         tmp *= x[d];
