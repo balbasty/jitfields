@@ -277,7 +277,7 @@ out : (..., *outshape, channel) tensor
 ```
 
 ```python
-push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True, out=None)
+push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
 """Splat a tensor using spline interpolation
 
 Parameters
@@ -298,6 +298,8 @@ extrapolate : bool or {'center', 'edge'}
       of the centers of the first and last voxels.
     - 'edge': do not extrapolate values that fall outside
        of the edges of the first and last voxels.
+    prefilter : bool, default=True
+        Whether to compute interpolating coefficients at the end.
 
 Returns
 -------

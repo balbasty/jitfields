@@ -14,10 +14,8 @@ offset_t index2offset(offset_t index, int ndim,
     offset_t current_stride = 1, next_stride = 1;
     for (int i = 0; i < ndim; ++i) {
         new_index1 = index;
-        if (i < ndim-1)  {
-            next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
-        }
+        next_stride = current_stride * size[i];
+        new_index1 = remainder(index, next_stride);
         new_index1 = new_index1 / current_stride;
         current_stride = next_stride;
         new_index += new_index1 * stride[i];

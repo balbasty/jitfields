@@ -37,7 +37,8 @@ void pull1d(scalar_t * out,
         offset_t grid_offset = index2offset(i, ndim-1, size_grid, stride_grid);
         reduce_t x = static_cast<reduce_t>(grid[grid_offset]);
         if (!InFOV<extrapolate, one>::infov(x, nx)) {
-            out[out_offset] = static_cast<scalar_t>(0);  // NaN?
+            for (offset_t c=0; c<nc; ++c)
+                out[out_offset + c * osc] = static_cast<scalar_t>(0);  // NaN?
             continue;
         }
         offset_t inp_offset = index2offset(i, ndim-2, size_grid, stride_inp);
@@ -130,7 +131,8 @@ void grad1d(scalar_t * out,
         offset_t grid_offset = index2offset(i, ndim-1, size_grid, stride_grid);
         reduce_t x = static_cast<reduce_t>(grid[grid_offset]);
         if (!InFOV<extrapolate, one>::infov(x, nx)) {
-            out[out_offset] = static_cast<scalar_t>(0);  // NaN?
+            for (offset_t c=0; c<nc; ++c)
+                out[out_offset + c * osc] = static_cast<scalar_t>(0);  // NaN?
             continue;
         }
         offset_t inp_offset = index2offset(i, ndim-2, size_grid, stride_inp);
@@ -214,7 +216,8 @@ void push1d_backward(
         offset_t gout_offset = index2offset(i, ndim-1, size_grid, stride_gout);
         reduce_t x = static_cast<reduce_t>(grid[grid_offset]);
         if (!InFOV<extrapolate, one>::infov(x, nx)) {
-            out[out_offset]   = static_cast<scalar_t>(0);
+            for (offset_t c=0; c<nc; ++c)
+                out[out_offset + c * osc]   = static_cast<scalar_t>(0);
             gout[gout_offset] = static_cast<scalar_t>(0);
             continue;
         }

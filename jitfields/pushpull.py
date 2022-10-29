@@ -1,6 +1,6 @@
 import torch
 from .utils import try_import, ensure_list
-from .splinc import spline_coeff_nd
+from .splinc import spline_coeff_nd, spline_coeff_nd_
 from .common.bounds import convert_bound
 from .common.spline import convert_order
 cuda_pushpull = try_import('jitfields.cuda', 'pushpull')
@@ -49,7 +49,7 @@ def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
 
 
 def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True,
-         out=None):
+         prefilter=False, out=None):
     """Splat a tensor using spline interpolation
 
     Parameters
@@ -70,6 +70,8 @@ def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True,
           of the centers of the first and last voxels.
         - 'edge': do not extrapolate values that fall outside
            of the edges of the first and last voxels.
+    prefilter : bool, default=True
+        Whether to compute interpolating coefficients at the end.
 
     Returns
     -------
@@ -83,7 +85,10 @@ def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True,
     inp, grid = _broadcast_push(inp, grid)
     shape = list(shape or inp.shape[-ndim-1:-1])
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
-    return Push.apply(inp, grid, shape, order, bound, extrapolate, out)
+    inp = Push.apply(inp, grid, shape, order, bound, extrapolate, out)
+    if prefilter:
+        inp = spline_coeff_nd_(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+    return inp
 
 
 def count(grid, shape=None, order=2, bound='dct2', extrapolate=True,

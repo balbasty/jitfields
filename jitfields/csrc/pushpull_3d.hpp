@@ -47,7 +47,8 @@ void pull3d(scalar_t * out,
         reduce_t y = static_cast<reduce_t>(grid[grid_offset + gsc]);
         reduce_t z = static_cast<reduce_t>(grid[grid_offset + gsc * 2]);
         if (!InFOV<extrapolate, three>::infov(x, y, z, nx, ny, nz)) {
-            out[out_offset]   = static_cast<scalar_t>(0);
+            for (offset_t c=0; c<nc; ++c)
+                out[out_offset + c * osc]   = static_cast<scalar_t>(0);
             continue;
         }
         offset_t inp_offset = index2offset(i, ndim-4, size_grid, stride_inp);
@@ -170,7 +171,11 @@ void grad3d(scalar_t * out,
         reduce_t y = static_cast<reduce_t>(grid[grid_offset + gsc]);
         reduce_t z = static_cast<reduce_t>(grid[grid_offset + gsc * 2]);
         if (!InFOV<extrapolate, three>::infov(x, y, z, nx, ny, nz)) {
-            out[out_offset] = static_cast<scalar_t>(0);  // NaN?
+            for (offset_t c=0; c<nc; ++c) {
+                out[out_offset + c * osc]           = static_cast<scalar_t>(0);
+                out[out_offset + c * osc + osg]     = static_cast<scalar_t>(0);
+                out[out_offset + c * osc + osg * 2] = static_cast<scalar_t>(0);
+            }
             continue;
         }
         offset_t inp_offset = index2offset(i, ndim-4, size_grid, stride_inp);
@@ -280,7 +285,8 @@ void push3d_backward(
         reduce_t y = static_cast<reduce_t>(grid[grid_offset + gsc]);
         reduce_t z = static_cast<reduce_t>(grid[grid_offset + gsc * 2]);
         if (!InFOV<extrapolate, three>::infov(x, y, z, nx, ny, nz)) {
-            out[out_offset]             = static_cast<scalar_t>(0);
+            for (offset_t c=0; c<nc; ++c)
+                out[out_offset + c * osc] = static_cast<scalar_t>(0);
             gout[gout_offset]           = static_cast<scalar_t>(0);
             gout[gout_offset + osg]     = static_cast<scalar_t>(0);
             gout[gout_offset + osg * 2] = static_cast<scalar_t>(0);
