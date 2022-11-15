@@ -36,7 +36,7 @@ __global__ void kernel1d(scalar_t * out, const scalar_t * inp, int ndim,
         Multiscale<one, zero, IX, BX>::restrict(
             out + out_offset, inp + batch_offset,
             x, size_inp[ndim-1], stride_inp[ndim-1],
-            scale[ndim-1], shift);
+            scale[0], shift);
     }
 }
 
@@ -62,8 +62,8 @@ __global__ void kernel2d(scalar_t * out, const scalar_t * inp, int ndim,
 
         Multiscale<two, zero, IX, BX, IY, BY>::restrict(
             out + out_offset, inp + batch_offset,
-            x, size_inp[ndim-2], stride_inp[ndim-2], scale[ndim-2],
-            y, size_inp[ndim-1], stride_inp[ndim-1], scale[ndim-1],
+            x, size_inp[ndim-2], stride_inp[ndim-2], scale[0],
+            y, size_inp[ndim-1], stride_inp[ndim-1], scale[1],
             shift);
     }
 }
@@ -91,9 +91,9 @@ __global__ void kernel3d(scalar_t * out, const scalar_t * inp, int ndim,
 
         Multiscale<three, zero, IX, BX, IY, BY, IZ, BZ>::restrict(
             out + out_offset, inp + batch_offset,
-            x, size_inp[ndim-3], stride_inp[ndim-3], scale[ndim-3],
-            y, size_inp[ndim-2], stride_inp[ndim-2], scale[ndim-2],
-            z, size_inp[ndim-1], stride_inp[ndim-1], scale[ndim-1],
+            x, size_inp[ndim-3], stride_inp[ndim-3], scale[0],
+            y, size_inp[ndim-2], stride_inp[ndim-2], scale[1],
+            z, size_inp[ndim-1], stride_inp[ndim-1], scale[2],
             shift);
     }
 }
@@ -149,7 +149,7 @@ __global__ void kernel21d(scalar_t * out, const scalar_t * inp, int ndim,
         Multiscale<one, two, IX, BX>::restrict(
             out + out_offset, inp + batch_offset,
             x, size_inp[ndim-1], stride_inp[ndim-1],
-            scale[ndim-1], shift);
+            scale[0], shift);
     }
 }
 
@@ -175,8 +175,8 @@ __global__ void kernel22d(scalar_t * out, const scalar_t * inp, int ndim,
 
         Multiscale<two, two, IX, BX, IY, BY>::restrict(
             out + out_offset, inp + batch_offset,
-            x, size_inp[ndim-2], stride_inp[ndim-2], scale[ndim-2],
-            y, size_inp[ndim-1], stride_inp[ndim-1], scale[ndim-1],
+            x, size_inp[ndim-2], stride_inp[ndim-2], scale[0],
+            y, size_inp[ndim-1], stride_inp[ndim-1], scale[1],
             shift);
     }
 }
@@ -204,9 +204,9 @@ __global__ void kernel23d(scalar_t * out, const scalar_t * inp, int ndim,
 
         Multiscale<three, two, IX, BX, IY, BY, IZ, BZ>::restrict(
             out + out_offset, inp + batch_offset,
-            x, size_inp[ndim-3], stride_inp[ndim-3], scale[ndim-3],
-            y, size_inp[ndim-2], stride_inp[ndim-2], scale[ndim-2],
-            z, size_inp[ndim-1], stride_inp[ndim-1], scale[ndim-1],
+            x, size_inp[ndim-3], stride_inp[ndim-3], scale[0],
+            y, size_inp[ndim-2], stride_inp[ndim-2], scale[1],
+            z, size_inp[ndim-1], stride_inp[ndim-1], scale[2],
             shift);
     }
 }
