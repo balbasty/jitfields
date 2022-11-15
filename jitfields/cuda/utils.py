@@ -1,14 +1,14 @@
 import os
 import torch
 import numpy as np
-from math import prod
+from ..utils import prod
 import re
 from torch.utils.dlpack import to_dlpack
 import cupy as cp
 from cupy_backends.cuda.api.driver import CUDADriverError
 
-_cuda_num_threads = None
-_num_threads = None
+_cuda_num_threads = os.environ.get('CUDA_NUM_THREADS', 1024)
+_num_threads = torch.get_num_threads()
 
 
 def init_cuda_num_threads():

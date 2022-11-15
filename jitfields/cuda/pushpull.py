@@ -1,6 +1,6 @@
 from ..common.bounds import cnames as bound_names, convert_bound
 from ..common.spline import cnames as order_names, convert_order
-from ..common.utils import cinfo
+from ..common.utils import cinfo, cstrides
 from ..utils import ensure_list, prod
 from .utils import (culaunch, get_offset_type, load_code, to_cupy)
 import cupy as cp
@@ -13,9 +13,10 @@ code = load_code('pushpull.cu')
 kernels = {}
 
 
-def get_kernel(func, ndim, order, bound, extrapolate, reduce_t, scalar_t, offset_t, backward=False):
-    key = (ndim, order, bound, extrapolate, reduce_t, scalar_t, offset_t, backward)
-    if key not in kernels:
+def get_kernel(*key):
+    kernel = kernels.get(key, None)
+    if not kernel:
+        func, ndim, order, bound, extrapolate, reduce_t, scalar_t, offset_t, backward = key
         template = f'{func}{ndim}d'
         if backward:
             template += '_backward'
@@ -51,8 +52,6 @@ def get_kernel(func, ndim, order, bound, extrapolate, reduce_t, scalar_t, offset
         kernel = module.get_function(template)
         if int(os.environ.get('JF_CACHE_KERNELS', '1')):
             kernels[key] = kernel
-    else:
-        kernel = kernels[key]
 
     return kernel
 
@@ -64,10 +63,11 @@ def get_kernel(func, ndim, order, bound, extrapolate, reduce_t, scalar_t, offset
 ndkernels = {}
 
 
-def get_kernelnd(func, ndim, extrapolate, reduce_t, scalar_t, offset_t, backward=False):
+def get_kernelnd(*key):
     """N-dimensional kernel"""
-    key = (ndim, extrapolate, reduce_t, scalar_t, offset_t, backward)
-    if key not in ndkernels:
+    kernel = ndkernels.get(key, None)
+    if not kernel:
+        func, ndim, extrapolate, reduce_t, scalar_t, offset_t, backward = key
         template = f'{func}nd'
         if backward:
             template += '_backward'
@@ -100,8 +100,6 @@ def get_kernelnd(func, ndim, extrapolate, reduce_t, scalar_t, offset_t, backward
         kernel = module.get_function(template)
 
         ndkernels[key] = kernel
-    else:
-        kernel = ndkernels[key]
 
     return kernel
 
@@ -137,20 +135,20 @@ def pull(out, inp, grid, order, bound, extrapolate):
     offset_t = cp.int64
     splinc_shape, instride = cinfo(np_inp, dtype=offset_t, backend=cp)
     grid_shape, gridstride = cinfo(np_grid, dtype=offset_t, backend=cp)
-    _, outstride = cinfo(np_out, dtype=offset_t, backend=cp)
+    outstride = cstrides(np_out, dtype=offset_t, backend=cp)
     nalldim = int(np_grid.ndim)
 
     # dispatch
     if ndim <= 3:
         func = get_kernel('pull', ndim, tuple(order), tuple(bound), extrapolate,
-                          reduce_t, scalar_t, offset_t)
+                          reduce_t, scalar_t, offset_t, False)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
         culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
-        func = get_kernelnd('pull', ndim, extrapolate, reduce_t, scalar_t, offset_t)
-        order = cp.asarray(order, dtype='uint8')
-        bound = cp.asarray(bound, dtype='uint8')
+        func = get_kernelnd('pull', ndim, extrapolate, reduce_t, scalar_t, offset_t, False)
+        order = cp.asarray(order, dtype=cp.uint8)
+        bound = cp.asarray(bound, dtype=cp.uint8)
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
         culaunch(func, prod(np_grid.shape[:-1]), args)
@@ -189,12 +187,12 @@ def push(out, inp, grid, order, bound, extrapolate):
     # dispatch
     if ndim <= 3:
         func = get_kernel('push', ndim, tuple(order), tuple(bound), extrapolate,
-                          reduce_t, scalar_t, offset_t)
+                          reduce_t, scalar_t, offset_t, False)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
         culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
-        func = get_kernelnd('push', ndim, extrapolate, reduce_t, scalar_t, offset_t)
+        func = get_kernelnd('push', ndim, extrapolate, reduce_t, scalar_t, offset_t, False)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
@@ -233,12 +231,12 @@ def count(out, grid, order, bound, extrapolate):
     # dispatch
     if ndim <= 3:
         func = get_kernel('count', ndim, tuple(order), tuple(bound), extrapolate,
-                          reduce_t, scalar_t, offset_t)
+                          reduce_t, scalar_t, offset_t, False)
         args = (np_out, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, gridstride)
         culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
-        func = get_kernelnd('count', ndim, extrapolate, reduce_t, scalar_t, offset_t)
+        func = get_kernelnd('count', ndim, extrapolate, reduce_t, scalar_t, offset_t, False)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_grid, nalldim, order, bound,
@@ -280,12 +278,12 @@ def grad(out, inp, grid, order, bound, extrapolate):
     # dispatch
     if ndim <= 3:
         func = get_kernel('grad', ndim, tuple(order), tuple(bound), extrapolate,
-                          reduce_t, scalar_t, offset_t)
+                          reduce_t, scalar_t, offset_t, False)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
         culaunch(func, prod(np_grid.shape[:-1]), args)
     else:
-        func = get_kernelnd('grad', ndim, extrapolate, reduce_t, scalar_t, offset_t)
+        func = get_kernelnd('grad', ndim, extrapolate, reduce_t, scalar_t, offset_t, False)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
