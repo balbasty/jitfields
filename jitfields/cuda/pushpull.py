@@ -1,8 +1,8 @@
-from ..common.bounds import cnames as bound_names, convert_bound
-from ..common.spline import cnames as order_names, convert_order
+from ..common.bounds import cnames as bound_names
+from ..common.spline import cnames as order_names
 from ..common.utils import cinfo, cstrides
-from ..utils import ensure_list, prod
-from .utils import (culaunch, get_offset_type, load_code, to_cupy)
+from ..utils import prod
+from .utils import (culaunch, load_code, to_cupy)
 import cupy as cp
 import os
 
@@ -144,14 +144,14 @@ def pull(out, inp, grid, order, bound, extrapolate):
                           reduce_t, scalar_t, offset_t, False)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        culaunch(func, prod(np_grid.shape[:-1]), args)
+        culaunch(func, np_grid[..., 0].size, args)
     else:
         func = get_kernelnd('pull', ndim, extrapolate, reduce_t, scalar_t, offset_t, False)
         order = cp.asarray(order, dtype=cp.uint8)
         bound = cp.asarray(bound, dtype=cp.uint8)
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        culaunch(func, prod(np_grid.shape[:-1]), args)
+        culaunch(func, np_grid[..., 0].size, args)
     return out
 
 
@@ -190,14 +190,14 @@ def push(out, inp, grid, order, bound, extrapolate):
                           reduce_t, scalar_t, offset_t, False)
         args = (np_out, np_inp, np_grid, nalldim,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        culaunch(func, prod(np_grid.shape[:-1]), args)
+        culaunch(func, np_grid[..., 0].size, args)
     else:
         func = get_kernelnd('push', ndim, extrapolate, reduce_t, scalar_t, offset_t, False)
         order = cp.asarray(order, dtype='uint8')
         bound = cp.asarray(bound, dtype='uint8')
         args = (np_out, np_inp, np_grid, nalldim, order, bound,
                 grid_shape, splinc_shape, outstride, instride, gridstride)
-        culaunch(func, prod(np_grid.shape[:-1]), args)
+        culaunch(func, np_grid[..., 0].size, args)
 
     return out
 

@@ -42,7 +42,7 @@ def get_cuda_blocks(n, max_threads_per_block=None):
 
 def culaunch(kernel, numel, args):
     trials = 0
-    num_threads = get_cuda_num_threads()
+    num_threads = get_cuda_num_threads() // 2
     e = None
     while trials < 4 and num_threads >= 1:
         num_blocks = get_cuda_blocks(numel, num_threads)
