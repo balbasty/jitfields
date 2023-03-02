@@ -1,3 +1,9 @@
+__all__ = [
+    'euclidean_distance_transform',
+    'l1_distance_transform',
+    'signed_distance_transform',
+]
+
 import torch
 from .utils import make_vector, try_import
 cuda_dist = try_import('jitfields.cuda', 'distance')

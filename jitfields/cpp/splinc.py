@@ -1,13 +1,11 @@
-from .utils import bound_as_cname, cwrap
-from ..common.utils import cinfo
+from .utils import cwrap
+from ..common.utils import cinfo, bound_as_cname
 from ..common.splinc import get_poles
 import numpy as np
 import cppyy
-import os
+from .utils import include
 
-
-this_folder = os.path.abspath(os.path.dirname(__file__))
-cppyy.add_include_path(os.path.join(this_folder, '..', 'csrc'))
+include()
 cppyy.include('splinc.hpp')
 
 

@@ -1,3 +1,5 @@
+__all__ = ['pull', 'push', 'count', 'grad']
+
 import torch
 from .utils import try_import, ensure_list
 from .splinc import spline_coeff_nd, spline_coeff_nd_
@@ -6,6 +8,7 @@ from .common.spline import convert_order
 cuda_pushpull = try_import('jitfields.cuda', 'pushpull')
 cpu_pushpull = try_import('jitfields.cpp', 'pushpull')
 
+foo = 0
 
 def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
          out=None):

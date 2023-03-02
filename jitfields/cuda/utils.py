@@ -62,9 +62,14 @@ def get_offset_type(*shapes):
     return np.int32 if can_use_32b else np.int64
 
 
-def load_code(filename):
-    this_folder = os.path.abspath(os.path.dirname(__file__))
-    with open(os.path.join(this_folder, '..', 'csrc', filename)) as f:
+def load_code(filename, relative=None):
+    if not relative:
+        relative = os.path.abspath(os.path.dirname(__file__))
+        relative = os.path.join(relative, '..', 'csrc', 'cuda')
+
+    filepath = os.path.join(relative, filename)
+    dirname = os.path.dirname(filepath)
+    with open(filepath) as f:
         code = f.read()
     lines = code.split('\n')
 
@@ -74,7 +79,7 @@ def load_code(filename):
     for line in lines:
         match = pattern.match(line)
         if match:
-            code += load_code(match.group('filename'))
+            code += load_code(match.group('filename'), relative=dirname)
         else:
             code += line + '\n'
     return code

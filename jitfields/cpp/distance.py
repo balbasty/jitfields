@@ -4,10 +4,10 @@ import torch
 import os
 import ctypes
 import numpy as np
+from .utils import include
 
 # cppyy.set_debug(True)
-this_folder = os.path.abspath(os.path.dirname(__file__))
-cppyy.add_include_path(os.path.join(this_folder, '..', 'csrc'))
+include()
 cppyy.include('distance_l1.hpp')
 cppyy.include('distance_euclidean.hpp')
 

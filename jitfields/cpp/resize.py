@@ -1,14 +1,13 @@
 from ..common.bounds import convert_bound
 from ..common.spline import convert_order
 from ..utils import ensure_list
-from .utils import boundspline_template, cwrap
-from ..common.utils import cinfo
+from .utils import cwrap
+from ..common.utils import cinfo, boundspline_template
 import cppyy
 import numpy as np
-import os
+from .utils import include
 
-this_folder = os.path.abspath(os.path.dirname(__file__))
-cppyy.add_include_path(os.path.join(this_folder, '..', 'csrc'))
+include()
 cppyy.include('resize.hpp')
 
 
@@ -44,15 +43,15 @@ def resize(x, factor=None, shape=None, ndim=None,
 
     # dispatch
     if ndim <= 3:
-        template = boundspline_template(bound, order)
-        func = cwrap(getattr(cppyy.gbl.jf.resize, f'loop{ndim}d')[template])
-        func(npy, npx, nalldim, shift, scale,
+        template = f'{nalldim}, ' + boundspline_template(bound, order)
+        func = cwrap(getattr(cppyy.gbl.jf.resize, f'loop{ndim}d')[template], 'resize')
+        func(npy, npx, shift, scale,
              outshape, inshape, outstride, instride)
     else:
-        func = cwrap(cppyy.gbl.jf.resize.loopnd[f'{int(ndim)}'])
+        func = cwrap(cppyy.gbl.jf.resize.loopnd[f'{ndim}, {nalldim}'])
         order = np.asarray(order, dtype='uint8')
         bound = np.asarray(bound, dtype='uint8')
-        func(npy, npx, nalldim, shift, scale,
+        func(npy, npx, shift, scale,
              order, bound, outshape, inshape, outstride, instride)
 
     return out

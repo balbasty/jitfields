@@ -1,7 +1,15 @@
 import ctypes
+import numbers
+import cppyy
+import os
+
 import numpy as np
-from ..common.bounds import convert_bound, cnames as cnames_bound
-from ..common.spline import convert_order, cnames as cnames_spline
+
+
+def include():
+    """Setup include directory"""
+    this_folder = os.path.abspath(os.path.dirname(__file__))
+    cppyy.add_include_path(os.path.join(this_folder, '..', 'csrc', 'cpp'))
 
 
 def ctype(dtype):
@@ -20,63 +28,58 @@ def as_pointer(array, dtype=None):
     return array.ctypes.data_as(ctypes.POINTER(dtype))
 
 
-def bound_as_cname(bound):
-    """Get C bound type"""
-    if isinstance(bound, (list, tuple)):
-        bound = [bound_as_cname(b) for b in bound]
-    else:
-        bound = convert_bound.get(bound, bound)
-        bound = 'jf::bound::type::' + cnames_bound[bound]
-    return bound
-
-
-def spline_as_cname(order):
-    """Get C spline type"""
-    if isinstance(order, (list, tuple)):
-        order = [spline_as_cname(o) for o in order]
-    else:
-        order = convert_order.get(order, order)
-        order = 'jf::spline::type::' + cnames_spline[order]
-    return order
-
-
-def boundspline_template(bound, order):
-    """Generate C template from bound/spline"""
-    assert len(bound) == len(order)
-    if not (isinstance(bound[0], str) and bound[0].startswith('jf::')):
-        bound = bound_as_cname(bound)
-    if not (isinstance(order[0], str) and order[0].startswith('jf::')):
-        order = spline_as_cname(order)
-    tpl = ''
-    for o, b in zip(order, bound):
-        tpl += f'{o}, {b}, '
-    tpl = tpl[:-2]
-    return tpl
-
-
 def as_ctype(x):
     """Convert arrays to C pointers and scalars to ctypes scalars"""
     if isinstance(x, np.ndarray):
         return as_pointer(x)
-    return ctype(type(x))(x)
+    if isinstance(x, (np.number, numbers.Number)):
+        return ctype(type(x))(x)
+    return x
 
 
-def cwrap(func):
+# def cwrap(func):
+#     """Decorator to automatically cast inputs to a cppyy function"""
+#     # from time import time
+#     def call(*args):
+#         args = list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
+#         # tic = time()
+#         out = func(*args)
+#         # print('internal:', (time() - tic) * 1e3, 'ms')
+#         return out
+#     return call
+
+
+def cwrap(func, tag='call'):
     """Decorator to automatically cast inputs to a cppyy function"""
+    def prep(*args):
+        return list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
+
     def call(*args):
-        args = list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
-        return func(*args)
-    return call
-
-
-def ctypename(dtype):
-    dtype = ctype(dtype).__name__[2:]
-    if dtype == 'byte':
-        return 'signed char'
-    if dtype == 'ubyte':
-        return 'unsigned char'
-    if dtype[0] == 'u':
-        return 'unsigned ' + dtype[1:]
-    return dtype
-
-
+        args = prep(*args)
+        out = func(*args)
+        return out
+    def restrict(*args):
+        args = prep(*args)
+        out = func(*args)
+        return out
+    def resize(*args):
+        args = prep(*args)
+        out = func(*args)
+        return out
+    def matvec(*args):
+        args = prep(*args)
+        out = func(*args)
+        return out
+    def solve(*args):
+        args = prep(*args)
+        out = func(*args)
+        return out
+    def solve_(*args):
+        args = prep(*args)
+        out = func(*args)
+        return out
+    def vel2mom(*args):
+        args = prep(*args)
+        out = func(*args)
+        return out
+    return locals()[tag]

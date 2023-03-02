@@ -226,7 +226,7 @@ def make_vector(input, n=None, crop=True, *args,
         default = kwargs['default']
     else:
         default = input[-1]
-    default = input.new_full([n-len(input)], default)
+    default = input.new_full([], default).expand([n-len(input)])
     return torch.cat([input, default])
 
 
@@ -380,3 +380,46 @@ def affine_grid(mat, shape):
     off = mat[..., :nb_dim, -1]
     grid = lin.matmul(grid.unsqueeze(-1)).squeeze(-1) + off
     return grid
+
+
+def broadcast(x, y, skip_last=0):
+    """Broadcast the shapes of two tensors.
+
+    The last `skip_last` dimensions are preserved and not included in
+    the broadcast.
+
+    Parameters
+    ----------
+    x : tensor
+    y : tensor
+    skip_last : int or (int, int), default=0
+
+    Returns
+    -------
+    x : tensor
+    y : tensor
+
+    """
+    ndim = max(x.dim(), y.dim())
+    while x.dim() < ndim:
+        x = x[None]
+    while y.dim() < ndim:
+        y = y[None]
+    xskip, yskip = ensure_list(skip_last, 2)
+    xslicer = slice(-xskip if xskip else None)
+    yslicer = slice(-yskip if yskip else None)
+    xbatch = x.shape[xslicer]
+    ybatch = y.shape[yslicer]
+    batch = []
+    for bx, by, in zip(xbatch, ybatch):
+        if bx > 1 and by > 1 and bx != by:
+            raise ValueError('Cannot broadcast batch shapes',
+                             tuple(xbatch), 'and', tuple(ybatch))
+        batch.append(max(bx, by))
+    xslicer = slice(-xskip if xskip else None, None)
+    yslicer = slice(-yskip if yskip else None, None)
+    xshape = batch + (list(x.shape[xslicer]) if xskip else [])
+    yshape = batch + (list(y.shape[yslicer]) if yskip else [])
+    x = x.expand(xshape)
+    y = y.expand(yshape)
+    return x, y
