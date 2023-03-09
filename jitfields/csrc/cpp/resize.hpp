@@ -8,118 +8,86 @@
 namespace jf {
 namespace resize {
 
-template <int ndim, spline::type IX, bound::type BX,
-          typename scalar_t, typename offset_t>
-void loop1d(scalar_t * out, const scalar_t * inp,
-            scalar_t shift, const scalar_t * scale,
-            const offset_t * size_out,
-            const offset_t * size_inp,
-            const offset_t * stride_out,
-            const offset_t * stride_inp)
+template <int nbatch, int ndim,
+          typename scalar_t, typename offset_t, typename reduce_t,
+          spline::type IX,    bound::type BX,
+          spline::type IY=IX, bound::type BY=BX,
+          spline::type IZ=IY, bound::type BZ=BY>
+void loop(
+    scalar_t * out,                 // (*batch, *shape) tensor
+    const scalar_t * inp,           // (*batch, *shape) tensor
+    reduce_t shift,
+    const reduce_t * _scale,        // [*shape] vector
+    const offset_t * _size_out,     // [*batch, *shape] vector
+    const offset_t * _size_inp,     // [*batch, *shape] vector
+    const offset_t * _stride_out,   // [*batch, *shape] vector
+    const offset_t * _stride_inp)   // [*batch, *shape] vector
 {
-    offset_t numel = prod<ndim>(size_out);
+    constexpr int nall = ndim + nbatch;
 
+    // copy vectors to the stack
+    reduce_t scale      [ndim]; fillfrom<ndim>(scale,      _scale);
+    offset_t size_out   [nall]; fillfrom<nall>(size_out,   _size_out);
+    offset_t size_inp   [nall]; fillfrom<nall>(size_inp,   _size_inp);
+    offset_t stride_out [nall]; fillfrom<nall>(stride_out, _stride_out);
+    offset_t stride_inp [nall]; fillfrom<nall>(stride_inp, _stride_inp);
+
+    offset_t numel = prod<nall>(size_out);
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
-        {
-            offset_t x;
-            offset_t batch_offset = index2offset_1d<ndim>(i, size_out, stride_inp, x);
-            offset_t out_offset = index2offset<ndim>(i, size_out, stride_out);
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t loc[ndim];
+        offset_t inp_offset = index2offset_nd<ndim,nall>(i, size_out, stride_inp, loc);
+        offset_t out_offset = index2offset<nall>(i, size_out, stride_out);
 
-            Multiscale<one, IX, BX>::resize(out + out_offset, inp + batch_offset,
-                                            x, size_inp[ndim-1], stride_inp[ndim-1],
-                                            scale[0], shift);
-        }
-    });
+        Multiscale<ndim, IX, BX, IY, BY, IZ, BZ>::resize(
+            out + out_offset, inp + inp_offset,
+            loc, size_inp + nbatch, stride_inp + nbatch,
+            scale, shift);
+    }});
 }
 
-template <int ndim,
-          spline::type IX, bound::type BX,
-          spline::type IY, bound::type BY,
-          typename scalar_t, typename offset_t>
-void loop2d(scalar_t * out, const scalar_t * inp,
-            scalar_t shift, const scalar_t * scale,
-            const offset_t * size_out,
-            const offset_t * size_inp,
-            const offset_t * stride_out,
-            const offset_t * stride_inp)
+template <int nbatch, int ndim,
+          typename scalar_t, typename offset_t, typename reduce_t>
+void loopnd(
+    scalar_t * out,                 // (*batch, *shape) tensor
+    const scalar_t * inp,           // (*batch, *shape) tensor
+    reduce_t shift,
+    const reduce_t * _scale,        // [*shape] vector
+    const unsigned char * _order,   // [*shape] vector
+    const unsigned char * _bnd,     // [*shape] vector
+    const offset_t * _size_out,     // [*batch, *shape] vector
+    const offset_t * _size_inp,     // [*batch, *shape] vector
+    const offset_t * _stride_out,   // [*batch, *shape] vector
+    const offset_t * _stride_inp)   // [*batch, *shape] vector
 {
-    offset_t numel = prod<ndim>(size_out);
+    constexpr int nall = ndim + nbatch;
 
+    const spline::type * corder = reinterpret_cast<const spline::type *>(_order);
+    const bound::type  * cbnd   = reinterpret_cast<const bound::type *>(_bnd);
+
+    // copy vectors to the stack
+    reduce_t scale      [ndim]; fillfrom<ndim>(scale,      _scale);
+    spline::type order  [ndim]; fillfrom<ndim>(order,      corder);
+    bound::type  bnd    [ndim]; fillfrom<ndim>(bnd,        cbnd);
+    offset_t size_out   [nall]; fillfrom<nall>(size_out,   _size_out);
+    offset_t size_inp   [nall]; fillfrom<nall>(size_inp,   _size_inp);
+    offset_t stride_out [nall]; fillfrom<nall>(stride_out, _stride_out);
+    offset_t stride_inp [nall]; fillfrom<nall>(stride_inp, _stride_inp);
+
+    offset_t numel = prod<nall>(size_out);
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
-        {
-            offset_t x, y;
-            offset_t batch_offset = index2offset_2d<ndim>(i, size_out, stride_inp, x, y);
-            offset_t out_offset = index2offset<ndim>(i, size_out, stride_out);
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t loc[ndim];
+        offset_t inp_offset = index2offset_nd<ndim,nall>(i, size_out, stride_inp, loc);
+        offset_t out_offset = index2offset<nall>(i, size_out, stride_out);
 
-            Multiscale<two, IX, BX, IY, BY>::resize(
-                out + out_offset, inp + batch_offset,
-                x, size_inp[ndim-2], stride_inp[ndim-2], scale[0],
-                y, size_inp[ndim-1], stride_inp[ndim-1], scale[1],
-                shift);
-        }
-    });
-}
-
-template <int ndim,
-          spline::type IX, bound::type BX,
-          spline::type IY, bound::type BY,
-          spline::type IZ, bound::type BZ,
-          typename scalar_t, typename offset_t>
-void loop3d(scalar_t * out, const scalar_t * inp,
-            scalar_t shift, const scalar_t * scale,
-            const offset_t * size_out,
-            const offset_t * size_inp,
-            const offset_t * stride_out,
-            const offset_t * stride_inp)
-{
-    offset_t numel = prod(size_out, ndim);
-
-    parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
-        {
-            offset_t x, y, z;
-            offset_t batch_offset = index2offset_3d<ndim>(i, size_out, stride_inp, x, y, z);
-            offset_t out_offset = index2offset<ndim>(i, size_out, stride_out);
-
-            Multiscale<three, IX, BX, IY, BY, IZ, BZ>::resize(
-                out + out_offset, inp + batch_offset,
-                x, size_inp[ndim-3], stride_inp[ndim-3], scale[0],
-                y, size_inp[ndim-2], stride_inp[ndim-2], scale[1],
-                z, size_inp[ndim-1], stride_inp[ndim-1], scale[2],
-                shift);
-        }
-    });
-}
-
-template <int D, int ndim, typename scalar_t, typename offset_t>
-void loopnd(scalar_t * out, const scalar_t * inp,
-            scalar_t shift, const scalar_t * scale,
-            const unsigned char * order,
-            const unsigned char * bnd,
-            const offset_t * size_out,
-            const offset_t * size_inp,
-            const offset_t * stride_out,
-            const offset_t * stride_inp)
-{
-    offset_t numel = prod<ndim>(size_out);
-    const spline::type * corder = reinterpret_cast<const spline::type *>(order);
-    const bound::type  * cbnd   = reinterpret_cast<const bound::type *>(bnd);
-
-    parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
-        {
-            offset_t x[D];
-            offset_t batch_offset = index2offset_nd<ndim>(i, size_out, stride_inp, x, D);
-            offset_t out_offset = index2offset<ndim>(i, size_out, stride_out);
-
-            Multiscale<D>::resize(
-                out + out_offset, inp + batch_offset,
-                x, size_inp + ndim - D, stride_inp + ndim - D,
-                corder, cbnd, scale, shift);
-        }
-    });
+        Multiscale<ndim>::resize(
+            out + out_offset, inp + inp_offset,
+            loc, size_inp + nbatch, stride_inp + nbatch,
+            order, bnd, scale, shift);
+    }});
 }
 
 } // namespace resize

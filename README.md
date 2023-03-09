@@ -33,14 +33,14 @@ pip install git+https://github.com/balbasty/jitfields
 ### Distance transforms
 
 ```python
-euclidean_distance_transform(x, dim=None, vx=1, dtype=None)
+def euclidean_distance_transform(x, ndim=None, vx=1, dtype=None): ...
 """Compute the Euclidean distance transform of a binary image
 
 Parameters
 ----------
 x : (..., *spatial) tensor
     Input tensor
-dim : int, default=`x.dim()`
+ndim : int, default=`x.ndim`
     Number of spatial dimensions
 vx : [sequence of] float, default=1
     Voxel size
@@ -60,14 +60,14 @@ References
 ```
 
 ```python
-l1_distance_transform(x, dim=None, vx=1, dtype=None)
+def l1_distance_transform(x, ndim=None, vx=1, dtype=None): ...
 """Compute the L1 distance transform of a binary image
 
 Parameters
 ----------
 x : (..., *spatial) tensor
     Input tensor
-dim : int, default=`x.dim()`
+dim : int, default=`x.ndim`
     Number of spatial dimensions
 vx : [sequence of] float, default=1
     Voxel size
@@ -94,7 +94,7 @@ References
 ### Interpolation/Resampling
 
 ```python
-spline_coeff(inp, order, bound='dct2', dim=-1)
+def spline_coeff(inp, order, bound='dct2', dim=-1): ...
 """Compute the interpolating spline coefficients, along a single dimension.
 
 Parameters
@@ -128,7 +128,7 @@ References
 ```
 
 ```python
-spline_coeff_nd(inp, order, bound='dct2', ndim=None)
+def spline_coeff_nd(inp, order, bound='dct2', ndim=None): ...
 """Compute the interpolating spline coefficients, along the last N dimensions.
 
 Parameters
@@ -162,8 +162,8 @@ References
 ```
 
 ```python
-resize(x, factor=None, shape=None, ndim=None,
-       anchor='e', order=2, bound='dct2', prefilter=True)
+def resize(x, factor=None, shape=None, ndim=None,
+           anchor='e', order=2, bound='dct2', prefilter=True): ...
 """Resize a tensor using spline interpolation
 
 Parameters
@@ -215,8 +215,8 @@ References
 ```
 
 ```python
-restrict(x, factor=None, shape=None, ndim=None,
-         anchor='e', order=2, bound='dct2', reduce_sum=False)
+def restrict(x, factor=None, shape=None, ndim=None,
+             anchor='e', order=2, bound='dct2', reduce_sum=False): ...
 """Restrict (adjoint of resize) a tensor using spline interpolation
 
 Parameters
@@ -252,7 +252,7 @@ x : (..., *shape) tensor
 ```
 
 ```python
-pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None): ...
 """Sample a tensor using spline interpolation
 
 Parameters
@@ -285,7 +285,7 @@ out : (..., *outshape, channel) tensor
 ```
 
 ```python
-push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None): ...
 """Splat a tensor using spline interpolation
 
 Parameters
@@ -317,7 +317,7 @@ out : (..., *shape, channel) tensor
 ```
 
 ```python
-count(grid, shape=None, order=2, bound='dct2', extrapolate=True, out=None)
+def count(grid, shape=None, order=2, bound='dct2', extrapolate=True, out=None): ...
 """Splat ones using spline interpolation
 
 Parameters
@@ -345,7 +345,7 @@ out : (..., *shape) tensor
 ```
 
 ```python
-grad(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+def grad(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None): ...
 """Sample the spatial gradients of a tensor using spline interpolation
 
 Parameters
@@ -381,7 +381,7 @@ out : (..., *outshape, channel, ndim) tensor
 Currently only implemented on the CPU.
 
 ```python
-sym_matvec(mat, vec, dtype=None, out=None)
+def sym_matvec(mat, vec, dtype=None, out=None): ...
 """Matrix-vector product for compact symmetric matrices
 
     `out = mat @ vec`
@@ -407,7 +407,7 @@ out : (..., C) tensor
 ```
 
 ```python
-sym_addmatvec(inp, mat, vec, dtype=None, out=None)
+def sym_addmatvec(inp, mat, vec, dtype=None, out=None): ...
 """Add a matrix-vector product for compact symmetric matrices
 
     `out = inp + mat @ vec`
@@ -435,7 +435,7 @@ out : (..., C) tensor
 ```
 
 ```python
-sym_addmatvec_(inp, mat, vec, dtype=None)
+def sym_addmatvec_(inp, mat, vec, dtype=None): ...
 """Inplace add a matrix-vector product for compact symmetric matrices
 
     `inp += mat @ vec`
@@ -461,7 +461,7 @@ inp : (..., C) tensor
 ```
 
 ```python
-sym_submatvec(inp, mat, vec, dtype=None, out=None)
+def sym_submatvec(inp, mat, vec, dtype=None, out=None): ...
 """Subtract a matrix-vector product for compact symmetric matrices
 
     `out = inp - mat @ vec`
@@ -489,7 +489,7 @@ out : (..., C) tensor
 ```
 
 ```python
-sym_submatvec_(inp, mat, vec, dtype=None)
+def sym_submatvec_(inp, mat, vec, dtype=None): ...
 """Inplace subtract a matrix-vector product for compact symmetric matrices
 
     `inp -= mat @ vec`
@@ -515,7 +515,7 @@ inp : (..., C) tensor
 ```
 
 ```python
-sym_solve(mat, vec, dtype=None, out=None)
+def sym_solve(mat, vec, dtype=None, out=None): ...
 """Solve the symmetric linear system
 
     `out = mat.inverse() @ vec`
@@ -543,7 +543,7 @@ out : (..., C) tensor
 ```
 
 ```python
-sym_solve_(mat, vec, dtype=None)
+def sym_solve_(mat, vec, dtype=None): ...
 """Solve the symmetric linear system in-place
 
     `vec = mat.inverse() @ vec`
@@ -569,7 +569,7 @@ vec : (..., C) tensor
 ```
 
 ```python
-sym_invert(mat, dtype=None, out=None)
+def sym_invert(mat, dtype=None, out=None): ...
 """Invert a compact symmetric matrix
 
     `out = mat.inverse()`
@@ -596,7 +596,7 @@ mat : (..., C*(C+1)//2) tensor
 ```
 
 ```python
-sym_invert_(mat, dtype=None)
+def sym_invert_(mat, dtype=None): ...
 """Invert a compact symmetric matrix in-place
 
     `mat = mat.inverse()`

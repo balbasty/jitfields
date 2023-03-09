@@ -37,8 +37,9 @@ namespace splinc {
 namespace _splinc {
 
 template <typename scalar_t, typename reduce_t, typename offset_t>
-inline __device__ scalar_t dft_initial(scalar_t * inp, reduce_t pole,
-                                       offset_t size, offset_t stride)
+inline __device__
+scalar_t dft_initial(const scalar_t * inp, reduce_t pole,
+                     offset_t size, offset_t stride)
 {
     offset_t max_iter = static_cast<offset_t>(ceil(-30./log(fabs(pole))));
     max_iter = min(max_iter, size);
@@ -55,8 +56,9 @@ inline __device__ scalar_t dft_initial(scalar_t * inp, reduce_t pole,
 }
 
 template <typename scalar_t, typename reduce_t, typename offset_t>
-inline __device__ scalar_t dft_final(scalar_t * inp, reduce_t pole,
-                                     offset_t size, offset_t stride)
+inline __device__
+scalar_t dft_final(const scalar_t * inp, reduce_t pole,
+                   offset_t size, offset_t stride)
 {
     offset_t max_iter = static_cast<offset_t>(ceil(-30./log(fabs(pole))));
     max_iter = min(max_iter, size);
@@ -72,8 +74,9 @@ inline __device__ scalar_t dft_final(scalar_t * inp, reduce_t pole,
 }
 
 template <typename scalar_t, typename reduce_t, typename offset_t>
-inline __device__ scalar_t dct1_initial(scalar_t * inp, reduce_t pole,
-                                        offset_t size, offset_t stride)
+inline __device__
+scalar_t dct1_initial(const scalar_t * inp, reduce_t pole,
+                      offset_t size, offset_t stride)
 {
     offset_t max_iter = static_cast<offset_t>(ceil(-30./log(fabs(pole))));
     max_iter = min(max_iter, size);
@@ -110,9 +113,11 @@ inline __device__ scalar_t dct1_initial(scalar_t * inp, reduce_t pole,
     return static_cast<scalar_t>(out);
 }
 
+
 template <typename scalar_t, typename reduce_t, typename offset_t>
-inline __device__ scalar_t dct1_final(scalar_t * inp, reduce_t pole,
-                                      offset_t size, offset_t stride)
+inline __device__
+scalar_t dct1_final(const scalar_t * inp, reduce_t pole,
+                    offset_t size, offset_t stride)
 {
     inp += (size - 1) * stride;
     reduce_t out = static_cast<reduce_t>(*inp);
@@ -124,8 +129,39 @@ inline __device__ scalar_t dct1_final(scalar_t * inp, reduce_t pole,
 
 
 template <typename scalar_t, typename reduce_t, typename offset_t>
-inline __device__ reduce_t dct2_initial(scalar_t * inp, reduce_t pole,
-                                        offset_t size, offset_t stride)
+inline __device__
+scalar_t dct1_scipy_initial(const scalar_t * inp, reduce_t pole,
+                            offset_t size, offset_t stride)
+{
+    // 2023-03-09
+    // JA's DCT1 conditions (or at least, my port of them) fail the
+    // interpolation test. In the meantime, I've ported scipy's version
+    // which pass the tests when `size` is large enough (but still fail
+    // for small `size`).
+    // I'll need to come back to investigate.
+    const scalar_t * rev = inp + (size - 1)*stride;
+
+    reduce_t polen  = pole;
+    reduce_t polen1 = pow(pole, static_cast<reduce_t>(size) - 1.);
+    reduce_t out = static_cast<reduce_t>(inp[0])
+                 + static_cast<reduce_t>(rev[0]) * polen1;
+    inp += stride;
+    rev -= stride;
+    for (offset_t i = 1; i < size-1; ++i, inp += stride, rev -= stride)
+    {
+        out    += polen * (static_cast<reduce_t>(*inp) +
+                           static_cast<reduce_t>(*inp) * polen1);
+        polen  *= pole;
+    }
+    out /= (1. - polen1*polen1);
+    return static_cast<scalar_t>(out);
+}
+
+
+template <typename scalar_t, typename reduce_t, typename offset_t>
+inline __device__
+reduce_t dct2_initial(const scalar_t * inp, reduce_t pole,
+                      offset_t size, offset_t stride)
 {
 // Ported from scipy:
 // https://github.com/scipy/scipy/blob/master/scipy/ndimage/src/ni_splines.c
@@ -138,14 +174,14 @@ inline __device__ reduce_t dct2_initial(scalar_t * inp, reduce_t pole,
 
     reduce_t polen = pole;
     reduce_t polen_last = pow(pole, static_cast<reduce_t>(size));
-    scalar_t * inp_last = inp + (size - 1) * stride;
+    const scalar_t * rev = inp + (size - 1) * stride;
     scalar_t inp0 = static_cast<reduce_t>(*inp);
-    reduce_t out = inp0  + static_cast<reduce_t>(*inp_last) * polen_last;
+    reduce_t out = inp0  + static_cast<reduce_t>(*rev) * polen_last;
     inp += stride;
-    inp_last -= stride;
-    for (offset_t i=1; i<size; ++i, inp += stride, inp_last -= stride ) {
+    rev -= stride;
+    for (offset_t i=1; i<size; ++i, inp += stride, rev -= stride ) {
         out += polen * (static_cast<reduce_t>(*inp) +
-                        static_cast<reduce_t>(*inp_last) * polen_last);
+                        static_cast<reduce_t>(*rev) * polen_last);
         polen *= pole;
     }
 
@@ -155,8 +191,9 @@ inline __device__ reduce_t dct2_initial(scalar_t * inp, reduce_t pole,
 }
 
 template <typename scalar_t, typename reduce_t, typename offset_t>
-inline __device__ scalar_t dct2_final(scalar_t * inp, reduce_t pole,
-                                      offset_t size, offset_t stride)
+inline __device__
+scalar_t dct2_final(const scalar_t * inp, reduce_t pole,
+                    offset_t size, offset_t stride)
 {
     reduce_t out = static_cast<reduce_t>(inp[(size - 1) * stride]);
     out *= pole / (pole - 1.);
@@ -216,7 +253,7 @@ template <bound::type B> struct utils {
     template <typename scalar_t, typename reduce_t, typename offset_t>
     static inline __device__ scalar_t initial(scalar_t * inp, reduce_t pole,
                                               offset_t size, offset_t stride)
-    { return _splinc::dct1_initial(inp, pole, size, stride); }
+    { return _splinc::dct1_scipy_initial(inp, pole, size, stride); }
     template <typename scalar_t, typename reduce_t, typename offset_t>
     static inline __device__ scalar_t final(scalar_t * inp, reduce_t pole,
                                             offset_t size, offset_t stride)
@@ -256,9 +293,10 @@ template <> struct utils<bound::type::DFT> {
     { return _splinc::dft_final(inp, pole, size, stride); }
 };
 
-template <bound::type B, typename scalar_t, typename reduce_t, typename offset_t>
+template <bound::type B, int npoles,
+          typename scalar_t, typename reduce_t, typename offset_t>
 inline __device__ void filter(scalar_t * inp, offset_t size, offset_t stride,
-                              const reduce_t * poles, int npoles)
+                              const reduce_t * poles)
 {
     using bound_utils = utils<B>;
 

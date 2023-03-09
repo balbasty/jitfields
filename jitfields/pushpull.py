@@ -3,10 +3,10 @@ __all__ = ['pull', 'push', 'count', 'grad']
 import torch
 from .utils import try_import, ensure_list
 from .splinc import spline_coeff_nd, spline_coeff_nd_
-from .common.bounds import convert_bound
-from .common.spline import convert_order
-cuda_pushpull = try_import('jitfields.cuda', 'pushpull')
-cpu_pushpull = try_import('jitfields.cpp', 'pushpull')
+from .bindings.common.bounds import convert_bound
+from .bindings.common.spline import convert_order
+cuda_pushpull = try_import('jitfields.bindings.cuda', 'pushpull')
+cpu_pushpull = try_import('jitfields.bindings.cpp', 'pushpull')
 
 foo = 0
 
@@ -174,22 +174,21 @@ class Pull(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, grid, order, bound, extrapolate, out):
-        _fwd = cuda_pushpull.pull if inp.is_cuda else cpu_pushpull.pull
+        fwd = (cuda_pushpull if inp.is_cuda else cpu_pushpull).pull
         ctx.opt = (order, bound, extrapolate)
         ctx.save_for_backward(inp, grid)
         fullshape = grid.shape[:-1] + inp.shape[-1:]
         out = inp.new_empty(fullshape) if out is None else out.view(fullshape)
-        out = _fwd(out, inp, grid, order, bound, extrapolate)
+        out = fwd(out, inp, grid, order, bound, extrapolate)
         return out
 
     @staticmethod
     def backward(ctx, grad):
-        _bwd = (cuda_pushpull.pull_backward if grad.is_cuda else
-                cpu_pushpull.pull_backward)
+        bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).pull_backward
         inp, grid = ctx.saved_tensors
         outgrad_inp = torch.zeros_like(inp)
         outgrad_grid = torch.empty_like(grid)
-        _bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
+        bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
         return (outgrad_inp, outgrad_grid) + (None,) * 4
 
 
@@ -197,23 +196,22 @@ class Push(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, grid, shape, order, bound, extrapolate, out):
-        _fwd = cuda_pushpull.push if inp.is_cuda else cpu_pushpull.push
+        fwd = (cuda_pushpull if inp.is_cuda else cpu_pushpull).push
         ctx.opt = (order, bound, extrapolate)
         ctx.save_for_backward(inp, grid)
         ndim = grid.shape[-1]
         fullshape = list(grid.shape[:-ndim-1]) + list(shape) + list(inp.shape[-1:])
         out = inp.new_zeros(fullshape) if out is None else out.view(fullshape)
-        out = _fwd(out, inp, grid, order, bound, extrapolate)
+        out = fwd(out, inp, grid, order, bound, extrapolate)
         return out
 
     @staticmethod
     def backward(ctx, grad):
-        _bwd = (cuda_pushpull.push_backward if grad.is_cuda else
-                cpu_pushpull.push_backward)
+        bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).push_backward
         inp, grid = ctx.saved_tensors
         outgrad_inp = torch.empty_like(inp)
         outgrad_grid = torch.empty_like(grid)
-        _bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
+        bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
         return (outgrad_inp, outgrad_grid) + (None,) * 5
 
 
@@ -221,19 +219,18 @@ class Count(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, grid, shape, order, bound, extrapolate, out):
-        _fwd = cuda_pushpull.count if grid.is_cuda else cpu_pushpull.count
+        fwd = (cuda_pushpull if grid.is_cuda else cpu_pushpull).count
         ctx.opt = (order, bound, extrapolate)
         ctx.save_for_backward(grid)
         ndim = grid.shape[-1]
         fullshape = list(grid.shape[:-ndim-1]) + list(shape) + [1]
         out = grid.new_zeros(fullshape) if out is None else out.view(fullshape)
-        out = _fwd(out, grid, order, bound, extrapolate).squeeze(-1)
+        out = fwd(out, grid, order, bound, extrapolate).squeeze(-1)
         return out
 
     @staticmethod
     def backward(ctx, grad):
-        _bwd = (cuda_pushpull.count_backward if grad.is_cuda else
-                cpu_pushpull.count_backward)
+        _bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).count_backward
         grid, = ctx.saved_tensors
         outgrad_grid = torch.empty_like(grid)
         _bwd(outgrad_grid, grad.unsqueeze(-1), grid, *ctx.opt)
@@ -244,22 +241,21 @@ class Grad(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, grid, order, bound, extrapolate, out):
-        _fwd = cuda_pushpull.grad if inp.is_cuda else cpu_pushpull.grad
+        fwd = (cuda_pushpull if inp.is_cuda else cpu_pushpull).grad
         ctx.opt = (order, bound, extrapolate)
         ctx.save_for_backward(inp, grid)
         fullshape = grid.shape[:-1] + inp.shape[-1:] + grid.shape[-1:]
         out = inp.new_empty(fullshape) if out is None else out.view(fullshape)
-        out = _fwd(out, inp, grid, order, bound, extrapolate)
+        out = fwd(out, inp, grid, order, bound, extrapolate)
         return out
 
     @staticmethod
     def backward(ctx, grad):
-        _bwd = (cuda_pushpull.grad_backward if grad.is_cuda else
-                cpu_pushpull.grad_backward)
+        bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).grad_backward
         inp, grid = ctx.saved_tensors
         outgrad_inp = torch.zeros_like(inp)
         outgrad_grid = torch.empty_like(grid)
-        _bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
+        bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
         return (outgrad_inp, outgrad_grid) + (None,) * 4
 
 

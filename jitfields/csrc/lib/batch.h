@@ -29,15 +29,18 @@ namespace jf {
 
 template <typename offset_t>
 inline __device__
-offset_t index2offset(offset_t index, int ndim,
-                      const offset_t * size, const offset_t * stride)
+offset_t index2offset(
+    offset_t index,
+    int ndim,
+    const offset_t * size,
+    const offset_t * stride)
 {
     offset_t new_index = 0, new_index1;
     offset_t current_stride = 1, next_stride = 1;
     for (int i = 0; i < ndim; ++i) {
         new_index1 = index;
         next_stride = current_stride * size[i];
-        new_index1 = remainder(index, next_stride);
+        new_index1 = index % next_stride;
         new_index1 = new_index1 / current_stride;
         current_stride = next_stride;
         new_index += new_index1 * stride[i];
@@ -47,9 +50,10 @@ offset_t index2offset(offset_t index, int ndim,
 
 template <int ndim, typename offset_t>
 inline __device__
-offset_t index2offset(offset_t index,
-                      const offset_t * size,
-                      const offset_t * stride)
+offset_t index2offset(
+    offset_t index,
+    const offset_t * size,
+    const offset_t * stride)
 {
     offset_t new_index = 0, new_index1;
     offset_t cur_stride = 1, nxt_stride = 1;
@@ -57,7 +61,7 @@ offset_t index2offset(offset_t index,
     for (int i = 0; i < ndim; ++i) {
         new_index1 = index;
         nxt_stride = cur_stride * size[i];
-        new_index1 = remainder(index, nxt_stride);
+        new_index1 = index % nxt_stride;
         new_index1 = new_index1 / cur_stride;
         cur_stride = nxt_stride;
         new_index += new_index1 * stride[i];
@@ -67,244 +71,120 @@ offset_t index2offset(offset_t index,
 
 template <typename offset_t>
 __device__
-offset_t index2offset_1d(offset_t index, int ndim,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t & x)
-{
-    offset_t new_index = 0, new_index1 = 0;
-    offset_t current_stride = 1, next_stride = 1;
-    for (int i = 0; i < ndim; ++i) {
-        new_index1 = index;
-        if (i < ndim-1)  {
-            next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
-        }
-        new_index1 = new_index1 / current_stride;
-        current_stride = next_stride;
-        if (i < ndim-1)
-            new_index += new_index1 * stride[i];
-        else
-            x = new_index1;
-    }
-    return new_index;
-}
-
-template <int ndim, typename offset_t>
-__device__
-offset_t index2offset_1d(offset_t index,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t & x)
-{
-    offset_t new_index = 0, new_index1 = 0;
-    offset_t current_stride = 1, next_stride = 1;
-#   pragma unroll
-    for (int i = 0; i < ndim; ++i) {
-        new_index1 = index;
-        if (i < ndim-1)  {
-            next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
-        }
-        new_index1 = new_index1 / current_stride;
-        current_stride = next_stride;
-        if (i < ndim-1)
-            new_index += new_index1 * stride[i];
-        else
-            x = new_index1;
-    }
-    return new_index;
-}
-
-template <typename offset_t>
-__device__
-offset_t index2offset_2d(offset_t index, int ndim,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t & x, offset_t & y)
+offset_t index2offset_nd(
+    offset_t index,
+    int nall,
+    const offset_t * size,
+    const offset_t * stride,
+    offset_t * x,
+    int ndim)
 {
     offset_t new_index = 0, new_index1;
     offset_t current_stride = 1, next_stride = 1;
-    for (int i = 0; i < ndim; ++i) {
+    for (int i = 0; i < nall; ++i) {
         new_index1 = index;
-        if (i < ndim-1)  {
+        if (i < nall-1)  {
             next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
+            new_index1 = index % next_stride;
         }
         new_index1 = new_index1 / current_stride;
         current_stride = next_stride;
-        if (i < ndim-2)
+        if (i < nall-ndim)
             new_index += new_index1 * stride[i];
-        else if (i == ndim-2)
-            x = new_index1;
         else
-            y = new_index1;
+            x[i-(nall-ndim)] = new_index1;
     }
     return new_index;
 }
 
-template <int ndim, typename offset_t>
+
+template <int ndim, int nall, typename offset_t>
 inline __device__
-offset_t index2offset_2d(offset_t index,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t & x, offset_t & y)
+offset_t index2offset_nd(
+    offset_t index,
+    const offset_t * size,
+    const offset_t * stride,
+    offset_t * x)
 {
     offset_t new_index = 0, new_index1;
     offset_t current_stride = 1, next_stride = 1;
 #   pragma unroll
-    for (int i = 0; i < ndim; ++i) {
+    for (int i = 0; i < nall; ++i) {
         new_index1 = index;
-        if (i < ndim-1)  {
+        if (i < nall-1)  {
             next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
+            new_index1 = index % next_stride;
         }
         new_index1 = new_index1 / current_stride;
         current_stride = next_stride;
-        if (i < ndim-2)
+        if (i < nall-ndim)
             new_index += new_index1 * stride[i];
-        else if (i == ndim-2)
-            x = new_index1;
         else
-            y = new_index1;
+            x[i-(nall-ndim)] = new_index1;
     }
     return new_index;
 }
 
-template <typename offset_t>
-__device__
-offset_t index2offset_3d(offset_t index, int ndim,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t & x, offset_t & y, offset_t & z)
-{
-    offset_t new_index = 0, new_index1;
-    offset_t current_stride = 1, next_stride = 1;
-    for (int i = 0; i < ndim; ++i) {
-        new_index1 = index;
-        if (i < ndim-1)  {
-            next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
-        }
-        new_index1 = new_index1 / current_stride;
-        current_stride = next_stride;
-        if (i < ndim-3)
-            new_index += new_index1 * stride[i];
-        else if (i == ndim-3)
-            x = new_index1;
-        else if (i == ndim-2)
-            y = new_index1;
-        else
-            z = new_index1;
-    }
-    return new_index;
-}
-
-template <int ndim, typename offset_t>
-inline __device__
-offset_t index2offset_3d(offset_t index,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t & x, offset_t & y, offset_t & z)
-{
-    offset_t new_index = 0,  new_index1;
-    offset_t cur_stride = 1, nxt_stride = 1;
-#   pragma unroll
-    for (int i = 0; i < ndim; ++i) {
-        new_index1 = index;
-        if (i < ndim-1)  {
-            nxt_stride = cur_stride * size[i];
-            new_index1 = remainder(index, nxt_stride);
-        }
-        new_index1 = new_index1 / cur_stride;
-        cur_stride = nxt_stride;
-        if (i < ndim-3)
-            new_index += new_index1 * stride[i];
-        else if (i == ndim-3)
-            x = new_index1;
-        else if (i == ndim-2)
-            y = new_index1;
-        else
-            z = new_index1;
-    }
-    return new_index;
-}
-
-template <typename offset_t>
-__device__
-offset_t index2offset_nd(offset_t index, int ndim,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t * x, int n)
-{
-    offset_t new_index = 0, new_index1;
-    offset_t current_stride = 1, next_stride = 1;
-    for (int i = 0; i < ndim; ++i) {
-        new_index1 = index;
-        if (i < ndim-1)  {
-            next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
-        }
-        new_index1 = new_index1 / current_stride;
-        current_stride = next_stride;
-        if (i < ndim-n)
-            new_index += new_index1 * stride[i];
-        else
-            x[ndim-n+i] = new_index1;
-    }
-    return new_index;
-}
-
-
-template <int n, int ndim, typename offset_t>
-inline __device__
-offset_t index2offset_nd(offset_t index,
-                         const offset_t * size,
-                         const offset_t * stride,
-                         offset_t * x)
-{
-    offset_t new_index = 0, new_index1;
-    offset_t current_stride = 1, next_stride = 1;
-#   pragma unroll
-    for (int i = 0; i < ndim; ++i) {
-        new_index1 = index;
-        if (i < ndim-1)  {
-            next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
-        }
-        new_index1 = new_index1 / current_stride;
-        current_stride = next_stride;
-        if (i < ndim-n)
-            new_index += new_index1 * stride[i];
-        else
-            x[ndim-n+i] = new_index1;
-    }
-    return new_index;
-}
-
-
-template <int n, int ndim, typename offset_t>
+// This version build the entire offset + extract the last N sub-indices
+// It differs from `index2offset<n,ndim>`, which only build the batch
+// offset when it extracts sub-indices.
+template <int ndim, int nall, typename offset_t>
 inline __device__
 offset_t index2offset_v2(
-    offset_t index, const offset_t * size, const offset_t * stride,
+    offset_t index,
+    const offset_t * size,
+    const offset_t * stride,
     offset_t * x = nullptr)
 {
     offset_t new_index = 0, new_index1;
     offset_t current_stride = 1, next_stride = 1;
 #   pragma unroll
-    for (int i = 0; i < ndim; ++i) {
+    for (int i = 0; i < nall; ++i) {
         new_index1 = index;
-        if (i < ndim-1)  {
+        if (i < nall-1)  {
             next_stride = current_stride * size[i];
-            new_index1 = remainder(index, next_stride);
+            new_index1 = index % next_stride;
         }
         new_index1 = new_index1 / current_stride;
         current_stride = next_stride;
-        if (i >= ndim-n)
-            x[ndim-n+i] = new_index1;
+        if (i >= nall-ndim)
+            x[i-(nall-ndim)] = new_index1;
         new_index += new_index1 * stride[i];
     }
     return new_index;
+}
+
+template <int ndim, typename offset_t>
+inline __device__
+offset_t sub2offset(const offset_t * sub, const offset_t * stride)
+{
+    offset_t offset = 0;
+    for (int d=0; d < ndim; ++d)
+        offset += sub[d] * stride[d];
+    return offset;
+}
+
+template <int nall, typename offset_t>
+inline __device__
+void index2sub(
+    offset_t index,
+    const offset_t * size,
+    offset_t * x)
+{
+    offset_t new_index1;
+    offset_t current_stride = 1, next_stride = 1;
+#   pragma unroll
+    for (int i = 0; i < nall; ++i) {
+        new_index1 = index;
+        if (i < nall-1)
+        {
+            next_stride = current_stride * size[i];
+            new_index1 = index % next_stride;
+        }
+        new_index1 = new_index1 / current_stride;
+        current_stride = next_stride;
+        x[i] = new_index1;
+    }
 }
 
 

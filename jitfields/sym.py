@@ -8,8 +8,8 @@ __all__ = [
 
 import torch
 from .utils import try_import, broadcast
-cuda_sym = try_import('jitfields.cuda', 'sym')
-cpu_sym = try_import('jitfields.cpp', 'sym')
+cuda_sym = try_import('jitfields.bindings.cuda', 'sym')
+cpu_sym = try_import('jitfields.bindings.cpp', 'sym')
 
 
 def sym_matvec(mat, vec, dtype=None, out=None):

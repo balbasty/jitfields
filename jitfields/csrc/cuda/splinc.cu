@@ -5,19 +5,28 @@
 
 using namespace jf;
 
-template <bound::type B, typename scalar_t, typename offset_t>
-__global__ void kernel(scalar_t * inp, int ndim,
-                       const offset_t * size, const offset_t * stride,
-                       const double * poles, int npoles)
+template <int ndim, int npoles, bound::type B,
+          typename scalar_t, typename offset_t, typename reduce_t>
+__global__
+void kernel(
+    scalar_t * inp,
+    const offset_t * size,
+    const offset_t * stride,
+    const reduce_t * poles)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
-    offset_t nthreads = prod(size, ndim-1);
 
-    for (offset_t i=index; index < nthreads;
+    constexpr int nbatch = ndim - 1;
+    reduce_t poles  [npoles];  fill<npoles>(poles, _poles);
+    offset_t size   [ndim];    fill<ndim>(size,    _size);
+    offset_t stride [ndim];    fill<ndim>(stride, _stride);
+
+    offset_t numel = prod<nbatch>(size);
+    for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t offset = index2offset(i, ndim-1, size, stride);
-        splinc::filter<B>(inp + offset, size[ndim-1], stride[ndim-1],
-                          poles, npoles);
+        offset_t offset = index2offset<nbatch>(i, size, stride);
+        splinc::filter<B,npoles>(
+            inp + offset, size[nbatch], stride[nbatch], poles, npoles);
     }
 }

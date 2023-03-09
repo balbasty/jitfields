@@ -2,13 +2,15 @@ __all__ = ['resize', 'restrict',
            'Prolong', 'Restrict', 'GridProlong', 'GridRestrict']
 
 import torch
+from .bindings.common.bounds import convert_bound
+from .bindings.common.spline import convert_order
 from .utils import try_import, ensure_list, prod
 from .splinc import spline_coeff_nd
 import math as pymath
-cuda_resize = try_import('jitfields.cuda', 'resize')
-cpu_resize = try_import('jitfields.cpp', 'resize')
-cuda_restrict = try_import('jitfields.cuda', 'restrict')
-cpu_restrict = try_import('jitfields.cpp', 'restrict')
+cuda_resize = try_import('jitfields.bindings.cuda', 'resize')
+cpu_resize = try_import('jitfields.bindings.cpp', 'resize')
+cuda_restrict = try_import('jitfields.bindings.cuda', 'restrict')
+cpu_restrict = try_import('jitfields.bindings.cpp', 'restrict')
 
 
 class Prolong:
@@ -327,18 +329,28 @@ def resize(x, factor=None, shape=None, ndim=None,
             ndim = len(factor)
         else:
             ndim = x.dim()
+
     if shape:
         shape = ensure_list(shape, ndim)
-    elif factor:
+    if factor:
         factor = ensure_list(factor, ndim)
-    else:
+    if not shape and not factor:
         raise ValueError('At least one of shape or factor must be provided')
+
     if not shape:
         if out is not None:
             shape = out.shape[-ndim:]
         else:
             shape = [pymath.ceil(s*f) for s, f in zip(x.shape[-ndim:], factor)]
 
+    fullshape = list(x.shape[:-ndim]) + list(shape)
+    if out is None:
+        out = x.new_empty(fullshape)
+    else:
+        out = out.expand(fullshape)
+
+    order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
+    bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
     if prefilter:
         x = spline_coeff_nd(x, order, bound, ndim)
     return _Resize.apply(x, factor, shape, ndim, anchor, order, bound, out)
@@ -386,18 +398,28 @@ def restrict(x, factor=None, shape=None, ndim=None,
             ndim = len(shape)
         else:
             ndim = x.dim()
+
     if shape:
         shape = ensure_list(shape, ndim)
     elif factor:
         factor = ensure_list(factor, ndim)
     else:
         raise ValueError('At least one of shape or factor must be provided')
+
     if not shape:
         if out is not None:
             shape = out.shape[-ndim:]
         else:
             shape = [pymath.ceil(s/f) for s, f in zip(x.shape[-ndim:], factor)]
 
+    fullshape = list(x.shape[:-ndim]) + list(shape)
+    if out is None:
+        out = x.new_empty(fullshape)
+    else:
+        out = out.expand(fullshape)
+
+    order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
+    bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
     x = _Restrict.apply(x, factor, shape, ndim, anchor, order, bound, reduce_sum, out)
     return x
 
@@ -406,34 +428,26 @@ class _Resize(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, x, factor, shape, ndim, anchor, order, bound, out):
-        if x.is_cuda:
-            _resize = cuda_resize.resize
-        else:
-            _resize = cpu_resize.resize
+        resize = (cuda_resize if x.is_cuda else cpu_resize).resize
         ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound)
-        x = _resize(x, factor, shape, ndim, anchor, order, bound, out)
+        x = resize(out, x, factor, anchor, order, bound)
         return x
 
     @staticmethod
     def backward(ctx, grad):
         inshape, factor, shape, ndim, anchor, order, bound = ctx.opt
-        if grad.is_cuda:
-            _restrict = cuda_restrict.restrict
-        else:
-            _restrict = cpu_restrict.restrict
-        grad = _restrict(grad, factor, inshape[-ndim:], ndim, anchor, order, bound)
-        return (grad,) + (None,) * 8
+        restrict = (cuda_restrict if grad.is_cuda else cpu_restrict).restrict
+        out = grad.new_empty([*grad.shape[:-ndim], *inshape[-ndim:]])
+        restrict(out, grad, factor, anchor, order, bound)
+        return (out,) + (None,) * 7
 
 
 class _Restrict(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, x, factor, shape, ndim, anchor, order, bound, reduce_sum, out):
-        if x.is_cuda:
-            _restrict = cuda_restrict.restrict
-        else:
-            _restrict = cpu_restrict.restrict
-        x, scale = _restrict(x, factor, shape, ndim, anchor, order, bound, out)
+        restrict = (cuda_restrict if x.is_cuda else cpu_restrict).restrict
+        x, scale = restrict(out, x, factor, anchor, order, bound)
         scale = prod(scale)
         ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound, reduce_sum, scale)
         if not reduce_sum:
@@ -443,11 +457,9 @@ class _Restrict(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad, *args):
         inshape, factor, shape, ndim, anchor, order, bound, reduce_sum, scale = ctx.opt
+        resize = (cuda_resize if grad.is_cuda else cpu_resize).resize
         if not reduce_sum:
             grad = grad / scale
-        if grad.is_cuda:
-            _resize = cuda_resize.resize
-        else:
-            _resize = cpu_resize.resize
-        grad = _resize(grad, factor, inshape[-ndim:], ndim, anchor, order, bound)
-        return (grad,) + (None,) * 8
+        out = grad.new_empty([*grad.shape[:-ndim], *inshape[-ndim:]])
+        out = resize(out, grad, factor, anchor, order, bound)
+        return (out,) + (None,) * 8

@@ -4,7 +4,7 @@
 #include "../lib/bounds.h"
 #include "../lib/utils.h"
 #include "../lib/batch.h"
-#include "../lib/reg_field_static_3d.h"
+#include "../lib/regularisers/field/3d_static.h"
 
 namespace jf {
 namespace reg_field {

@@ -4,6 +4,19 @@
 
 namespace jf {
 
+// static check for floating types
+template <typename T>
+struct is_floating_point { static constexpr bool value = false; };
+template <>
+struct is_floating_point<float> { static constexpr bool value = true; };
+template <>
+struct is_floating_point<double> { static constexpr bool value = true; };
+#ifdef __CUDACC__
+template <>
+struct is_floating_point<half> { static constexpr bool value = true; };
+#endif
+
+
 template <typename T>
 inline __device__
 void swap(T& a, T& b)
@@ -13,7 +26,10 @@ void swap(T& a, T& b)
 
 template <typename T>
 inline __device__
-T square(T a) { return a*a; }
+T square(T a)
+{
+    return a*a;
+}
 
 template <int N, typename T>
 inline __device__
@@ -27,34 +43,94 @@ T pow(T a) {
 
 template <typename T>
 inline __device__
-T min(T a, T b) { return (a < b ? a : b); }
+T pow(T a, int N) {
+    T p = a;
+#   pragma unroll
+    for(int d = 0; d < N-1; ++d)
+        p *= a;
+    return p;
+}
 
 template <typename T>
 inline __device__
-T max(T a, T b) { return (a > b ? a : b); }
+T min(T a, T b)
+{
+    return (a < b ? a : b);
+}
+
+template <typename T>
+inline __device__
+T max(T a, T b)
+{
+    return (a > b ? a : b);
+}
+
+template <typename T>
+inline __device__
+T abs(T a)
+{
+    return static_cast<T>(a < 0 ? -a : a);
+}
+
+template <typename T>
+inline __device__
+signed char sign(T a)
+{
+    return static_cast<signed char>(a == 0 ? 0 : a < 0 ? -1 : 1);
+}
 
 #ifdef __CUDACC__
 template <>
 inline __device__
-half min<>(half a, half b) {
+half min<>(half a, half b)
+{
     float af = static_cast<float>(a);
     float bf = static_cast<float>(b);
     return (a < b ? a : b);
 }
 template <>
 inline __device__
-half max<>(half a, half b) {
+half max<>(half a, half b)
+{
     float af = static_cast<float>(a);
     float bf = static_cast<float>(b);
     return (a > b ? a : b);
 }
 #endif
 
-template <typename T>
-inline __device__
-T remainder(T x, T d)
+// fmod
+template <typename T, typename U,
+          bool is_float_T = is_floating_point<T>::value,
+          bool is_float_U = is_floating_point<U>::value >
+struct _mod
 {
-    return (x - (x / d) * d);
+    inline __device__ static
+    T f(T x, U d)
+    {
+        signed char sx = sign(x);
+        signed char sd = sign(d);
+
+        long ratio = (sx*sd)*static_cast<long>(trunc(abs(x)/abs(d)));
+        return (x - ratio * d);
+    }
+};
+
+
+template <typename T, typename U>
+struct _mod<T, U, false, false>
+{
+    inline __device__ static
+    T f(T x, U d)
+    {
+        return x % d;
+    }
+};
+
+template <typename T, typename U>
+inline __device__
+T mod(T x, U d)
+{
+    return _mod<T,U>::f(x, d);
 }
 
 template <typename T, typename size_t>

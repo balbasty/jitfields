@@ -1,36 +1,33 @@
 #ifndef JF_DISTANCE_L1_LOOP
 #define JF_DISTANCE_L1_LOOP
 #include "../lib/cuda_switch.h"
-#include "../lib/distance_l1.h"
+#include "../lib/distance.h"
 #include "../lib/batch.h"
+#include "../lib/parallel.h"
 
 namespace jf {
 namespace distance_l1 {
 
-template <typename scalar_t, typename offset_t>
-void loop(scalar_t * f, scalar_t w, int ndim,
-          const offset_t * size, const offset_t *  stride)
+template <int ndim, typename scalar_t, typename offset_t>
+void loop(
+    scalar_t * f,
+    scalar_t w,
+    const offset_t * _size,
+    const offset_t * _stride)
 {
-    offset_t numel = prod(size, ndim-1);
+    constexpr int nbatch = ndim - 1;
+    offset_t size   [ndim]; fillfrom<ndim>(size,   _size);
+    offset_t stride [ndim]; fillfrom<ndim>(stride, _stride);
+    offset_t n = size[nbatch];
+    offset_t s = stride[nbatch];
 
-    for (offset_t i=0; i < numel; ++i)
+    offset_t numel = prod<nbatch>(size);
+    parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
+    for (offset_t i=start; i < end; ++i)
     {
-        offset_t batch_offset = index2offset(i, ndim-1, size, stride);
-        algo(f + batch_offset, size[ndim-1], stride[ndim-1], w);
-    }
-}
-
-template <typename scalar_t, typename offset_t>
-void loop3d(scalar_t * f, scalar_t w,
-            const offset_t * size, const offset_t *  stride)
-{
-    offset_t size_x = size[0], size_y = size[1], size_z = size[2];
-    offset_t stride_x = stride[0], stride_y = stride[1], stride_z = stride[2];
-    offset_t i, j;
-    scalar_t *fi, *fj;
-    for (i=0, fi=f; i < size_x; ++i, fi += stride_x)
-    for (j=0, fj=fi; j < size_y; ++j, fj += stride_y)
-        algo(fj, size_z, stride_z, w);
+        offset_t offset = index2offset<nbatch>(i, size, stride);
+        algo(f + offset, n, s, w);
+    }});
 }
 
 } // namespace distance _l1

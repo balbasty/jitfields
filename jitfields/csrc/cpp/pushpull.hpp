@@ -46,22 +46,21 @@ void pull(
 
     offset_t numel = prod<nall>(size_grid);  // no outer loop across channels
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
-        {
-            offset_t out_offset = index2offset_v2<0,nall>(i, size_grid, stride_out);
-            offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t out_offset = index2offset<nall>(i, size_grid, stride_out);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
 
-            reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
-            if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch)) {
-                for (offset_t c=0; c<nc; ++c)
-                    out[out_offset + c * osc] = static_cast<scalar_t>(0);
-                continue;
-            }
-            offset_t inp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
-
-            pull(loc, out_offset, inp_offset);
+        reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
+        if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch)) {
+            for (offset_t c=0; c<nc; ++c)
+                out[out_offset + c * osc] = static_cast<scalar_t>(0);
+            continue;
         }
-    });
+        offset_t inp_offset = index2offset<nbatch>(i, size_grid, stride_inp);
+
+        pull(loc, out_offset, inp_offset);
+    }});
 }
 
 template <int nbatch, int ndim, int extrapolate,
@@ -103,20 +102,19 @@ void push(
     {
         offset_t numel = prod<nall>(size_grid);  // no outer loop across channels
         parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
-            {
-                offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
 
-                reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
-                if (!InFOV<extrapolate, ndim>::infov(loc, _size_splinc+nbatch))
-                    continue;
+            reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
+            if (!InFOV<extrapolate, ndim>::infov(loc, _size_splinc+nbatch))
+                continue;
 
-                offset_t inp_offset = index2offset_v2<0,nall>(i, size_grid, stride_inp);
-                offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
+            offset_t inp_offset = index2offset_v2<0,nall>(i, size_grid, stride_inp);
+            offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
 
-                push(loc, out_offset, inp_offset);
-            }
-        });
+            push(loc, out_offset, inp_offset);
+        }});
     }
     else
     {
@@ -124,28 +122,27 @@ void push(
         offset_t numel_spatial = prod<ndim>(size_grid+nbatch); // sequential spatial loop (no channel)
         long grain_size = max(GRAIN_SIZE/numel_spatial, 1L);
         parallel_for(0, numel_batch, grain_size, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_grid);
+            offset_t inp_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
+            offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
+
+            for (offset_t j=0; j < numel_spatial; ++j)
             {
-                offset_t grid_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_grid);
-                offset_t inp_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
-                offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
+                offset_t grid_offset = grid_offset0
+                    + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_grid+nbatch);
 
-                for (offset_t j=0; j < numel_spatial; ++j)
-                {
-                    offset_t grid_offset = grid_offset0
-                        + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_grid+nbatch);
+                reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
+                if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
+                    continue;
 
-                    reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
-                    if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
-                        continue;
+                offset_t inp_offset = inp_offset0
+                    + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_inp+nbatch);
 
-                    offset_t inp_offset = inp_offset0
-                        + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_inp+nbatch);
-
-                    push(loc, out_offset, inp_offset);
-                }
+                push(loc, out_offset, inp_offset);
             }
-        });
+        }});
     }
 }
 
@@ -165,10 +162,10 @@ void count(
     static constexpr int nall = ndim + nbatch;
 
     // copy vectors to the stack
-    offset_t size_grid[nall+1];   fillfrom<nall+1>(size_grid,   _size_grid);
-    offset_t size_splinc[nall+1]; fillfrom<nall+1>(size_splinc, _size_splinc);
-    offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out,  _stride_out);
-    offset_t stride_grid[nall+1]; fillfrom<nall+1>(stride_grid, _stride_grid);
+    offset_t size_grid   [nall+1]; fillfrom<nall+1>(size_grid,   _size_grid);
+    offset_t size_splinc [nall+1]; fillfrom<nall+1>(size_splinc, _size_splinc);
+    offset_t stride_out  [nall+1]; fillfrom<nall+1>(stride_out,  _stride_out);
+    offset_t stride_grid [nall+1]; fillfrom<nall+1>(stride_grid, _stride_grid);
     offset_t gsc = stride_grid[nall];
 
     auto count = [&](const reduce_t * loc, offset_t out_offset)
@@ -181,41 +178,39 @@ void count(
     {
         offset_t numel = prod<nall>(size_grid);  // no outer loop across channels
         parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
-            {
-                offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-                reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
-                if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
-                    continue;
-                offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+            reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
+            if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
+                continue;
+            offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
 
-                count(loc, out_offset);
-            }
-        });
+            count(loc, out_offset);
+        }});
     }
     else
     {
-        offset_t numel_batch = prod<nbatch>(size_grid);
+        offset_t numel_batch   = prod<nbatch>(size_grid);
         offset_t numel_spatial = prod<ndim>(size_grid+nbatch);
         long grain_size = max(GRAIN_SIZE/numel_spatial, 1L);
         parallel_for(0, numel_batch, grain_size, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_grid);
+            offset_t out_offset   = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
+            for (offset_t j=0; j < numel_spatial; ++j)
             {
-                offset_t grid_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_grid);
-                offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
-                for (offset_t j=0; j < numel_spatial; ++j)
-                {
-                    offset_t grid_offset = grid_offset0
-                        + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_grid+nbatch);
+                offset_t grid_offset = grid_offset0
+                    + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_grid+nbatch);
 
-                    reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
-                    if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
-                        continue;
+                reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
+                if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
+                    continue;
 
-                    count(loc, out_offset);
-                }
+                count(loc, out_offset);
             }
-        });
+        }});
     }
 }
 
@@ -258,24 +253,23 @@ void grad(
 
     offset_t numel = prod<nall>(size_grid);
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t out_offset = index2offset_v2<0,nall>(i, size_grid, stride_out);
+        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+
+        reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
+        if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
         {
-            offset_t out_offset = index2offset_v2<0,nall>(i, size_grid, stride_out);
-            offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-
-            reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
-            if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
-            {
-                for (offset_t c=0; c<nc; ++c)
-                    fill<ndim>(out + out_offset + c * osc, 0, osg);
-                continue;
-            }
-
-            offset_t inp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
-
-            grad(loc, out_offset, inp_offset);
+            for (offset_t c=0; c<nc; ++c)
+                fill<ndim>(out + out_offset + c * osc, 0, osg);
+            continue;
         }
-    });
+
+        offset_t inp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
+
+        grad(loc, out_offset, inp_offset);
+    }});
 }
 
 template <int nbatch, int ndim, int extrapolate,
@@ -333,10 +327,43 @@ void pull_backward(
     {
         offset_t numel = prod<nall>(size_grid);  // no outer loop across channels
         parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
+            offset_t gout_offset = index2offset<nall>(i, size_grid, stride_gout);
+
+            reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
+            if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
             {
-                offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-                offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
+                fill<ndim>(gout + gout_offset, 0, osg);
+                continue;
+            }
+
+            offset_t inp_offset  = index2offset<nbatch>(i, size_grid, stride_inp);
+            offset_t out_offset  = index2offset<nbatch>(i, size_grid, stride_out);
+            offset_t ginp_offset = index2offset<nall>(i, size_grid, stride_ginp);
+
+            pull_backward(loc, out_offset, gout_offset, inp_offset, ginp_offset);
+        }});
+    }
+    else
+    {
+        offset_t numel_batch = prod<nbatch>(size_grid);
+        offset_t numel_spatial = prod<ndim>(size_grid+nbatch);
+        long grain_size = max(GRAIN_SIZE/numel_spatial, 1L);
+        parallel_for(0, numel_batch, grain_size, [&](long start, long end) {
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset0 = index2offset<nbatch>(i, size_grid, stride_grid);
+            offset_t ginp_offset0 = index2offset<nbatch>(i, size_grid, stride_ginp);
+            offset_t gout_offset  = index2offset<nall>(i, size_grid, stride_gout);
+            offset_t inp_offset   = index2offset<nbatch>(i, size_grid, stride_inp);
+            offset_t out_offset   = index2offset<nbatch>(i, size_grid, stride_out);
+
+            for (offset_t j=0; j < numel_spatial; ++j)
+            {
+                offset_t grid_offset = grid_offset0
+                    + index2offset<ndim>(j, size_grid+nbatch, stride_grid+nbatch);
 
                 reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
                 if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
@@ -345,47 +372,12 @@ void pull_backward(
                     continue;
                 }
 
-                offset_t inp_offset  = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
-                offset_t out_offset  = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
-                offset_t ginp_offset = index2offset_v2<0,nall>(i, size_grid, stride_ginp);
+                offset_t ginp_offset = ginp_offset0
+                    + index2offset<ndim>(j, size_grid+nbatch, stride_ginp+nbatch);
 
                 pull_backward(loc, out_offset, gout_offset, inp_offset, ginp_offset);
             }
-        });
-    }
-    else
-    {
-        offset_t numel_batch = prod<nbatch>(size_grid);
-        offset_t numel_spatial = prod<ndim>(size_grid+nbatch);
-        long grain_size = max(GRAIN_SIZE/numel_spatial, 1L);
-        parallel_for(0, numel_batch, grain_size, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
-            {
-                offset_t grid_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_grid);
-                offset_t ginp_offset0 = index2offset_v2<0,nbatch>(i, size_grid, stride_ginp);
-                offset_t gout_offset  = index2offset_v2<0,nbatch>(i, size_grid, stride_gout);
-                offset_t inp_offset   = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
-                offset_t out_offset   = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
-
-                for (offset_t j=0; j < numel_spatial; ++j)
-                {
-                    offset_t grid_offset = grid_offset0
-                        + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_grid+nbatch);
-
-                    reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
-                    if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
-                    {
-                        fill<ndim>(gout + gout_offset, 0, osg);
-                        continue;
-                    }
-
-                    offset_t ginp_offset = ginp_offset0
-                        + index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_ginp+nbatch);
-
-                    pull_backward(loc, out_offset, gout_offset, inp_offset, ginp_offset);
-                }
-            }
-        });
+        }});
     }
 }
 
@@ -441,26 +433,25 @@ void push_backward(
 
     offset_t numel = prod<nall>(size_grid);  // no outer loop across channels
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+        offset_t out_offset  = index2offset_v2<0,nall>(i, size_grid, stride_out);
+        offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
+
+        reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
+        if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
         {
-            offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-            offset_t out_offset  = index2offset_v2<0,nall>(i, size_grid, stride_out);
-            offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
-
-            reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
-            if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
-            {
-                for (offset_t c=0; c<nc; ++c)
-                    out[out_offset + c * osc] = static_cast<scalar_t>(0);
-                fill<ndim>(gout + gout_offset, 0, osg);
-                continue;
-            }
-
-            offset_t inp_offset = index2offset_v2<0,nall>(i, size_grid, stride_inp);
-            offset_t ginp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_ginp);
-            push_backward(loc, out_offset, gout_offset, inp_offset, ginp_offset);
+            for (offset_t c=0; c<nc; ++c)
+                out[out_offset + c * osc] = static_cast<scalar_t>(0);
+            fill<ndim>(gout + gout_offset, 0, osg);
+            continue;
         }
-    });
+
+        offset_t inp_offset = index2offset_v2<0,nall>(i, size_grid, stride_inp);
+        offset_t ginp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_ginp);
+        push_backward(loc, out_offset, gout_offset, inp_offset, ginp_offset);
+    }});
 }
 
 
@@ -503,22 +494,21 @@ void count_backward(
 
     offset_t numel = prod<nall>(size_grid);  // no outer loop across channels
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+        offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
+
+        reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
+        if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
         {
-            offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-            offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
-
-            reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
-            if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
-            {
-                fill<ndim>(gout + gout_offset, 0, osg);
-                continue;
-            }
-
-            offset_t ginp_offset = index2offset_v2<0,ndim>(i, size_grid, stride_ginp);
-            count_backward(loc, gout_offset, ginp_offset);
+            fill<ndim>(gout + gout_offset, 0, osg);
+            continue;
         }
-    });
+
+        offset_t ginp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_ginp);
+        count_backward(loc, gout_offset, ginp_offset);
+    }});
 }
 
 template <int nbatch, int ndim, int extrapolate,
@@ -589,22 +579,21 @@ void grad_backward(
             return index2offset_v2<0,nall>(i, size_grid, stride_ginp); };
 
         parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset = get_grid_offset(i);
+            offset_t gout_offset = get_gout_offset(i);
+
+            reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, grsc);
+            if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
             {
-                offset_t grid_offset = get_grid_offset(i);
-                offset_t gout_offset = get_gout_offset(i);
-
-                reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, grsc);
-                if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
-                {
-                    fill<ndim>(gout + gout_offset, 0, osg);
-                    continue;
-                }
-
-                grad_backward(loc, get_out_offset(i), gout_offset,
-                              get_inp_offset(i), get_ginp_offset(i));
+                fill<ndim>(gout + gout_offset, 0, osg);
+                continue;
             }
-        });
+
+            grad_backward(loc, get_out_offset(i), gout_offset,
+                          get_inp_offset(i), get_ginp_offset(i));
+        }});
     }
     else
     {
@@ -622,40 +611,39 @@ void grad_backward(
         auto get_out_offset = [&](offset_t i) {
             return index2offset_v2<0,nbatch>(i, size_grid, stride_out); };
         auto get_grid_offset = [&](offset_t j) {
-            return index2offset_v2<ndim>(j, size_grid+nbatch, stride_grid+nbatch); };
+            return index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_grid+nbatch); };
         auto get_gout_offset = [&](offset_t j) {
-            return index2offset_v2<ndim>(j, size_grid+nbatch, stride_gout+nbatch); };
+            return index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_gout+nbatch); };
         auto get_ginp_offset = [&](offset_t j) {
-            return index2offset_v2<ndim>(j, size_grid+nbatch, stride_ginp+nbatch); };
+            return index2offset_v2<0,ndim>(j, size_grid+nbatch, stride_ginp+nbatch); };
 
         long grain_size = max(GRAIN_SIZE/numel_spatial, 1L);
         parallel_for(0, numel_batch, grain_size, [&](long start, long end) {
-            for (offset_t i=start; i < end; ++i)
+        for (offset_t i=start; i < end; ++i)
+        {
+            offset_t grid_offset0 = get_grid_offset0(i);
+            offset_t gout_offset0 = get_gout_offset0(i);
+            offset_t ginp_offset0 = get_ginp_offset0(i);
+            offset_t inp_offset   = get_inp_offset(i);
+            offset_t out_offset   = get_out_offset(i);
+            for (offset_t j=0; j < numel_spatial; ++j)
             {
-                offset_t grid_offset0 = get_grid_offset0(i);
-                offset_t gout_offset0 = get_gout_offset0(i);
-                offset_t ginp_offset0 = get_ginp_offset0(i);
-                offset_t inp_offset   = get_inp_offset(i);
-                offset_t out_offset   = get_out_offset(i);
-                for (offset_t j=0; j < numel_spatial; ++j)
+                offset_t grid_offset = grid_offset0 + get_grid_offset(j);
+                offset_t gout_offset = gout_offset0 + get_gout_offset(j);
+
+                reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, grsc);
+                if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
                 {
-                    offset_t grid_offset = grid_offset0 + get_grid_offset(j);
-                    offset_t gout_offset = gout_offset0 + get_gout_offset(j);
-
-                    reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, grsc);
-                    if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
-                    {
-                        fill<ndim>(gout + gout_offset, 0, osg);
-                        continue;
-                    }
-
-                    offset_t ginp_offset = ginp_offset0 + get_ginp_offset(j);
-
-                    grad_backward(loc, out_offset, gout_offset,
-                                  inp_offset, ginp_offset);
+                    fill<ndim>(gout + gout_offset, 0, osg);
+                    continue;
                 }
+
+                offset_t ginp_offset = ginp_offset0 + get_ginp_offset(j);
+
+                grad_backward(loc, out_offset, gout_offset,
+                              inp_offset, ginp_offset);
             }
-        });
+        }});
     }
 }
 

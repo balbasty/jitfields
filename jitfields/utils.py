@@ -1,6 +1,5 @@
 from typing import List, Sequence, TypeVar
 from types import GeneratorType as generator
-import math as pymath
 import torch
 import importlib
 import inspect
@@ -11,7 +10,9 @@ def try_import(module, key=None):
     def try_import_module(path):
         try:
             return importlib.import_module(path)
-        except (ImportError, ModuleNotFoundError):
+        except (ImportError, ModuleNotFoundError) as e:
+            if 'cuda' not in path:
+                raise e
             return None
     if key:
         fullmodule = try_import_module(module + '.' + key)

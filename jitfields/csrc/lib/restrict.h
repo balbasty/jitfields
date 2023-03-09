@@ -15,6 +15,12 @@ const int one   = 1;
 const int two   = 2;
 const int three = 3;
 
+/***********************************************************************
+ *
+ *                                  ND
+ *
+ **********************************************************************/
+ /***                              ANY                              ***/
 // D - Number of spatial dimensions
 // U - Upper bound on the restriction factor
 // IX, IY, IZ - Interpolation order
@@ -23,7 +29,49 @@ template <int D, int U=zero,
           spline::type IX=Z,  bound::type BX=B0,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
-struct Multiscale {};
+struct Multiscale
+{
+    template <typename scalar_t, typename offset_t, typename reduce_t>
+    static __device__
+    void restrict(scalar_t * out, const scalar_t * inp,
+                  const offset_t * coord, const offset_t * size, const offset_t * stride,
+                  const spline::type * inter, const bound::type * bnd,
+                  const reduce_t * scl,  reduce_t shift, signed char sgn = 1)
+    {
+        offset_t numel = 1;
+        offset_t ilow[D], iupp[D], isize[D];
+        reduce_t x[D];
+        for (offset_t d=0; d<D; ++d)
+        {
+            int spline_order = static_cast<int>(inter[d]);
+            x[d] = (coord[d] + shift) * scl[d] - shift;
+            ilow[d] = max(
+                static_cast<offset_t>(0),
+                static_cast<offset_t>(ceil(x[d] - 0.5 * (spline_order + 1) * scl[d])));
+            iupp[d] = min(
+                static_cast<offset_t>(size[d]-1),
+                static_cast<offset_t>(floor(x[d] + 0.5 * (spline_order + 1) * scl[d])));
+            isize[d] = 1 + iupp[d] - ilow[d];
+            numel *= isize[d];
+        }
+
+        reduce_t acc = static_cast<reduce_t>(0);
+        for (offset_t j=0; j<numel; ++j)
+        {
+            offset_t sub[D]; index2sub<D>(j, isize, sub);
+            offset_t offset = static_cast<offset_t>(0);
+            reduce_t weight = static_cast<reduce_t>(1);
+            for (offset_t d=0; d<D; ++d)
+            {
+                offset_t i = ilow[d] + sub[d];
+                weight *= spline::weight(inter[d], (x[d] - i) / scl[d]);
+                offset += i * stride[d];
+            }
+            acc += static_cast<reduce_t>(inp[offset]) * weight;
+        }
+        bound::add(out, static_cast<offset_t>(0), acc, sgn);
+    }
+};
 
 /***********************************************************************
  *
@@ -33,7 +81,8 @@ struct Multiscale {};
 
  /***                              ANY                              ***/
 template <int U, spline::type I, bound::type B>
-struct Multiscale<one, U, I, B> {
+struct Multiscale<one, U, I, B>
+{
     using bound_utils = bound::utils<B>;
     using spline_utils = spline::utils<I>;
     static const int spline_order = static_cast<int>(I);
@@ -41,59 +90,70 @@ struct Multiscale<one, U, I, B> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void restrict(scalar_t * out, const scalar_t * inp,
-                  offset_t w, offset_t nw, offset_t sw,
-                  reduce_t wscl, reduce_t shift)
+                  const offset_t loc[1], const offset_t size[1],
+                  const offset_t stride[1], const reduce_t scl[1],
+                  reduce_t shift, signed char sgn = 1)
     {
+        offset_t w = loc[0], nw = size[0], sw = stride[0];
+        reduce_t wscl = scl[0];
         reduce_t x = (w + shift) * wscl - shift;
-        offset_t ixlow = static_cast<offset_t>(ceil(x - 0.5 * (spline_order + 1 ) * wscl));
-        offset_t ixupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order + 1 ) * wscl));
+        offset_t ixlow = max(
+            static_cast<offset_t>(0),
+            static_cast<offset_t>(ceil(x - 0.5 * (spline_order + 1 ) * wscl)));
+        offset_t ixupp = min(
+            static_cast<offset_t>(nw-1),
+            static_cast<offset_t>(floor(x + 0.5 * (spline_order + 1 ) * wscl)));
 
         reduce_t acc = static_cast<reduce_t>(0);
-        for (offset_t ix = ixlow; ix <= ixupp; ++ix) {
-            reduce_t    dx = spline_utils::weight((x - ix) / wscl);
-            signed char sx = bound_utils::sign(ix, nw);
-            offset_t    ox = bound_utils::index(ix, nw) * sw;
-            acc += static_cast<reduce_t>(bound::get(inp, ox, sx)) * dx;
+        for (offset_t ix = ixlow; ix <= ixupp; ++ix)
+        {
+            reduce_t dx = spline_utils::weight((x - ix) / wscl);
+            acc += static_cast<reduce_t>(inp[ix * sw]) * dx;
         }
-        *out = static_cast<scalar_t>(acc);
+        bound::add(out, static_cast<offset_t>(0), acc, sgn);
     }
 };
 
- /***                      LINEAR + BOUND 2                         ***/
-template <bound::type B>
-struct Multiscale<one, two, L, B> {
-    using bound_utils = bound::utils<B>;
-    using spline_utils = spline::utils<L>;
-
-    template <typename scalar_t, typename offset_t, typename reduce_t>
-    static __device__
-    void restrict(scalar_t * out, const scalar_t * inp,
-                   offset_t w, offset_t nw, offset_t sw,
-                   reduce_t wscl, reduce_t shift)
-    {
-        reduce_t x = (w + shift) * wscl - shift;
-        offset_t ix1 = static_cast<offset_t>(floor(x));
-        offset_t ix0 =  ix1 - 1, ix2 = ix1 + 1, ix3 = ix1 + 2;
-        reduce_t dx1 = spline_utils::weight((x - ix1) / wscl);
-        reduce_t dx0 = spline_utils::weight((x - ix0) / wscl);
-        reduce_t dx2 = spline_utils::weight((ix2 - x) / wscl);
-        reduce_t dx3 = spline_utils::weight((ix3 - x) / wscl);
-        signed char sx3 = bound_utils::sign(ix3, nw);
-        signed char sx2 = bound_utils::sign(ix2, nw);
-        signed char sx0 = bound_utils::sign(ix0, nw);
-        signed char sx1 = bound_utils::sign(ix1, nw);
-        ix3 = bound_utils::index(ix3, nw) * sw;
-        ix2 = bound_utils::index(ix2, nw) * sw;
-        ix0 = bound_utils::index(ix0, nw) * sw;
-        ix1 = bound_utils::index(ix1, nw) * sw;
-
-        *out = static_cast<scalar_t>(
-                static_cast<reduce_t>(bound::get(inp, ix0, sx0)) * dx0
-              + static_cast<reduce_t>(bound::get(inp, ix1, sx1)) * dx1
-              + static_cast<reduce_t>(bound::get(inp, ix2, sx2)) * dx2
-              + static_cast<reduce_t>(bound::get(inp, ix3, sx3)) * dx3);
-    }
-};
+// /***                      LINEAR + BOUND 2                         ***/
+//template <bound::type B>
+//struct Multiscale<one, two, L, B> {
+//    using bound_utils = bound::utils<B>;
+//    using spline_utils = spline::utils<L>;
+//
+//    template <typename scalar_t, typename offset_t, typename reduce_t>
+//    static __device__
+//    void restrict(scalar_t * out, const scalar_t * inp,
+//                  const offset_t loc[1], const offset_t size[1],
+//                  const offset_t stride[1], const reduce_t scl[1],
+//                  reduce_t shift, signed char sgn = 1)
+//    {
+//        offset_t w = loc[0], nw = size[0], sw = stride[0];
+//        reduce_t wscl = scl[0];
+//        reduce_t x = (w + shift) * wscl - shift;
+//        offset_t ix1 = static_cast<offset_t>(floor(x));
+//        offset_t ix0 =  ix1 - 1, ix2 = ix1 + 1, ix3 = ix1 + 2;
+//
+//        reduce_t acc = static_cast<reduce_t>(0);
+//        if (0 <= ix0 && ix0 < nw) {
+//            reduce_t dx0 = spline_utils::weight((x - ix0) / wscl);
+//            acc += static_cast<reduce_t>(inp[ix0*sw]) * dx0;
+//        }
+//        if (0 <= ix1 && ix1 < nw) {
+//            reduce_t dx1 = spline_utils::weight((x - ix1) / wscl);
+//            acc += static_cast<reduce_t>(inp[ix1*sw]) * dx1;
+//        }
+//        if (0 <= ix2 && ix2 < nw) {
+//            reduce_t dx2 = spline_utils::weight((ix2 - x) / wscl);
+//            acc += static_cast<reduce_t>(inp[ix2*sw]) * dx2;
+//        }
+//        if (0 <= ix3 && ix3 < nw) {
+//            reduce_t dx3 = spline_utils::weight((ix3 - x) / wscl);
+//            acc += static_cast<reduce_t>(inp[ix3*sw]) * dx3;
+//        }
+//
+//        bound::add(out, static_cast<offset_t>(0), acc, sgn);
+//    }
+//};
 
 /***********************************************************************
  *
@@ -106,9 +166,9 @@ template <int U,
           spline::type IX, bound::type BX,
           spline::type IY, bound::type BY>
 struct Multiscale<two, U, IX, BX, IY, BY> {
-    using bound_utils_x = bound::utils<BX>;
+    using bound_utils_x  = bound::utils<BX>;
     using spline_utils_x = spline::utils<IX>;
-    using bound_utils_y = bound::utils<BY>;
+    using bound_utils_y  = bound::utils<BY>;
     using spline_utils_y = spline::utils<IY>;
     static const int spline_order_x = static_cast<int>(IX);
     static const int spline_order_y = static_cast<int>(IY);
@@ -116,30 +176,41 @@ struct Multiscale<two, U, IX, BX, IY, BY> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void restrict(scalar_t * out, const scalar_t * inp,
-                  offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                  offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                  reduce_t shift)
+                  const offset_t loc[2], const offset_t size[2],
+                  const offset_t stride[2], const reduce_t scl[2],
+                  reduce_t shift, signed char sgn = 1)
     {
+        offset_t w = loc[0], nw = size[0], sw = stride[0];
+        offset_t h = loc[1], nh = size[1], sh = stride[1];
+        reduce_t wscl = scl[0], hscl = scl[1];
         reduce_t x = (w + shift) * wscl - shift;
-        offset_t ixlow = static_cast<offset_t>(ceil(x - 0.5 * (spline_order_x + 1 ) * wscl));
-        offset_t ixupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1 ) * wscl));
+        offset_t ixlow = max(
+            static_cast<offset_t>(0),
+            static_cast<offset_t>(ceil(x - 0.5 * (spline_order_x + 1) * wscl)));
+        offset_t ixupp = min(
+            static_cast<offset_t>(nw-1),
+            static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1) * wscl)));
         reduce_t y = (h + shift) * hscl - shift;
-        offset_t iylow = static_cast<offset_t>(ceil(y - 0.5 * (spline_order_y + 1 ) * hscl));
-        offset_t iyupp = static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1 ) * hscl));
+        offset_t iylow = max(
+            static_cast<offset_t>(0),
+            static_cast<offset_t>(ceil(y - 0.5 * (spline_order_y + 1) * hscl)));
+        offset_t iyupp = min(
+            static_cast<offset_t>(nh-1),
+            static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1) * hscl)));
 
         reduce_t acc = static_cast<reduce_t>(0);
-        for (offset_t iy = iylow; iy <= iyupp; ++iy) {
+        for (offset_t iy = iylow; iy <= iyupp; ++iy)
+        {
             reduce_t    dy = spline_utils_y::weight((y - iy) / hscl);
-            signed char sy = bound_utils_y::sign(iy, nh);
-            offset_t    oy = bound_utils_y::index(iy, nh) * sh;
-            for (offset_t ix = ixlow; ix <= ixupp; ++ix) {
+            offset_t    oy = iy * sh;
+            for (offset_t ix = ixlow; ix <= ixupp; ++ix)
+            {
                 reduce_t    dx = dy * spline_utils_x::weight((x - ix) / wscl);
-                signed char sx = sy * bound_utils_x::sign(ix, nw);
-                offset_t    ox = oy + bound_utils_x::index(ix, nw) * sw;
-                acc += static_cast<reduce_t>(bound::get(inp, ox, sx)) * dx;
+                offset_t    ox = oy + ix * sw;
+                acc += static_cast<reduce_t>(inp[ox]) * dx;
             }
         }
-        *out = static_cast<scalar_t>(acc);
+        bound::add(out, static_cast<offset_t>(0), acc, sgn);
     }
 };
 
@@ -168,44 +239,57 @@ struct Multiscale<three, U, IX, BX, IY, BY, IZ, BZ> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void restrict(scalar_t * out, const scalar_t * inp,
-                  offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                  offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                  offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
-                  reduce_t shift)
+                  const offset_t loc[3], const offset_t size[3],
+                  const offset_t stride[3], const reduce_t scl[3],
+                  reduce_t shift, signed char sgn = 1)
     {
+        offset_t w = loc[0], nw = size[0], sw = stride[0];
+        offset_t h = loc[1], nh = size[1], sh = stride[1];
+        offset_t d = loc[2], nd = size[2], sd = stride[2];
+        reduce_t wscl = scl[0], hscl = scl[1], dscl = scl[2];
         reduce_t x = (w + shift) * wscl - shift;
-        offset_t ixlow = static_cast<offset_t>(ceil(x - 0.5 * (spline_order_x + 1) * wscl));
-        offset_t ixupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1) * wscl));
+        offset_t ixlow = max(
+            static_cast<offset_t>(0),
+            static_cast<offset_t>(ceil(x - 0.5 * (spline_order_x + 1) * wscl)));
+        offset_t ixupp = min(
+            static_cast<offset_t>(nw - 1),
+            static_cast<offset_t>(floor(x + 0.5 * (spline_order_x + 1) * wscl)));
         reduce_t y = (h + shift) * hscl - shift;
-        offset_t iylow = static_cast<offset_t>(ceil(y - 0.5 * (spline_order_y + 1) * hscl));
-        offset_t iyupp = static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1) * hscl));
+        offset_t iylow = max(
+            static_cast<offset_t>(0),
+            static_cast<offset_t>(ceil(y - 0.5 * (spline_order_y + 1) * hscl)));
+        offset_t iyupp = min(
+            static_cast<offset_t>(nh - 1),
+            static_cast<offset_t>(floor(y + 0.5 * (spline_order_y + 1) * hscl)));
         reduce_t z = (d + shift) * dscl - shift;
-        offset_t izlow = static_cast<offset_t>(ceil(z - 0.5 * (spline_order_z + 1) * dscl));
-        offset_t izupp = static_cast<offset_t>(floor(z + 0.5 * (spline_order_z + 1) * dscl));
+        offset_t izlow = max(
+            static_cast<offset_t>(0),
+            static_cast<offset_t>(ceil(z - 0.5 * (spline_order_z + 1) * dscl)));
+        offset_t izupp = min(
+            static_cast<offset_t>(nd - 1),
+            static_cast<offset_t>(floor(z + 0.5 * (spline_order_z + 1) * dscl)));
 
         reduce_t acc = static_cast<reduce_t>(0);
         for (offset_t iz = izlow; iz <= izupp; ++iz) {
             reduce_t    dz = spline_utils_z::weight((z - iz) / dscl);
-            signed char sz = bound_utils_z::sign(iz, nd);
-            offset_t    oz = bound_utils_z::index(iz, nd) * sd;
+            offset_t    oz = iz * sd;
             for (offset_t iy = iylow; iy <= iyupp; ++iy) {
                 reduce_t    dy = dz * spline_utils_y::weight((y - iy) / hscl);
-                signed char sy = sz * bound_utils_y::sign(iy, nh);
-                offset_t    oy = oz + bound_utils_y::index(iy, nh) * sh;
+                offset_t    oy = oz + iy * sh;
                 for (offset_t ix = ixlow; ix <= ixupp; ++ix) {
                     reduce_t    dx = dy * spline_utils_x::weight((x - ix) / wscl);
-                    signed char sx = sy * bound_utils_x::sign(ix, nw);
-                    offset_t    ox = oy + bound_utils_x::index(ix, nw) * sw;
-                    acc += bound::cget<reduce_t>(inp, ox, sx) * dx;
+                    offset_t    ox = oy + ix * sw;
+                    acc += static_cast<reduce_t>(inp[ox]) * dx;
                 }
             }
         }
-        *out = static_cast<scalar_t>(acc);
+        bound::add(out, static_cast<offset_t>(0), acc, sgn);
     }
 };
 
 
 /***                      LINEAR + BOUND 2                         ***/
+
 template <bound::type BX, bound::type BY, bound::type BZ>
 struct Multiscale<three, two, L, BX, L, BY, L, BZ> {
     using bound_utils_x = bound::utils<BX>;
@@ -216,11 +300,15 @@ struct Multiscale<three, two, L, BX, L, BY, L, BZ> {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void restrict(scalar_t * out, const scalar_t * inp,
-                  offset_t w, offset_t nw, offset_t sw, reduce_t wscl,
-                  offset_t h, offset_t nh, offset_t sh, reduce_t hscl,
-                  offset_t d, offset_t nd, offset_t sd, reduce_t dscl,
-                  reduce_t shift)
+                  const offset_t loc[3], const offset_t size[3],
+                  const offset_t stride[3], const reduce_t scl[3],
+                  reduce_t shift, signed char sgn = 1)
     {
+        offset_t w = loc[0], nw = size[0], sw = stride[0];
+        offset_t h = loc[1], nh = size[1], sh = stride[1];
+        offset_t d = loc[2], nd = size[2], sd = stride[2];
+        reduce_t wscl = scl[0], hscl = scl[1], dscl = scl[2];
+
         reduce_t x = (w + shift) * wscl - shift;
         offset_t ix1 = static_cast<offset_t>(floor(x));
         offset_t ix0 =  ix1 - 1, ix2 = ix1 + 1, ix3 = ix1 + 2;
@@ -260,76 +348,34 @@ struct Multiscale<three, two, L, BX, L, BY, L, BZ> {
         reduce_t dz0 = spline_utils::weight((z - iz0) / dscl);
         reduce_t dz2 = spline_utils::weight((iz2 - z) / dscl);
         reduce_t dz3 = spline_utils::weight((iz3 - z) / dscl);
-        signed char sz3 = bound_utils_z::sign(iz3, nd);
-        signed char sz2 = bound_utils_z::sign(iz2, nd);
-        signed char sz0 = bound_utils_z::sign(iz0, nd);
-        signed char sz1 = bound_utils_z::sign(iz1, nd);
-        iz3 = bound_utils_z::index(iz3, nd) * sd;
-        iz2 = bound_utils_z::index(iz2, nd) * sd;
-        iz0 = bound_utils_z::index(iz0, nd) * sd;
-        iz1 = bound_utils_z::index(iz1, nd) * sd;
 
-        auto accum1d = [&](offset_t i, signed char s)
+        auto accum1d = [&](offset_t i)
         {
-          return bound::cget<reduce_t>(inp, i + ix0, s * sx0) * dx0
-               + bound::cget<reduce_t>(inp, i + ix1, s * sx1) * dx1
-               + bound::cget<reduce_t>(inp, i + ix2, s * sx2) * dx2
-               + bound::cget<reduce_t>(inp, i + ix3, s * sx3) * dx3;
+          reduce_t acc = static_cast<reduce_t>(0);
+          if (0 < ix0 && ix0 < nw) acc += static_cast<reduce_t>(inp[i+ix0]) * dx0;
+          if (0 < ix1 && ix1 < nw) acc += static_cast<reduce_t>(inp[i+ix1]) * dx1;
+          if (0 < ix2 && ix2 < nw) acc += static_cast<reduce_t>(inp[i+ix2]) * dx2;
+          if (0 < ix3 && ix3 < nw) acc += static_cast<reduce_t>(inp[i+ix3]) * dx3;
+          return acc;
         };
 
-        auto accum2d = [&](offset_t i, signed char s)
+        auto accum2d = [&](offset_t i)
         {
-          return accum1d(iy0 + i, sy0 * s) * dy0
-               + accum1d(iy1 + i, sy1 * s) * dy1
-               + accum1d(iy2 + i, sy2 * s) * dy2
-               + accum1d(iy3 + i, sy3 * s) * dy3;
+          reduce_t acc = static_cast<reduce_t>(0);
+          if (0 < iy0 && iy0 < nh) acc += accum1d(iy0 + i) * dy0;
+          if (0 < iy1 && iy1 < nh) acc += accum1d(iy1 + i) * dy1;
+          if (0 < iy2 && iy2 < nh) acc += accum1d(iy2 + i) * dy2;
+          if (0 < iy3 && iy3 < nh) acc += accum1d(iy3 + i) * dy3;
+          return acc;
         };
 
-        *out = static_cast<scalar_t>(accum2d(iz0, sz0) * dz0
-                                   + accum2d(iz1, sz1) * dz1
-                                   + accum2d(iz2, sz2) * dz2
-                                   + accum2d(iz3, sz3) * dz3);
-    }
-};
+      reduce_t acc = static_cast<reduce_t>(0);
+      if (0 < iz0 && iz0 < nd) acc += accum2d(iz0) * dz0;
+      if (0 < iz1 && iz1 < nd) acc += accum2d(iz1) * dz1;
+      if (0 < iz2 && iz2 < nd) acc += accum2d(iz2) * dz2;
+      if (0 < iz3 && iz3 < nd) acc += accum2d(iz3) * dz3;
 
-/***********************************************************************
- *
- *                                  ND
- *
- **********************************************************************/
-
- /***                              ANY                              ***/
-template <int D, int U> struct Multiscale<D, U> {
-
-    template <typename scalar_t, typename offset_t, typename reduce_t>
-    static __device__
-    void restrict(scalar_t * out, const scalar_t * inp,
-                  const offset_t * coord, const offset_t * size, const offset_t * stride,
-                  const spline::type * inter, const bound::type * bnd,
-                  const reduce_t * scl,  reduce_t shift)
-    {
-        offset_t    offsets[D];
-        signed char signs[D];
-        reduce_t    weights[D];
-        reduce_t acc = static_cast<reduce_t>(0);
-        for (int d=0; d<D; ++d) {
-            reduce_t x = (coord[d] + shift) * scl[d] - shift;
-            int spline_order = static_cast<int>(inter[d]);
-            offset_t ilow = static_cast<offset_t>(ceil(x - 0.5 * (spline_order + 1 ) * scl[d]));
-            offset_t iupp = static_cast<offset_t>(floor(x + 0.5 * (spline_order + 1 ) * scl[d]));
-
-            for (offset_t i = ilow; i <= iupp; ++i) {
-                signs[d]   = (d > 0 ? signs[d-1]   : static_cast<signed char>(1))
-                           * bound::sign(bnd[d], i, size[d]);
-                weights[d] = (d > 0 ? weights[d-1] : static_cast<reduce_t>(1))
-                           * spline::weight(inter[d], (x - i) / scl[d]);
-                offsets[d] = (d > 0 ? offsets[d-1] : static_cast<offset_t>(0))
-                           + bound::index(bnd[d], i, size[d]) * stride[d];
-                if (d == D-1)
-                    acc += static_cast<reduce_t>(bound::get(inp, offsets[D-1], signs[D-1])) * weights[D-1];
-            }
-        }
-        *out = static_cast<offset_t>(acc);
+      bound::add(out, static_cast<offset_t>(0), acc, sgn);
     }
 };
 

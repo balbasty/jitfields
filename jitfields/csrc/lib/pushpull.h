@@ -1,6 +1,3 @@
-#ifndef JF_PUSHPULL
-#define JF_PUSHPULL
-#include "pushpull_1d.h"
-#include "pushpull_2d.h"
-#include "pushpull_3d.h"
-#endif // JF_PUSHPULL
+#include "pushpull/1d.h"
+#include "pushpull/2d.h"
+#include "pushpull/3d.h"

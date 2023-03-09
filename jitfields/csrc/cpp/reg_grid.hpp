@@ -4,7 +4,7 @@
 #include "../lib/bounds.h"
 #include "../lib/utils.h"
 #include "../lib/batch.h"
-#include "../lib/reg_grid.h"
+#include "../lib/regularisers/grid.h"
 #include "../lib/posdef.h"
 
 namespace jf {
@@ -88,7 +88,7 @@ void kernel_absolute(
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
         for (offset_t i=start; i < end; ++i)
         {
-            offset_t out_offset = index2offset_v2<nbatch>(i, size, stride);
+            offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
             out_offset += offset;
 
             Impl::template kernel_absolute<opfunc>(out + out_offset, sc, kernel);
@@ -205,7 +205,7 @@ void kernel_membrane(
     offset_t numel = prod<nbatch>(size);
 
     reduce_t kernel[Impl::kernelsize_membrane];
-    Impl::make_kernel_membrane(kernel, absolute, membrane, voxel_size);
+    Impl::make_fullkernel_membrane(kernel, absolute, membrane, voxel_size);
 
     offset_t offset = center_offset<ndim>(size + nbatch, stride + nbatch);
 
@@ -407,7 +407,7 @@ void kernel_bending(
     offset_t numel = prod<nbatch>(size);
 
     reduce_t kernel[Impl::kernelsize_bending];
-    Impl::make_kernel_bending(kernel, absolute, membrane, bending, voxel_size);
+    Impl::make_fullkernel_bending(kernel, absolute, membrane, bending, voxel_size);
 
     offset_t offset = center_offset<ndim>(size + nbatch, stride + nbatch);
 
@@ -591,9 +591,9 @@ template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
 void kernel_lame(
-    scalar_t * out,                 // (*batch, *spatial, channels) tensor
-    const offset_t * _size,         // [*batch, *spatial, channels] vector
-    const offset_t * _stride,       // [*batch, *spatial, channels] vector
+    scalar_t * out,                 // (*batch, *spatial, C, C) tensor
+    const offset_t * _size,         // [*batch, *spatial, C, C] vector
+    const offset_t * _stride,       // [*batch, *spatial, C, C] vector
     const reduce_t * _voxel_size,   // [*spatial] vector
     reduce_t absolute, reduce_t membrane, reduce_t shears, reduce_t div)
 {
@@ -602,13 +602,13 @@ void kernel_lame(
     using Impl = RegGrid<ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
-    offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
-    offset_t stride[nall+1];      fillfrom<nall+1>(stride,     _stride);
+    offset_t size[nall+2];        fillfrom<nall+2>(size,     _size);
+    offset_t stride[nall+2];      fillfrom<nall+2>(stride,   _stride);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t numel = prod<nbatch>(size);
 
     reduce_t kernel[Impl::kernelsize_lame];
-    Impl::make_kernel_lame(kernel, absolute, membrane, shears, div, voxel_size);
+    Impl::make_fullkernel_lame(kernel, absolute, membrane, shears, div, voxel_size);
 
     offset_t offset = center_offset<ndim>(size + nbatch, stride + nbatch);
 
@@ -630,9 +630,9 @@ template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
 void diag_lame(
-    scalar_t * out,                 // (*batch, *spatial, channels) tensor
-    const offset_t * _size,         // [*batch, *spatial, channels] vector
-    const offset_t * _stride,       // [*batch, *spatial, channels] vector
+    scalar_t * out,                 // (*batch, *spatial, C) tensor
+    const offset_t * _size,         // [*batch, *spatial, C] vector
+    const offset_t * _stride,       // [*batch, *spatial, C] vector
     const reduce_t * _voxel_size,   // [*spatial] vector
     reduce_t absolute, reduce_t membrane, reduce_t shears, reduce_t div)
 {
@@ -792,9 +792,9 @@ template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
 void kernel_all(
-    scalar_t * out,                 // (*batch, *spatial, channels) tensor
-    const offset_t * _size,         // [*batch, *spatial, channels] vector
-    const offset_t * _stride,       // [*batch, *spatial, channels] vector
+    scalar_t * out,                 // (*batch, *spatial, C, C) tensor
+    const offset_t * _size,         // [*batch, *spatial, C, C] vector
+    const offset_t * _stride,       // [*batch, *spatial, C, C] vector
     const reduce_t * _voxel_size,   // [*spatial] vector
     reduce_t absolute, reduce_t membrane, reduce_t bending,
     reduce_t shears, reduce_t div)
@@ -804,14 +804,13 @@ void kernel_all(
     using Impl = RegGrid<ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
-    offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
-    offset_t stride[nall+1];      fillfrom<nall+1>(stride,     _stride);
+    offset_t size[nall+2];        fillfrom<nall+2>(size,     _size);
+    offset_t stride[nall+2];      fillfrom<nall+2>(stride,   _stride);
     reduce_t voxel_size[ndim];    fillfrom<ndim>(voxel_size, _voxel_size);
-    offset_t sc = stride[nall];
     offset_t numel = prod<nbatch>(size);
 
     reduce_t kernel[Impl::kernelsize_all];
-    Impl::make_kernel_all(kernel, absolute, membrane, bending, shears, div, voxel_size);
+    Impl::make_fullkernel_all(kernel, absolute, membrane, bending, shears, div, voxel_size);
 
     offset_t offset = center_offset<ndim>(size + nbatch, stride + nbatch);
 
@@ -822,7 +821,7 @@ void kernel_all(
             out_offset += offset;
 
             Impl::template kernel_all<opfunc>(
-                out + out_offset, sc, stride + nbatch, kernel);
+                out + out_offset, stride + nall, stride + nbatch, kernel);
         }
     });
 }
@@ -833,9 +832,9 @@ template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
 void diag_all(
-    scalar_t * out,                 // (*batch, *spatial, channels) tensor
-    const offset_t * _size,         // [*batch, *spatial, channels] vector
-    const offset_t * _stride,       // [*batch, *spatial, channels] vector
+    scalar_t * out,                 // (*batch, *spatial, C) tensor
+    const offset_t * _size,         // [*batch, *spatial, C] vector
+    const offset_t * _stride,       // [*batch, *spatial, C] vector
     const reduce_t * _voxel_size,   // [*spatial] vector
     reduce_t absolute, reduce_t membrane, reduce_t bending,
     reduce_t shears, reduce_t div)

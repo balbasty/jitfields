@@ -6,18 +6,18 @@ __all__ = [
 
 import torch
 from .utils import make_vector, try_import
-cuda_dist = try_import('jitfields.cuda', 'distance')
-cpu_dist = try_import('jitfields.cpp', 'distance')
+cuda_dist = try_import('jitfields.bindings.cuda', 'distance')
+cpu_dist = try_import('jitfields.bindings.cpp', 'distance')
 
 
-def euclidean_distance_transform(x, dim=None, vx=1, dtype=None):
+def euclidean_distance_transform(x, ndim=None, vx=1, dtype=None):
     """Compute the Euclidean distance transform of a binary image
 
     Parameters
     ----------
     x : (..., *spatial) tensor
         Input tensor
-    dim : int, default=`x.dim()`
+    ndim : int, default=`x.ndim`
         Number of spatial dimensions
     vx : [sequence of] float, default=1
         Voxel size
@@ -45,25 +45,25 @@ def euclidean_distance_transform(x, dim=None, vx=1, dtype=None):
         dtype = torch.get_default_dtype()
     x = x.to(dtype, copy=True)
     x.masked_fill_(x > 0, float('inf'))
-    dim = dim or x.dim()
-    vx = make_vector(vx, dim, dtype=torch.float).tolist()
-    x = l1dt_1d_(x, -dim, vx[0])
-    if dim > 1:
+    ndim = ndim or x.ndim
+    vx = make_vector(vx, ndim, dtype=torch.float).tolist()
+    x = l1dt_1d_(x, -ndim, vx[0])
+    if ndim > 1:
         x.square_()
-        for d, w in zip(range(1, dim), vx[1:]):
-            x = edt_1d_(x, d-dim, w)
+        for d, w in zip(range(1, ndim), vx[1:]):
+            x = edt_1d_(x, d-ndim, w)
         x.sqrt_()
     return x
 
 
-def l1_distance_transform(x, dim=None, vx=1, dtype=None):
+def l1_distance_transform(x, ndim=None, vx=1, dtype=None):
     """Compute the L1 distance transform of a binary image
 
     Parameters
     ----------
     x : (..., *spatial) tensor
         Input tensor
-    dim : int, default=`x.dim()`
+    ndim : int, default=`x.ndim`
         Number of spatial dimensions
     vx : [sequence of] float, default=1
         Voxel size
@@ -93,21 +93,21 @@ def l1_distance_transform(x, dim=None, vx=1, dtype=None):
         dtype = torch.get_default_dtype()
     x = x.to(dtype, copy=True)
     x.masked_fill_(x > 0, float('inf'))
-    dim = dim or x.dim()
-    vx = make_vector(vx, dim, dtype=torch.float).tolist()
+    ndim = ndim or x.ndim
+    vx = make_vector(vx, ndim, dtype=torch.float).tolist()
     for d, w in enumerate(vx):
-        x = l1dt_1d_(x, d-dim, w)
+        x = l1dt_1d_(x, d-ndim, w)
     return x
 
 
-def signed_distance_transform(x, dim=None, vx=1, dtype=None):
+def signed_distance_transform(x, ndim=None, vx=1, dtype=None):
     """Compute the Euclidean distance transform of a binary image
 
     Parameters
     ----------
     x : (..., *spatial) tensor
         Input tensor
-    dim : int, default=`x.dim()`
+    ndim : int, default=`x.ndim`
         Number of spatial dimensions
     vx : [sequence of] float, default=1
         Voxel size
@@ -125,6 +125,6 @@ def signed_distance_transform(x, dim=None, vx=1, dtype=None):
           https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
     """
     x = x > 0
-    d = euclidean_distance_transform(x, dim, vx, dtype)
-    d -= euclidean_distance_transform(x.logical_not_(), dim, vx, dtype)
+    d = euclidean_distance_transform(x, ndim, vx, dtype)
+    d -= euclidean_distance_transform(x.logical_not_(), ndim, vx, dtype)
     return d
