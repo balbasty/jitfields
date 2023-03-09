@@ -20,7 +20,7 @@ Anchor methods
 """
 
 def resize(out: Tensor, inp: Tensor, factor: list[float],
-           anchor: str, order: list[int], bound: list[int]): ...
+           anchor: str, order: list[int], bound: list[int]) -> Tensor: ...
 """
 Resize a volume encoded by B-splines
 

@@ -1,4 +1,5 @@
 from torch import Tensor
+from typing import Tuple
 
 """
 Boundary conditions
@@ -20,7 +21,8 @@ Anchor methods
 """
 
 def restrict(out: Tensor, inp: Tensor, factor: list[float],
-             anchor: str, order: list[int], bound: list[int]): ...
+             anchor: str, order: list[int], bound: list[int]) \
+        -> Tuple[Tensor, list[float]]: ...
 """
 Restrict a volume (adjoint of resize)
 
