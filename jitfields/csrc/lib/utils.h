@@ -159,6 +159,7 @@ T prod(const T * x)
 }
 
 template <int N, typename U, typename V>
+inline __device__
 void fillfrom(U out[N], const V * inp)
 {
 #   pragma unroll
@@ -167,6 +168,7 @@ void fillfrom(U out[N], const V * inp)
 }
 
 template <int N, typename U, typename V, typename W>
+inline __device__
 void fillfrom(U out[N], const V * inp, W stride)
 {
 #   pragma unroll
@@ -176,6 +178,7 @@ void fillfrom(U out[N], const V * inp, W stride)
 
 
 template <int N, typename U, typename V>
+inline __device__
 void fill(U * out, V inp)
 {
     auto val = static_cast<U>(inp);
@@ -185,6 +188,7 @@ void fill(U * out, V inp)
 }
 
 template <int N, typename U, typename V, typename W>
+inline __device__
 void fill(U * out, V inp, W stride)
 {
     auto val = static_cast<U>(inp);

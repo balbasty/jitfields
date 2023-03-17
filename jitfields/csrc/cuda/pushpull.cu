@@ -13,6 +13,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void pull(
     scalar_t * out,                // (*batch, *spatial_grid, C) tensor | Placeholder for the pulled volume
     const scalar_t * inp,          // (*batch, *spatial_spln, C) tensor | Input volume
@@ -48,16 +49,17 @@ void pull(
     for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t out_offset = index2offset_v2<0,nall>(i, size_grid, stride_out);
-        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+        offset_t out_offset = index2offset<nall>(i, size_grid, stride_out);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
 
         reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
-        if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch)) {
+        if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
+        {
             for (offset_t c=0; c<nc; ++c)
                 out[out_offset + c * osc] = static_cast<scalar_t>(0);
             continue;
         }
-        offset_t inp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
+        offset_t inp_offset = index2offset<nbatch>(i, size_grid, stride_inp);
 
         pull(loc, out_offset, inp_offset);
     }
@@ -68,6 +70,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void push(
     scalar_t * out,                   // (*batch, *spatial_spln, C) tensor | Placeholder for the splatted volume
     const scalar_t * inp,             // (*batch, *spatial_grid, C) tensor | Input volume
@@ -103,14 +106,14 @@ void push(
     for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
 
         reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
         if (!InFOV<extrapolate, ndim>::infov(loc, _size_splinc+nbatch))
             continue;
 
-        offset_t inp_offset = index2offset_v2<0,nall>(i, size_grid, stride_inp);
-        offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
+        offset_t inp_offset = index2offset<nall>(i, size_grid, stride_inp);
+        offset_t out_offset = index2offset<nbatch>(i, size_grid, stride_out);
 
         push(loc, out_offset, inp_offset);
     }
@@ -121,6 +124,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void count(
     scalar_t * out,                  // (*batch, *spatial_spln, C) tensor | Placeholder for the count image
     const scalar_t * grid,           // (*batch, *spatial_grid, D) tensor | Coordinates into the output volume
@@ -133,10 +137,10 @@ void count(
     static constexpr int nall = ndim + nbatch;
 
     // copy vectors to the stack
-    offset_t size_grid[nall+1];   fillfrom<nall+1>(size_grid,   _size_grid);
-    offset_t size_splinc[nall+1]; fillfrom<nall+1>(size_splinc, _size_splinc);
-    offset_t stride_out[nall+1];  fillfrom<nall+1>(stride_out,  _stride_out);
-    offset_t stride_grid[nall+1]; fillfrom<nall+1>(stride_grid, _stride_grid);
+    offset_t size_grid   [nall+1]; fillfrom<nall+1>(size_grid,   _size_grid);
+    offset_t size_splinc [nall+1]; fillfrom<nall+1>(size_splinc, _size_splinc);
+    offset_t stride_out  [nall+1]; fillfrom<nall+1>(stride_out,  _stride_out);
+    offset_t stride_grid [nall+1]; fillfrom<nall+1>(stride_grid, _stride_grid);
     offset_t gsc = stride_grid[nall];
 
     auto count = [&](const reduce_t * loc, offset_t out_offset)
@@ -149,13 +153,13 @@ void count(
     for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
 
         reduce_t loc[ndim]; fillfrom<ndim>(loc, grid + grid_offset, gsc);
         if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
             continue;
 
-        offset_t out_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
+        offset_t out_offset = index2offset<nbatch>(i, size_grid, stride_out);
 
         count(loc, out_offset);
     }
@@ -166,6 +170,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void grad(
     scalar_t * out,                 // (*batch, *spatial_grid, C, D) tensor | Placeholder for the pulled gradients
     const scalar_t * inp,           // (*batch, *spatial_spln, C) tensor    | Input volume
@@ -203,8 +208,8 @@ void grad(
     for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t out_offset = index2offset_v2<0,nall>(i, size_grid, stride_out);
-        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
+        offset_t out_offset = index2offset<nall>(i, size_grid, stride_out);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
 
         reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
         if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
@@ -214,7 +219,7 @@ void grad(
             continue;
         }
 
-        offset_t inp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
+        offset_t inp_offset = index2offset<nbatch>(i, size_grid, stride_inp);
 
         grad(loc, out_offset, inp_offset);
     }
@@ -225,6 +230,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void pull_backward(
     scalar_t * out,                 // (*batch, *spatial_spln, C) tensor | Placeholder for the gradient wrt `inp`
     scalar_t * gout,                // (*batch, *spatial_grid, D) tensor | Placeholder for the gradient wrt `grid`
@@ -276,8 +282,8 @@ void pull_backward(
     for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-        offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
+        offset_t gout_offset = index2offset<nall>(i, size_grid, stride_gout);
 
         reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
         if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
@@ -286,9 +292,9 @@ void pull_backward(
             continue;
         }
 
-        offset_t inp_offset  = index2offset_v2<0,nbatch>(i, size_grid, stride_inp);
-        offset_t out_offset  = index2offset_v2<0,nbatch>(i, size_grid, stride_out);
-        offset_t ginp_offset = index2offset_v2<0,nall>(i, size_grid, stride_ginp);
+        offset_t inp_offset  = index2offset<nbatch>(i, size_grid, stride_inp);
+        offset_t out_offset  = index2offset<nbatch>(i, size_grid, stride_out);
+        offset_t ginp_offset = index2offset<nall>(i, size_grid, stride_ginp);
 
         pull_backward(loc, out_offset, gout_offset, inp_offset, ginp_offset);
     }
@@ -299,6 +305,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void push_backward(
     scalar_t * out,                 // (*batch, *spatial_grid, C) tensor | Placeholder for the gradient wrt `inp`
     scalar_t * gout,                // (*batch, *spatial_grid, D) tensor | Placeholder for the gradient wrt `grid`
@@ -349,9 +356,9 @@ void push_backward(
     for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-        offset_t out_offset  = index2offset_v2<0,nall>(i, size_grid, stride_out);
-        offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
+        offset_t out_offset  = index2offset<nall>(i, size_grid, stride_out);
+        offset_t gout_offset = index2offset<nall>(i, size_grid, stride_gout);
 
         reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
         if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc+nbatch))
@@ -362,8 +369,8 @@ void push_backward(
             continue;
         }
 
-        offset_t inp_offset = index2offset_v2<0,nall>(i, size_grid, stride_inp);
-        offset_t ginp_offset = index2offset_v2<0,nbatch>(i, size_grid, stride_ginp);
+        offset_t inp_offset = index2offset<nall>(i, size_grid, stride_inp);
+        offset_t ginp_offset = index2offset<nbatch>(i, size_grid, stride_ginp);
         push_backward(loc, out_offset, gout_offset, inp_offset, ginp_offset);
     }
 }
@@ -374,6 +381,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void count_backward(
     scalar_t * gout,                // (*batch, *spatial_grid, D) tensor | Placeholder for the gradient wrt `grid`
     const scalar_t * ginp,          // (*batch, *spatial_spln, 1) tensor | Gradient wrt to the output of the forward pass
@@ -411,8 +419,8 @@ void count_backward(
     for (offset_t i=index; index < numel;
          index += blockDim.x * gridDim.x, i=index)
     {
-        offset_t grid_offset = index2offset_v2<0,nall>(i, size_grid, stride_grid);
-        offset_t gout_offset = index2offset_v2<0,nall>(i, size_grid, stride_gout);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
+        offset_t gout_offset = index2offset<nall>(i, size_grid, stride_gout);
 
         reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
         if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
@@ -421,7 +429,7 @@ void count_backward(
             continue;
         }
 
-        offset_t ginp_offset = index2offset_v2<0,ndim>(i, size_grid, stride_ginp);
+        offset_t ginp_offset = index2offset<nbatch>(i, size_grid, stride_ginp);
         count_backward(loc, gout_offset, ginp_offset);
     }
 }
@@ -431,6 +439,7 @@ template <int nbatch, int ndim, int extrapolate,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
+__global__
 void grad_backward(
     scalar_t * out,                 // (*batch, *spatial_spln, C) tensor    | Placeholder for the gradient wrt `inp`
     scalar_t * gout,                // (*batch, *spatial_grid, D) tensor    | Placeholder for the gradient wrt `grid`
@@ -480,15 +489,15 @@ void grad_backward(
     };
 
     auto get_grid_offset = [&](offset_t i) {
-        return index2offset_v2<0,nall>(i, size_grid, stride_grid); };
+        return index2offset<nall>(i, size_grid, stride_grid); };
     auto get_gout_offset = [&](offset_t i) {
-        return index2offset_v2<0,nall>(i, size_grid, stride_gout); };
+        return index2offset<nall>(i, size_grid, stride_gout); };
     auto get_inp_offset = [&](offset_t i) {
-        return index2offset_v2<0,nbatch>(i, size_grid, stride_inp); };
+        return index2offset<nbatch>(i, size_grid, stride_inp); };
     auto get_out_offset = [&](offset_t i) {
-        return index2offset_v2<0,nbatch>(i, size_grid, stride_out); };
+        return index2offset<nbatch>(i, size_grid, stride_out); };
     auto get_ginp_offset = [&](offset_t i) {
-        return index2offset_v2<0,nall>(i, size_grid, stride_ginp); };
+        return index2offset<nall>(i, size_grid, stride_ginp); };
 
     offset_t numel = prod<nall>(size_grid);  // no outer loop across channels
     for (offset_t i=index; index < numel;

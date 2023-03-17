@@ -16,8 +16,7 @@ extrapolate = True
 
 # parameters
 bounds = [boundnames[i].lower() for i in range(7)]
-orders = list(range(8))
-orders = [2]
+orders = list(range(8))[:3]
 devices = test_devices()
 dims = [1, 2, 3]
 

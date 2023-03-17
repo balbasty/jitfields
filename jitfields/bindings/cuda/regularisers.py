@@ -12,10 +12,10 @@ def get_kernel(key):
     template = func
     template += f'<{nbatch}, {ndim}, '
     if 'relax' not in func:
-        template += f'{op[0]}, '
+        template += f"'{op[0]}', "
     template += ctypename(reduce_t) + ', '
     template += ctypename(scalar_t) + ', '
-    template += ctypename(offset_t)
+    template += ctypename(offset_t) + ', '
     template += ', '.join(map(bound_as_cname, bound))
     template += '>'
     return template
@@ -62,15 +62,24 @@ def grid_vel2mom(out, inp, bound, voxel_size,
     reduce_t = cp.float64
     scalar_t = np_inp.dtype
 
-    voxel_size = cp.ascontiguousarray(voxel_size, dtype=reduce_t)
+    voxel_size = cp.ascontiguousarray(cp.asarray(voxel_size, dtype=reduce_t))
     shape, instride = cinfo(np_inp, dtype=offset_t, backend=cp)
     outstride = cstrides(np_out, dtype=offset_t, backend=cp)
 
     op = fixop(op)
     if bending == div == shears == membrane == 0:
         bound = (nocheck,) * ndim
-    keys = (nbatch, ndim, bound, reduce_t, scalar_t, offset_t, op)
+    keys = (nbatch, ndim, tuple(bound), reduce_t, scalar_t, offset_t, op)
     args = (np_out, np_inp, shape, outstride, instride, voxel_size)
+
+    asreduce = (cp.float16 if reduce_t == cp.float16 else
+                cp.float32 if reduce_t == cp.float32 else
+                cp.float64)
+    absolute = asreduce(absolute)
+    membrane = asreduce(membrane)
+    bending = asreduce(bending)
+    shears = asreduce(shears)
+    div = asreduce(div)
 
     func = 'vel2mom_'
     if bending:
@@ -134,7 +143,7 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     scalar_t = np_inp.dtype
     reduce_t = cp.float64
 
-    voxel_size = cp.ascontiguousarray(voxel_size, dtype=reduce_t)
+    voxel_size = cp.ascontiguousarray(cp.asarray(voxel_size, dtype=reduce_t))
     shape, instride = cinfo(np_inp, dtype=offset_t, backend=cp)
     outstride = cstrides(np_out, dtype=offset_t, backend=cp)
     wgtstride = cstrides(np_wgt, dtype=offset_t, backend=cp)
@@ -142,8 +151,17 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     op = fixop(op)
     if bending == div == shears == membrane == 0:
         bound = (nocheck,) * ndim
-    keys = (nbatch, ndim, bound, reduce_t, scalar_t, offset_t, op)
+    keys = (nbatch, ndim, tuple(bound), reduce_t, scalar_t, offset_t, op)
     args = (np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride, voxel_size)
+
+    asreduce = (cp.float16 if reduce_t == cp.float16 else
+                cp.float32 if reduce_t == cp.float32 else
+                cp.float64)
+    absolute = asreduce(absolute)
+    membrane = asreduce(membrane)
+    bending = asreduce(bending)
+    shears = asreduce(shears)
+    div = asreduce(div)
 
     func = 'vel2mom_'
     if bending:
@@ -194,7 +212,7 @@ def grid_kernel(out, bound, voxel_size,
     """
     ndim = out.shape[-1]
     nbatch = out.ndim - ndim - 1 - int(shears or div)
-    numel = out.shape[:nbatch+ndim].numel()
+    numel = out.shape[:nbatch].numel()
     if ndim > 3:
         raise ValueError('grid_kernel only implemented up to dimension 3')
 
@@ -204,17 +222,26 @@ def grid_kernel(out, bound, voxel_size,
     scalar_t = np_out.dtype
     reduce_t = cp.float64
 
-    voxel_size = cp.ascontiguousarray(voxel_size, dtype=reduce_t)
+    voxel_size = cp.ascontiguousarray(cp.asarray(voxel_size, dtype=reduce_t))
     shape, stride = cinfo(np_out, dtype=offset_t, backend=cp)
 
     op = fixop(op)
     if bending == div == shears == membrane == 0:
         bound = (nocheck,) * ndim
-    keys = (nbatch, ndim, bound, reduce_t, scalar_t, offset_t, op)
+    keys = (nbatch, ndim, tuple(bound), reduce_t, scalar_t, offset_t, op)
     args = (np_out, shape, stride, voxel_size)
 
     if op == '=':
         out.zero_()
+
+    asreduce = (cp.float16 if reduce_t == cp.float16 else
+                cp.float32 if reduce_t == cp.float32 else
+                cp.float64)
+    absolute = asreduce(absolute)
+    membrane = asreduce(membrane)
+    bending = asreduce(bending)
+    shears = asreduce(shears)
+    div = asreduce(div)
 
     func = 'kernel_'
     if bending:
@@ -273,14 +300,23 @@ def grid_diag(out, bound, voxel_size,
     scalar_t = np_out.dtype
     reduce_t = cp.float64
 
-    voxel_size = cp.ascontiguousarray(voxel_size, dtype=reduce_t)
+    voxel_size = cp.ascontiguousarray(cp.asarray(voxel_size, dtype=reduce_t))
     shape, stride = cinfo(np_out, dtype=offset_t, backend=cp)
 
     op = fixop(op)
     if bending == div == shears == membrane == 0:
         bound = (nocheck,) * ndim
-    keys = (nbatch, ndim, bound, reduce_t, scalar_t, offset_t, op)
+    keys = (nbatch, ndim, tuple(bound), reduce_t, scalar_t, offset_t, op)
     args = (np_out, shape, stride, voxel_size)
+
+    asreduce = (cp.float16 if reduce_t == cp.float16 else
+                cp.float32 if reduce_t == cp.float32 else
+                cp.float64)
+    absolute = asreduce(absolute)
+    membrane = asreduce(membrane)
+    bending = asreduce(bending)
+    shears = asreduce(shears)
+    div = asreduce(div)
 
     if op == '=':
         out.zero_()
@@ -344,15 +380,24 @@ def grid_diag_rls(out, wgt, bound, voxel_size,
     scalar_t = np_out.dtype
     reduce_t = cp.float64
 
-    voxel_size = cp.ascontiguousarray(voxel_size, dtype=reduce_t)
+    voxel_size = cp.ascontiguousarray(cp.asarray(voxel_size, dtype=reduce_t))
     shape, stride = cinfo(np_out, dtype=offset_t, backend=cp)
     wgtstride = cstrides(np_wgt, dtype=offset_t, backend=cp)
 
     op = fixop(op)
     if bending == div == shears == membrane == 0:
         bound = (nocheck,) * ndim
-    keys = (nbatch, ndim, bound, reduce_t, scalar_t, offset_t, op)
+    keys = (nbatch, ndim, tuple(bound), reduce_t, scalar_t, offset_t, op)
     args = (np_out, np_wgt, shape, stride, wgtstride, voxel_size)
+
+    asreduce = (cp.float16 if reduce_t == cp.float16 else
+                cp.float32 if reduce_t == cp.float32 else
+                cp.float64)
+    absolute = asreduce(absolute)
+    membrane = asreduce(membrane)
+    bending = asreduce(bending)
+    shears = asreduce(shears)
+    div = asreduce(div)
 
     if op == '=':
         out.zero_()
@@ -418,16 +463,25 @@ def grid_relax_(sol, hes, grd, niter, bound, voxel_size,
     reduce_t = cp.float64
     scalar_t = np_sol.dtype
 
-    voxel_size = cp.ascontiguousarray(voxel_size, dtype=reduce_t)
+    voxel_size = cp.ascontiguousarray(cp.asarray(voxel_size, dtype=reduce_t))
     shape, solstride = cinfo(np_sol, dtype=offset_t, backend=cp)
     hesstride = cstrides(np_hes, dtype=offset_t, backend=cp)
     grdstride = cstrides(np_grd, dtype=offset_t, backend=cp)
 
     if bending == div == shears == membrane == 0:
         bound = (nocheck,) * ndim
-    keys = (nbatch, ndim, bound, reduce_t, scalar_t, offset_t)
+    keys = (nbatch, ndim, tuple(bound), reduce_t, scalar_t, offset_t)
     args = (np_sol, np_hes, np_grd, shape, solstride, hesstride, grdstride,
             voxel_size)
+
+    asreduce = (cp.float16 if reduce_t == cp.float16 else
+                cp.float32 if reduce_t == cp.float32 else
+                cp.float64)
+    absolute = asreduce(absolute)
+    membrane = asreduce(membrane)
+    bending = asreduce(bending)
+    shears = asreduce(shears)
+    div = asreduce(div)
 
     func = 'relax_'
     if bending:
@@ -497,7 +551,7 @@ def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
     reduce_t = cp.float64
     scalar_t = np_sol.dtype
 
-    voxel_size = cp.ascontiguousarray(voxel_size, dtype=reduce_t)
+    voxel_size = cp.ascontiguousarray(cp.asarray(voxel_size, dtype=reduce_t))
     shape, solstride = cinfo(np_sol, dtype=offset_t, backend=cp)
     hesstride = cstrides(np_hes, dtype=offset_t, backend=cp)
     grdstride = cstrides(np_grd, dtype=offset_t, backend=cp)
@@ -505,9 +559,18 @@ def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
 
     if bending == div == shears == membrane == 0:
         bound = (nocheck,) * ndim
-    keys = (nbatch, ndim, bound, reduce_t, scalar_t, offset_t)
+    keys = (nbatch, ndim, tuple(bound), reduce_t, scalar_t, offset_t)
     args = (np_sol, np_hes, np_grd, np_wgt, shape,
             solstride, hesstride, grdstride, wgtstride, voxel_size)
+
+    asreduce = (cp.float16 if reduce_t == cp.float16 else
+                cp.float32 if reduce_t == cp.float32 else
+                cp.float64)
+    absolute = asreduce(absolute)
+    membrane = asreduce(membrane)
+    bending = asreduce(bending)
+    shears = asreduce(shears)
+    div = asreduce(div)
 
     func = 'relax_'
     if bending:

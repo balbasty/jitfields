@@ -21,7 +21,7 @@ __global__ void kernel(
     offset_t stride [ndim]; fillfrom<ndim>(stride, _stride);
 
     offset_t n = size[nbatch];
-    offset_t s = size[nbatch];
+    offset_t s = stride[nbatch];
     w *= w;
 
     offset_t stride_buf = blockDim.x * gridDim.x;

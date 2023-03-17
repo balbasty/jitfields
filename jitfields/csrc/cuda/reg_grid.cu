@@ -18,6 +18,7 @@ using namespace jf::reg_grid;
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void vel2mom_absolute(
     scalar_t * out,                  // (*batch, *spatial, channels) tensor
     const scalar_t * inp,            // (*batch, *spatial, channels) tensor
@@ -61,6 +62,7 @@ void vel2mom_absolute(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void kernel_absolute(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const offset_t * _size,         // [*batch, *spatial, channels] vector
@@ -88,7 +90,7 @@ void kernel_absolute(
 
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
-        offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+        offset_t out_offset = index2offset<nbatch>(i, size, stride);
         out_offset += offset;
 
         Impl::template kernel_absolute<opfunc>(out + out_offset, sc, kernel);
@@ -100,6 +102,7 @@ void kernel_absolute(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_absolute(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const offset_t * _size,         // [*batch, *spatial, channels] vector
@@ -141,6 +144,7 @@ void diag_absolute(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void vel2mom_membrane(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const scalar_t * inp,           // (*batch, *spatial, channels) tensor
@@ -172,7 +176,7 @@ void vel2mom_membrane(
     {
         offset_t loc[ndim];
         offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-        offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+        offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
         Impl::template vel2mom_membrane<opfunc>(
             out + out_offset, inp + inp_offset,
@@ -185,6 +189,7 @@ void vel2mom_membrane(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void kernel_membrane(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const offset_t * _size,         // [*batch, *spatial, channels] vector
@@ -212,7 +217,7 @@ void kernel_membrane(
 
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
-        offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+        offset_t out_offset = index2offset<nbatch>(i, size, stride);
         out_offset += offset;
 
         Impl::template kernel_membrane<opfunc>(
@@ -225,6 +230,7 @@ void kernel_membrane(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_membrane(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const offset_t * _size,         // [*batch, *spatial, channels] vector
@@ -263,6 +269,7 @@ void diag_membrane(
 template <int nbatch, int ndim,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_membrane_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -307,8 +314,8 @@ void relax_membrane_(
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
         if (!patch1<ndim>(loc, n))
             continue;
-        offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-        offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+        offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+        offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
         // gradient
 #       pragma unroll
@@ -342,6 +349,7 @@ void relax_membrane_(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void vel2mom_bending(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -373,7 +381,7 @@ void vel2mom_bending(
     {
         offset_t loc[ndim];
         offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-        offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+        offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
         Impl::template vel2mom_bending<opfunc>(
             out + out_offset, inp + inp_offset,
@@ -386,6 +394,7 @@ void vel2mom_bending(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void kernel_bending(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const offset_t * _size,         // [*batch, *spatial, channels] vector
@@ -413,7 +422,7 @@ void kernel_bending(
 
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
-        offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+        offset_t out_offset = index2offset<nbatch>(i, size, stride);
         out_offset += offset;
 
         Impl::template kernel_bending<opfunc>(
@@ -426,6 +435,7 @@ void kernel_bending(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_bending(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const offset_t * _size,         // [*batch, *spatial, channels] vector
@@ -464,6 +474,7 @@ void diag_bending(
 template <int nbatch, int ndim,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_bending_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -508,8 +519,8 @@ void relax_bending_(
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
         if (!patch3<ndim>(loc, n))
             continue;
-        offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-        offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+        offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+        offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
         // gradient
 #       pragma unroll
@@ -543,6 +554,7 @@ void relax_bending_(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void vel2mom_lame(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -574,7 +586,7 @@ void vel2mom_lame(
     {
         offset_t loc[ndim];
         offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-        offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+        offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
         Impl::template vel2mom_lame<opfunc>(
             out + out_offset, inp + inp_offset,
@@ -587,6 +599,7 @@ void vel2mom_lame(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void kernel_lame(
     scalar_t * out,                 // (*batch, *spatial, C, C) tensor
     const offset_t * _size,         // [*batch, *spatial, C, C] vector
@@ -613,7 +626,7 @@ void kernel_lame(
 
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
-        offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+        offset_t out_offset = index2offset<nbatch>(i, size, stride);
         out_offset += offset;
 
         Impl::template kernel_lame<opfunc>(
@@ -626,6 +639,7 @@ void kernel_lame(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_lame(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const offset_t * _size,         // [*batch, *spatial, C] vector
@@ -663,6 +677,7 @@ void diag_lame(
 template <int nbatch, int ndim,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_lame_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -707,8 +722,8 @@ void relax_lame_(
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
         if (!patch2<ndim>(loc, n))
             continue;
-        offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-        offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+        offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+        offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
         // gradient
 #       pragma unroll
@@ -742,6 +757,7 @@ void relax_lame_(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void vel2mom_all(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -774,7 +790,7 @@ void vel2mom_all(
     {
         offset_t loc[ndim];
         offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-        offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+        offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
         Impl::template vel2mom_all<opfunc>(
             out + out_offset, inp + inp_offset,
@@ -787,6 +803,7 @@ void vel2mom_all(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void kernel_all(
     scalar_t * out,                 // (*batch, *spatial, C, C) tensor
     const offset_t * _size,         // [*batch, *spatial, C, C] vector
@@ -814,7 +831,7 @@ void kernel_all(
 
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
-        offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+        offset_t out_offset = index2offset<nbatch>(i, size, stride);
         out_offset += offset;
 
         Impl::template kernel_all<opfunc>(
@@ -827,6 +844,7 @@ void kernel_all(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_all(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const offset_t * _size,         // [*batch, *spatial, C] vector
@@ -866,6 +884,7 @@ void diag_all(
 template <int nbatch, int ndim,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_all_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -911,8 +930,8 @@ void relax_all_(
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
         if (!patch3<ndim>(loc, n))
             continue;
-        offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-        offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+        offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+        offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
         // gradient
 #       pragma unroll
@@ -945,6 +964,7 @@ void relax_all_(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void vel2mom_membrane_jrls(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -979,8 +999,8 @@ void vel2mom_membrane_jrls(
     {
         offset_t loc[ndim];
         offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-        offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
-        offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+        offset_t out_offset = index2offset<nall>(i, size, stride_out);
+        offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
         Impl::template vel2mom_membrane_jrls<opfunc>(
             out + out_offset, inp + inp_offset, wgt + wgt_offset,
@@ -994,6 +1014,7 @@ void vel2mom_membrane_jrls(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_membrane_jrls(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const scalar_t * wgt,           // (*batch, *spatial, channels) tensor
@@ -1024,7 +1045,7 @@ void diag_membrane_jrls(
     {
         offset_t loc[ndim];
         offset_t out_offset = index2offset_v2<ndim,nall>(i, size, stride_out, loc);
-        offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+        offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
         Impl::template diag_membrane_jrls<opfunc>(
             out + out_offset, wgt + wgt_offset,
@@ -1037,6 +1058,7 @@ void diag_membrane_jrls(
 template <int nbatch, int ndim,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_membrane_jrls_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -1084,9 +1106,9 @@ void relax_membrane_jrls_(
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
         if (!patch1<ndim>(loc, n))
             continue;
-        offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-        offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
-        offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+        offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+        offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
+        offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
         // gradient
 #       pragma unroll
@@ -1122,6 +1144,7 @@ void relax_membrane_jrls_(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void vel2mom_lame_jrls(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -1156,8 +1179,8 @@ void vel2mom_lame_jrls(
     {
         offset_t loc[ndim];
         offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-        offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
-        offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+        offset_t out_offset = index2offset<nall>(i, size, stride_out);
+        offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
         Impl::template vel2mom_lame_jrls<opfunc>(
             out + out_offset, inp + inp_offset, wgt + wgt_offset,
@@ -1171,6 +1194,7 @@ void vel2mom_lame_jrls(
 template <int nbatch, int ndim, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_lame_jrls(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const scalar_t * wgt,           // (*batch, *spatial, channels) tensor
@@ -1201,7 +1225,7 @@ void diag_lame_jrls(
     {
         offset_t loc[ndim];
         offset_t out_offset = index2offset_v2<ndim,nall>(i, size, stride_out, loc);
-        offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+        offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
         Impl::template diag_lame_jrls<opfunc>(
             out + out_offset, wgt + wgt_offset,
@@ -1214,6 +1238,7 @@ void diag_lame_jrls(
 template <int nbatch, int ndim,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_lame_jrls_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -1261,9 +1286,9 @@ void relax_lame_jrls_(
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
         if (!patch2<ndim>(loc, n))
             continue;
-        offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-        offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
-        offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+        offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+        offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
+        offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
         // gradient
 #       pragma unroll

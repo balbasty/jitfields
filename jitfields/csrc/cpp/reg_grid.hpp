@@ -74,9 +74,9 @@ void kernel_absolute(
     using Impl = RegGrid<ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
-    offset_t size[nall+1];       fillfrom<nall+1>(size, _size);
-    offset_t stride[nall+1];     fillfrom<nall+1>(stride, _stride);
-    reduce_t voxel_size[ndim];   fillfrom<ndim>(voxel_size, _voxel_size);
+    offset_t size       [nall+1]; fillfrom<nall+1>(size, _size);
+    offset_t stride     [nall+1]; fillfrom<nall+1>(stride, _stride);
+    reduce_t voxel_size [ndim];   fillfrom<ndim>(voxel_size, _voxel_size);
     offset_t sc = stride[nall];
     offset_t numel = prod<nbatch>(size);  // loop across batch only
 
@@ -86,14 +86,13 @@ void kernel_absolute(
     offset_t offset = center_offset<ndim>(size+nbatch, stride+nbatch);
 
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
-        {
-            offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
-            out_offset += offset;
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t out_offset = index2offset<nbatch>(i, size, stride);
+        out_offset += offset;
 
-            Impl::template kernel_absolute<opfunc>(out + out_offset, sc, kernel);
-        }
-    });
+        Impl::template kernel_absolute<opfunc>(out + out_offset, sc, kernel);
+    }});
 }
 
 // --- ABSOLUTE: diagonal ----------------------------------------------
@@ -172,7 +171,7 @@ void vel2mom_membrane(
         {
             offset_t loc[ndim];
             offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-            offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+            offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
             Impl::template vel2mom_membrane<opfunc>(
                 out + out_offset, inp + inp_offset,
@@ -212,7 +211,7 @@ void kernel_membrane(
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
         for (offset_t i=start; i < end; ++i)
         {
-            offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+            offset_t out_offset = index2offset<nbatch>(i, size, stride);
             out_offset += offset;
 
             Impl::template kernel_membrane<opfunc>(
@@ -307,8 +306,8 @@ void relax_membrane_(
             offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
             if (!patch1<ndim>(loc, n))
                 continue;
-            offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-            offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+            offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+            offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
             // gradient
 #           pragma unroll
@@ -374,7 +373,7 @@ void vel2mom_bending(
         {
             offset_t loc[ndim];
             offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-            offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+            offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
             Impl::template vel2mom_bending<opfunc>(
                 out + out_offset, inp + inp_offset,
@@ -414,7 +413,7 @@ void kernel_bending(
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
         for (offset_t i=start; i < end; ++i)
         {
-            offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+            offset_t out_offset = index2offset<nbatch>(i, size, stride);
             out_offset += offset;
 
             Impl::template kernel_bending<opfunc>(
@@ -509,8 +508,8 @@ void relax_bending_(
             offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
             if (!patch3<ndim>(loc, n))
                 continue;
-            offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-            offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+            offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+            offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
             // gradient
 #           pragma unroll
@@ -576,7 +575,7 @@ void vel2mom_lame(
         {
             offset_t loc[ndim];
             offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-            offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+            offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
             Impl::template vel2mom_lame<opfunc>(
                 out + out_offset, inp + inp_offset,
@@ -615,7 +614,7 @@ void kernel_lame(
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
         for (offset_t i=start; i < end; ++i)
         {
-            offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+            offset_t out_offset = index2offset<nbatch>(i, size, stride);
             out_offset += offset;
 
             Impl::template kernel_lame<opfunc>(
@@ -709,8 +708,8 @@ void relax_lame_(
             offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
             if (!patch2<ndim>(loc, n))
                 continue;
-            offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-            offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+            offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+            offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
             // gradient
 #           pragma unroll
@@ -777,7 +776,7 @@ void vel2mom_all(
         {
             offset_t loc[ndim];
             offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-            offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
+            offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
             Impl::template vel2mom_all<opfunc>(
                 out + out_offset, inp + inp_offset,
@@ -817,7 +816,7 @@ void kernel_all(
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
         for (offset_t i=start; i < end; ++i)
         {
-            offset_t out_offset = index2offset_v2<0,nbatch>(i, size, stride);
+            offset_t out_offset = index2offset<nbatch>(i, size, stride);
             out_offset += offset;
 
             Impl::template kernel_all<opfunc>(
@@ -914,8 +913,8 @@ void relax_all_(
             offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
             if (!patch3<ndim>(loc, n))
                 continue;
-            offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-            offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
+            offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+            offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
             // gradient
 #           pragma unroll
@@ -983,8 +982,8 @@ void vel2mom_membrane_jrls(
         {
             offset_t loc[ndim];
             offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-            offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
-            offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+            offset_t out_offset = index2offset<nall>(i, size, stride_out);
+            offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
             Impl::template vel2mom_membrane_jrls<opfunc>(
                 out + out_offset, inp + inp_offset, wgt + wgt_offset,
@@ -1028,7 +1027,7 @@ void diag_membrane_jrls(
         {
             offset_t loc[ndim];
             offset_t out_offset = index2offset_v2<ndim,nall>(i, size, stride_out, loc);
-            offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+            offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
             Impl::template diag_membrane_jrls<opfunc>(
                 out + out_offset, wgt + wgt_offset,
@@ -1088,9 +1087,9 @@ void relax_membrane_jrls_(
             offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
             if (!patch1<ndim>(loc, n))
                 continue;
-            offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-            offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
-            offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+            offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+            offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
+            offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
             // gradient
 #           pragma unroll
@@ -1161,8 +1160,8 @@ void vel2mom_lame_jrls(
         {
             offset_t loc[ndim];
             offset_t inp_offset = index2offset_v2<ndim,nall>(i, size, stride_inp, loc);
-            offset_t out_offset = index2offset_v2<0,nall>(i, size, stride_out);
-            offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+            offset_t out_offset = index2offset<nall>(i, size, stride_out);
+            offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
             Impl::template vel2mom_lame_jrls<opfunc>(
                 out + out_offset, inp + inp_offset, wgt + wgt_offset,
@@ -1206,7 +1205,7 @@ void diag_lame_jrls(
         {
             offset_t loc[ndim];
             offset_t out_offset = index2offset_v2<ndim,nall>(i, size, stride_out, loc);
-            offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+            offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
             Impl::template diag_lame_jrls<opfunc>(
                 out + out_offset, wgt + wgt_offset,
@@ -1266,9 +1265,9 @@ void relax_lame_jrls_(
             offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
             if (!patch2<ndim>(loc, n))
                 continue;
-            offset_t grd_offset = index2offset_v2<0,nall>(i, size, stride_grd);
-            offset_t hes_offset = index2offset_v2<0,nall>(i, size, stride_hes);
-            offset_t wgt_offset = index2offset_v2<0,nall>(i, size, stride_wgt);
+            offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
+            offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
+            offset_t wgt_offset = index2offset<nall>(i, size, stride_wgt);
 
             // gradient
 #           pragma unroll

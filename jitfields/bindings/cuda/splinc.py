@@ -6,7 +6,7 @@ from ..common.splinc import get_poles
 import cupy as cp
 
 
-def get_kernel(*key):
+def get_kernel(key):
     nbatch, npoles, bound, scalar_t, offset_t, reduce_t = key
     template = f'kernel<{nbatch}, {npoles}, {bound_as_cname(bound)}, '
     template += ctypename(scalar_t) + ', '

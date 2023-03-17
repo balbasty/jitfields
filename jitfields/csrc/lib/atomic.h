@@ -142,8 +142,7 @@ struct Atomic##NAME##IntegerImpl<T, 2> {                                        
   inline __device__ void operator()(T *address, T val, const func_t& func) {                                           \
     size_t offset = (size_t)address & 2;                                                                               \
     unsigned int * address_as_ui = (unsigned int *)((char *)address - offset);                                         \
-    bool is_
-    32_align = offset;                                                                                         \
+    bool is_32_align = offset;                                                                                         \
     unsigned int old = *address_as_ui;                                                                                 \
     unsigned int old_bytes;                                                                                            \
     unsigned int newval;                                                                                               \

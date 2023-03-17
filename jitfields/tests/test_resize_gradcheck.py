@@ -18,9 +18,9 @@ prefilter = False
 bounds = [boundnames[i].lower() for i in range(7)][3:4]
 orders = list(range(8))[:4]
 anchors = ['center', 'edge', 'first'][:1]
-factors = [2, 3][1:]
+factors = [2, 3]
 devices = test_devices()
-dims = [1, 2, 3][1:]
+dims = [1, 2, 3]
 
 
 if hasattr(torch, 'use_deterministic_algorithms'):

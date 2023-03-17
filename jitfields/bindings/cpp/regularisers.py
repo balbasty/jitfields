@@ -4,7 +4,6 @@ import cppyy
 import numpy as np
 from .utils import include
 
-cppyy.set_debug()
 include()
 cppyy.include('reg_grid.hpp')
 # cppyy.include('reg_field_static_3d.hpp')

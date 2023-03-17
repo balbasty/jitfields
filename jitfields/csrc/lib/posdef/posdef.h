@@ -24,7 +24,7 @@ enum class type: unsigned char {
 };
 
 template <typename offset_t>
-static __host__ inline
+static inline
 type guess_type(offset_t C, offset_t CC)
 {
     if (CC == 0)
@@ -298,7 +298,7 @@ struct common
         hptr_t h,
         vptr_t v,
         wptr_t w,
-        float unused)
+        half unused)
     {
         const void * b = nullptr;
         return this_type::relax_(x, h, v, w, b, unused);
@@ -538,7 +538,7 @@ struct common<Child, offset_t, 0>
     template <typename xptr_t, typename vptr_t,
               typename hptr_t, typename wptr_t = const void *>
     static inline __device__
-    void relax_(offset_t C, xptr_t x, hptr_t h, vptr_t v, wptr_t w, float unused)
+    void relax_(offset_t C, xptr_t x, hptr_t h, vptr_t v, wptr_t w, half unused)
     {
         const void * b = nullptr;
         return this_type::relax_(C, x, v, h, w, b, unused);

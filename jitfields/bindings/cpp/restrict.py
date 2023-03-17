@@ -5,7 +5,6 @@ import cppyy
 import numpy as np
 from .utils import include
 
-cppyy.set_debug()
 include()
 cppyy.include('restrict.hpp')
 

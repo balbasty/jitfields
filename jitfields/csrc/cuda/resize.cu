@@ -18,7 +18,8 @@ template <int nbatch, int ndim,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
           spline::type IZ=IY, bound::type BZ=BY>
-__global__ void kernel(
+__global__
+void kernel(
     scalar_t * out,                 // (*batch, *shape) tensor
     const scalar_t * inp,           // (*batch, *shape) tensor
     reduce_t shift,
@@ -32,7 +33,7 @@ __global__ void kernel(
     constexpr int nall = ndim + nbatch;
 
     // copy vectors to the stack
-    offset_t scale      [ndim]; fillfrom<ndim>(scale,      _scale);
+    reduce_t scale      [ndim]; fillfrom<ndim>(scale,      _scale);
     offset_t size_out   [nall]; fillfrom<nall>(size_out,   _size_out);
     offset_t size_inp   [nall]; fillfrom<nall>(size_inp,   _size_inp);
     offset_t stride_out [nall]; fillfrom<nall>(stride_out, _stride_out);
@@ -46,7 +47,7 @@ __global__ void kernel(
         offset_t inp_offset = index2offset_nd<ndim,nall>(i, size_out, stride_inp, loc);
         offset_t out_offset = index2offset<nall>(i, size_out, stride_out);
 
-        Multiscale<one, IX, BX, IY, BY, IZ, BZ>::resize(
+        Multiscale<ndim, IX, BX, IY, BY, IZ, BZ>::resize(
             out + out_offset, inp + inp_offset,
             loc, size_inp + nbatch, stride_inp + nbatch,
             scale, shift);
@@ -55,7 +56,8 @@ __global__ void kernel(
 
 template <int nbatch, int ndim,
           typename scalar_t, typename offset_t, typename reduce_t>
-__global__ void kernelnd
+__global__
+void kernelnd(
     scalar_t * out,                 // (*batch, *shape) tensor
     const scalar_t * inp,           // (*batch, *shape) tensor
     reduce_t shift,
@@ -74,7 +76,7 @@ __global__ void kernelnd
     const bound::type  * cbnd   = reinterpret_cast<const bound::type *>(_bnd);
 
     // copy vectors to the stack
-    offset_t scale      [ndim]; fillfrom<ndim>(scale,      _scale);
+    reduce_t scale      [ndim]; fillfrom<ndim>(scale,      _scale);
     spline::type order  [ndim]; fillfrom<ndim>(order,      corder);
     bound::type  bnd    [ndim]; fillfrom<ndim>(bnd,        cbnd);
     offset_t size_out   [nall]; fillfrom<nall>(size_out,   _size_out);
@@ -90,7 +92,7 @@ __global__ void kernelnd
         offset_t inp_offset = index2offset_nd<ndim,nall>(i, size_out, stride_inp, loc);
         offset_t out_offset = index2offset<nall>(i, size_out, stride_out);
 
-        Multiscale<D>::resize(
+        Multiscale<ndim>::resize(
             out + out_offset, inp + inp_offset,
             x, size_inp + nbatch, stride_inp + nbatch,
             order, bnd, scale, shift);

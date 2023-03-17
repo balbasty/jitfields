@@ -49,7 +49,7 @@ void loop(
 
     if ( jf::has_atomic_add<scalar_t>::value )
     {
-        offset_t numel = prod<nall>(size_out);
+        offset_t numel = prod<nall>(fullsize);
         parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
         for (offset_t i=start; i < end; ++i)
         {

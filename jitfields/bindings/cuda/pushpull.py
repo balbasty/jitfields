@@ -31,7 +31,7 @@ kernels = CachedKernel('pushpull.cu', get_kernel)
 # ===
 
 
-def get_kernelnd(*key):
+def get_kernelnd(key):
     func, nbatch, ndim, extrapolate, reduce_t, scalar_t, offset_t, backward = key
     template = func
     if backward:
@@ -272,6 +272,7 @@ def pull_backward(out_grad_inp, out_grad_grid, inp_grad, inp, grid,
     scalar_t = np_grid.dtype.type
     reduce_t = scalar_t
     offset_t = get_offset_type(np_inp, np_inp_grad, np_grid, np_out_grad_inp, np_out_grad_grid)
+
     splinc_shape, inp_stride = cinfo(np_inp, dtype=offset_t, backend=cp)
     grid_shape, grid_stride = cinfo(np_grid, dtype=offset_t, backend=cp)
     _, inp_grad_stride = cinfo(np_inp_grad, dtype=offset_t, backend=cp)

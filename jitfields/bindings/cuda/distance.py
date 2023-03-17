@@ -7,7 +7,7 @@ import torch
 
 
 kernels_l1 = CachedKernel('distance_l1.cu')
-kernels_l2 = CachedKernel('distance_e.cu')
+kernels_l2 = CachedKernel('distance_euclidean.cu')
 
 
 def l1dt_1d_(f, dim=-1, w=1):
@@ -18,12 +18,16 @@ def l1dt_1d_(f, dim=-1, w=1):
 
     cuf = to_cupy(f)
 
-    scalar_t = cuf.dtype.dtype
+    scalar_t = cuf.dtype
     offset_t = get_offset_type(cuf)
     shape, stride = cinfo(cuf, dtype=offset_t, backend=cp)
 
-    kernel = kernels_l1.get(ndim, scalar_t, offset_t)
-    culaunch(kernel, n, (cuf, float(w), shape, stride))
+    asscalar = (cp.float16 if scalar_t == cp.float16 else
+                cp.float32 if scalar_t == cp.float32 else
+                cp.float64)
+
+    kernel = kernels_l1.get('kernel', ndim, scalar_t, offset_t)
+    culaunch(kernel, n, (cuf, asscalar(w), shape, stride))
     return f.movedim(-1, dim)
 
 
@@ -44,7 +48,7 @@ def edt_1d_(f, dim=-1, w=1):
 
     cuf = to_cupy(f)
 
-    scalar_t = cuf.dtype.dtype
+    scalar_t = cuf.dtype
     offset_t = get_offset_type(cuf)
     shape, stride = cinfo(cuf, dtype=offset_t, backend=cp)
 
@@ -53,8 +57,12 @@ def edt_1d_(f, dim=-1, w=1):
     buf *= 2 * cuf.dtype.itemsize + stride.dtype.itemsize
     buf = cp.empty([buf], dtype=cp.uint8)
 
-    kernel = kernels_l2.get(ndim, scalar_t, offset_t)
-    culaunch(kernel, n, (cuf, buf, float(w), shape, stride))
+    asscalar = (cp.float16 if scalar_t == cp.float16 else
+                cp.float32 if scalar_t == cp.float32 else
+                cp.float64)
+
+    kernel = kernels_l2.get('kernel', ndim, scalar_t, offset_t)
+    culaunch(kernel, n, (cuf, buf, asscalar(w), shape, stride))
     return f.movedim(-1, dim)
 
 

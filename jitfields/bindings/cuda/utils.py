@@ -57,7 +57,7 @@ def culaunch(kernel, numel, args):
 def get_offset_type(*shapes):
     can_use_32b = True
     for shape in shapes:
-        if isinstance(shape, np.ndarray):
+        if isinstance(shape, (np.ndarray, cp.ndarray)):
             array = shape
             maxstride = max(sz * st for sz, st in zip(array.shape, array.strides))
         else:
@@ -71,7 +71,7 @@ def get_offset_type(*shapes):
 def load_code(filename, relative=None):
     if not relative:
         relative = os.path.abspath(os.path.dirname(__file__))
-        relative = os.path.join(relative, '..', 'csrc', 'cuda')
+        relative = os.path.join(relative, '..', '..', 'csrc', 'cuda')
 
     filepath = os.path.join(relative, filename)
     dirname = os.path.dirname(filepath)
@@ -79,7 +79,7 @@ def load_code(filename, relative=None):
         code = f.read()
     lines = code.split('\n')
 
-    pattern = re.compile(r'\s*#include\s+"(?P<filename>[\w\.]+)"')
+    pattern = re.compile(r'\s*#include\s+"(?P<filename>[^"]+)"')
 
     code = ''
     for line in lines:
@@ -116,7 +116,7 @@ class CachedKernel:
         func = keys[0]
         args = []
         for key in keys[1:]:
-            if isinstance(key, (np.dtype, torch.dtype)):
+            if isinstance(key, (np.dtype, torch.dtype, type)):
                 args.append(ctypename(key))
             elif isinstance(key, bool):
                 args.append('true' if key else 'false')
@@ -128,8 +128,10 @@ class CachedKernel:
         if key not in self.kernels:
             key2expr = self.key2expr or self.default_key2expr
             expr = key2expr(key)
-            module = cp.RawModule(code=str(self.code), options=('--std=c++14',),
-                                  name_expressions=(expr,))
+            module = cp.RawModule(
+                code=str(self.code),
+                options=('--std=c++14', '-default-device '),
+                name_expressions=(expr,))
             kernel = module.get_function(expr)
             if int(os.environ.get('JF_CACHE_KERNELS', '1')):
                 self.kernels[key] = kernel

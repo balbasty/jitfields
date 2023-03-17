@@ -77,6 +77,7 @@ struct Op<'-', scalar_t, reduce_t> {
 //----------------------------------------------------------------------
 
 template <int N, typename U>
+__device__ inline
 U center_offset(const U * size, const U * stride)
 {
     U offset = 0;
@@ -87,6 +88,7 @@ U center_offset(const U * size, const U * stride)
 }
 
 template <int N, typename offset_t>
+__device__ inline
 bool patch1(const offset_t loc[N], offset_t n)
 {
     offset_t acc = 0;
@@ -97,6 +99,7 @@ bool patch1(const offset_t loc[N], offset_t n)
 }
 
 template <int N, typename offset_t>
+__device__ inline
 bool patch2(const offset_t loc[N], offset_t n)
 {
     offset_t acc = 0;
@@ -108,6 +111,7 @@ bool patch2(const offset_t loc[N], offset_t n)
 }
 
 template <int N, typename offset_t>
+__device__ inline
 bool patch3(const offset_t loc[N], offset_t n)
 {
     offset_t acc = 0;

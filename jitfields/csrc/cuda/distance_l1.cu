@@ -22,8 +22,7 @@ void kernel(
     offset_t stride [ndim]; fillfrom<ndim>(stride, _stride);
 
     offset_t n = size[nbatch];
-    offset_t s = size[nbatch];
-    w *= w;
+    offset_t s = stride[nbatch];
 
     offset_t numel = prod<nbatch>(size);
     for (offset_t i=index; index < numel;
