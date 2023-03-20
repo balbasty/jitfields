@@ -1,18 +1,10 @@
 # jitfields
 Fast functions for dense scalar and vector fields, implemented using just-in-time compilation.
 
-**/!\ This is very experimental**
+**/!\ This is (still) experimental**
 
 - GPU version of the algorithms are written in pure CUDA, and compiled just-in-time by `cupy`.
 - CPU version of the algorithms are written in pure C++, and compiled just-in-time by `cppyy`.
-
-## Recent changes
-- While most CPU algorithms are single-threaded, I have added a thread pool
-and basic parallel loop, which is in use in a few selected functions.
-However, the thread pool only works on LLVM >= 13, which is not the default
-version on some linux distributions. I plan to add another parallel 
-implementation using OpenMP. I hope that it'll be possible to select the 
-most appropriate backend at startup.
 
 ## Installation
 
@@ -22,10 +14,16 @@ interaction is in term of cuda version.
 pip install git+https://github.com/balbasty/jitfields
 ```
 
+If you intend to run code on the GPU, specify the [cuda] extra tag, which
+ensures that cupy gets installed.
+```sh
+pip install git+https://github.com/balbasty/jitfields#egg=jitfields[cuda]
+```
+
 Pre-installing dependencies from conda may be more robust:
 ```sh
-conda install -c conda-forge numpy cupy ccpyy pytorch cudatoolkit=10.2
-pip install git+https://github.com/balbasty/jitfields
+conda install -c python>=3.6 conda-forge numpy cupy ccpyy pytorch>=1.8 cudatoolkit=10.2
+pip install git+https://github.com/balbasty/jitfields#egg=jitfields[cuda]
 ```
 
 ## Implemented so far
