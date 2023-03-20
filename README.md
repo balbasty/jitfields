@@ -4,10 +4,15 @@ Fast functions for dense scalar and vector fields, implemented using just-in-tim
 **/!\ This is very experimental**
 
 - GPU version of the algorithms are written in pure CUDA, and compiled just-in-time by `cupy`.
-- CPU version of the algorithms are written in pure C++, and compiled just-in-time by `cppyy`. 
+- CPU version of the algorithms are written in pure C++, and compiled just-in-time by `cppyy`.
 
-Note that currently, the CPU implementation is single-threaded. 
-I do plan to implement a multi-threaded parallel loop in the near future.
+## Recent changes
+- While most CPU algorithms are single-threaded, I have added a thread pool
+and basic parallel loop, which is in use in a few selected functions.
+However, the thread pool only works on LLVM >= 13, which is not the default
+version on some linux distributions. I plan to add another parallel 
+implementation using OpenMP. I hope that it'll be possible to select the 
+most appropriate backend at startup.
 
 ## Installation
 
@@ -25,17 +30,17 @@ pip install git+https://github.com/balbasty/jitfields
 
 ## Implemented so far
 
-### CPU and GPU
+### Distance transforms
 
 ```python
-euclidean_distance_transform(x, dim=None, vx=1, dtype=None)
+def euclidean_distance_transform(x, ndim=None, vx=1, dtype=None): ...
 """Compute the Euclidean distance transform of a binary image
 
 Parameters
 ----------
 x : (..., *spatial) tensor
     Input tensor
-dim : int, default=`x.dim()`
+ndim : int, default=`x.ndim`
     Number of spatial dimensions
 vx : [sequence of] float, default=1
     Voxel size
@@ -55,14 +60,14 @@ References
 ```
 
 ```python
-l1_distance_transform(x, dim=None, vx=1, dtype=None)
+def l1_distance_transform(x, ndim=None, vx=1, dtype=None): ...
 """Compute the L1 distance transform of a binary image
 
 Parameters
 ----------
 x : (..., *spatial) tensor
     Input tensor
-dim : int, default=`x.dim()`
+dim : int, default=`x.ndim`
     Number of spatial dimensions
 vx : [sequence of] float, default=1
     Voxel size
@@ -85,9 +90,80 @@ References
     """
 ```
 
+
+### Interpolation/Resampling
+
 ```python
-resize(x, factor=None, shape=None, ndim=None,
-       anchor='e', order=2, bound='dct2', prefilter=True)
+def spline_coeff(inp, order, bound='dct2', dim=-1): ...
+"""Compute the interpolating spline coefficients, along a single dimension.
+
+Parameters
+----------
+inp : tensor
+    Input tensor
+order : {0..7}, default=2
+    Interpolation order.
+bound : {'zero', 'replicate', 'dct1', 'dct2', 'dft'}, default='dct2'
+    Boundary conditions.
+dim : int, default=-1
+    Dimension along which to filter
+    
+Returns
+-------
+coeff : tensor
+    Spline coefficients
+
+References
+----------
+..[1]  M. Unser, A. Aldroubi and M. Eden.
+       "B-Spline Signal Processing: Part I-Theory,"
+       IEEE Transactions on Signal Processing 41(2):821-832 (1993).
+..[2]  M. Unser, A. Aldroubi and M. Eden.
+       "B-Spline Signal Processing: Part II-Efficient Design and Applications,"
+       IEEE Transactions on Signal Processing 41(2):834-848 (1993).
+..[3]  M. Unser.
+       "Splines: A Perfect Fit for Signal and Image Processing,"
+       IEEE Signal Processing Magazine 16(6):22-38 (1999).
+"""
+```
+
+```python
+def spline_coeff_nd(inp, order, bound='dct2', ndim=None): ...
+"""Compute the interpolating spline coefficients, along the last N dimensions.
+
+Parameters
+----------
+inp : (..., *spatial) tensor
+    Input tensor
+order : [sequence of] {0..7}, default=2
+    Interpolation order.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dft'}, default='dct2'
+    Boundary conditions.
+ndim : int, default=`inp.dim()`
+    Number of spatial dimensions
+    
+Returns
+-------
+coeff : (..., *spatial) tensor
+    Spline coefficients
+
+References
+----------
+..[1]  M. Unser, A. Aldroubi and M. Eden.
+       "B-Spline Signal Processing: Part I-Theory,"
+       IEEE Transactions on Signal Processing 41(2):821-832 (1993).
+..[2]  M. Unser, A. Aldroubi and M. Eden.
+       "B-Spline Signal Processing: Part II-Efficient Design and Applications,"
+       IEEE Transactions on Signal Processing 41(2):834-848 (1993).
+..[3]  M. Unser.
+       "Splines: A Perfect Fit for Signal and Image Processing,"
+       IEEE Signal Processing Magazine 16(6):22-38 (1999).
+"""
+```
+
+```python
+def resize(x, factor=None, shape=None, ndim=None,
+           anchor='e', order=2, bound='dct2', prefilter=True): ...
 """Resize a tensor using spline interpolation
 
 Parameters
@@ -139,76 +215,8 @@ References
 ```
 
 ```python
-spline_coeff(inp, order, bound='dct2', dim=-1)
-"""Compute the interpolating spline coefficients, along a single dimension.
-
-Parameters
-----------
-inp : tensor
-    Input tensor
-order : {0..7}, default=2
-    Interpolation order.
-bound : {'zero', 'replicate', 'dct1', 'dct2', 'dft'}, default='dct2'
-    Boundary conditions.
-dim : int, default=-1
-    Dimension along which to filter
-    
-Returns
--------
-coeff : tensor
-    Spline coefficients
-
-References
-----------
-..[1]  M. Unser, A. Aldroubi and M. Eden.
-       "B-Spline Signal Processing: Part I-Theory,"
-       IEEE Transactions on Signal Processing 41(2):821-832 (1993).
-..[2]  M. Unser, A. Aldroubi and M. Eden.
-       "B-Spline Signal Processing: Part II-Efficient Design and Applications,"
-       IEEE Transactions on Signal Processing 41(2):834-848 (1993).
-..[3]  M. Unser.
-       "Splines: A Perfect Fit for Signal and Image Processing,"
-       IEEE Signal Processing Magazine 16(6):22-38 (1999).
-"""
-```
-
-```python
-spline_coeff_nd(inp, order, bound='dct2', ndim=None)
-"""Compute the interpolating spline coefficients, along the last N dimensions.
-
-Parameters
-----------
-inp : (..., *spatial) tensor
-    Input tensor
-order : [sequence of] {0..7}, default=2
-    Interpolation order.
-bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dft'}, default='dct2'
-    Boundary conditions.
-ndim : int, default=`inp.dim()`
-    Number of spatial dimensions
-    
-Returns
--------
-coeff : (..., *spatial) tensor
-    Spline coefficients
-
-References
-----------
-..[1]  M. Unser, A. Aldroubi and M. Eden.
-       "B-Spline Signal Processing: Part I-Theory,"
-       IEEE Transactions on Signal Processing 41(2):821-832 (1993).
-..[2]  M. Unser, A. Aldroubi and M. Eden.
-       "B-Spline Signal Processing: Part II-Efficient Design and Applications,"
-       IEEE Transactions on Signal Processing 41(2):834-848 (1993).
-..[3]  M. Unser.
-       "Splines: A Perfect Fit for Signal and Image Processing,"
-       IEEE Signal Processing Magazine 16(6):22-38 (1999).
-"""
-```
-
-```python
-restrict(x, factor=None, shape=None, ndim=None,
-         anchor='e', order=2, bound='dct2', reduce_sum=False)
+def restrict(x, factor=None, shape=None, ndim=None,
+             anchor='e', order=2, bound='dct2', reduce_sum=False): ...
 """Restrict (adjoint of resize) a tensor using spline interpolation
 
 Parameters
@@ -244,7 +252,7 @@ x : (..., *shape) tensor
 ```
 
 ```python
-pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None): ...
 """Sample a tensor using spline interpolation
 
 Parameters
@@ -277,7 +285,7 @@ out : (..., *outshape, channel) tensor
 ```
 
 ```python
-push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None): ...
 """Splat a tensor using spline interpolation
 
 Parameters
@@ -309,7 +317,7 @@ out : (..., *shape, channel) tensor
 ```
 
 ```python
-count(grid, shape=None, order=2, bound='dct2', extrapolate=True, out=None)
+def count(grid, shape=None, order=2, bound='dct2', extrapolate=True, out=None): ...
 """Splat ones using spline interpolation
 
 Parameters
@@ -337,7 +345,7 @@ out : (..., *shape) tensor
 ```
 
 ```python
-grad(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None)
+def grad(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False, out=None): ...
 """Sample the spatial gradients of a tensor using spline interpolation
 
 Parameters
@@ -365,5 +373,515 @@ Returns
 -------
 out : (..., *outshape, channel, ndim) tensor
     Pulled gradients
+"""
+```
+
+### Compact symmetric (or postive-definite) matrices
+
+Currently only implemented on the CPU.
+
+```python
+def sym_matvec(mat, vec, dtype=None, out=None): ...
+"""Matrix-vector product for compact symmetric matrices
+
+    `out = mat @ vec`
+
+Parameters
+----------
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+vec : (..., C) tensor
+    Vector
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+out : (..., C) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (..., C) tensor
+    Matrix-vector product
+"""
+```
+
+```python
+def sym_addmatvec(inp, mat, vec, dtype=None, out=None): ...
+"""Add a matrix-vector product for compact symmetric matrices
+
+    `out = inp + mat @ vec`
+
+Parameters
+----------
+inp : (..., C) tensor
+    Vector to which the matrix-vector product is added
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+vec : (..., C) tensor
+    Vector used in the matrix-vector product
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+out : (..., C) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (..., C) tensor
+    Added matrix-vector product
+"""
+```
+
+```python
+def sym_addmatvec_(inp, mat, vec, dtype=None): ...
+"""Inplace add a matrix-vector product for compact symmetric matrices
+
+    `inp += mat @ vec`
+
+Parameters
+----------
+inp : (..., C) tensor
+    Vector to which the matrix-vector product is added
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+vec : (..., C) tensor
+    Vector used in the matrix-vector product
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+
+Returns
+-------
+inp : (..., C) tensor
+    Added matrix-vector product
+"""
+```
+
+```python
+def sym_submatvec(inp, mat, vec, dtype=None, out=None): ...
+"""Subtract a matrix-vector product for compact symmetric matrices
+
+    `out = inp - mat @ vec`
+
+Parameters
+----------
+inp : (..., C) tensor
+    Vector to which the matrix-vector product is added
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+vec : (..., C) tensor
+    Vector used in the matrix-vector product
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+out : (..., C) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (..., C) tensor
+    Subtracted matrix-vector product
+"""
+```
+
+```python
+def sym_submatvec_(inp, mat, vec, dtype=None): ...
+"""Inplace subtract a matrix-vector product for compact symmetric matrices
+
+    `inp -= mat @ vec`
+
+Parameters
+----------
+inp : (..., C) tensor
+    Vector to which the matrix-vector product is added
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+vec : (..., C) tensor
+    Vector used in the matrix-vector product
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+
+Returns
+-------
+inp : (..., C) tensor
+    Subtracted matrix-vector product
+"""
+```
+
+```python
+def sym_solve(mat, vec, dtype=None, out=None): ...
+"""Solve the symmetric linear system
+
+    `out = mat.inverse() @ vec`
+
+!! Does not backpropagate through `mat` !!
+
+Parameters
+----------
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+vec : (..., C) tensor
+    Vector
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+out : (..., C) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (..., C) tensor
+    Solution of the linear system
+"""
+```
+
+```python
+def sym_solve_(mat, vec, dtype=None): ...
+"""Solve the symmetric linear system in-place
+
+    `vec = mat.inverse() @ vec`
+
+!! Does not backpropagate through `mat` !!
+
+Parameters
+----------
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+vec : (..., C) tensor
+    Vector
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+
+Returns
+-------
+vec : (..., C) tensor
+    Solution of the linear system
+"""
+```
+
+```python
+def sym_invert(mat, dtype=None, out=None): ...
+"""Invert a compact symmetric matrix
+
+    `out = mat.inverse()`
+
+!! Does not backpropagate through `mat` !!
+
+Parameters
+----------
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+out : (..., C*(C+1)//2) tensor, optional
+    Output placeholder
+
+Returns
+-------
+mat : (..., C*(C+1)//2) tensor
+    Inverse matrix
+
+"""
+```
+
+```python
+def sym_invert_(mat, dtype=None): ...
+"""Invert a compact symmetric matrix in-place
+
+    `mat = mat.inverse()`
+
+!! Does not backpropagate through `mat` !!
+
+Parameters
+----------
+mat : (..., C*(C+1)//2) tensor
+    Symmetric matrix with compact storage.
+    The matrix should be saved as a vector containing the diagonal
+    followed by the rows of the upper triangle.
+dtype : torch.dtype, optional
+    Data type used to carry the computation. By default, same as input.
+
+Returns
+-------
+mat : (..., C*(C+1)//2) tensor
+    Inverse matrix
+
+"""
+```
+
+### Regularisers for dense flow fields
+
+```python
+def flow_matvec(
+    vel: Tensor, weight: Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""Apply a spatial regularization matrix.
+
+Parameters
+----------
+vel : (*batch, *spatial, ndim) tensor
+    Input displacement field, in voxels.
+weight : (*batch, *spatial) tensor, optional
+    Weight map, to spatially modulate the regularization.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, ndim) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (*batch, *spatial, ndim) tensor
+"""
+
+# We also implement variants that adds to or subtracts from an input tensor
+def flow_matvec_add(inp: Tensor, ...): ...
+def flow_matvec_add_(inp: Tensor, ...): ...
+def flow_matvec_sub(inp: Tensor, ...): ...
+def flow_matvec_sub_(inp: Tensor, ...): ...
+```
+
+```python
+def flow_kernel(
+    shape: list[int],
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""
+Return the kernel of a Toeplitz regularization matrix.
+
+Parameters
+----------
+shape : int or list[int]
+    Number of spatial dimensions or shape of the tensor
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears. Linear elastic energy's `mu`.
+div : float
+    Penalty on local volume changes. Linear elastic energy's `lambda`.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*shape, ndim, [ndim]) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (*shape, ndim, [ndim]) tensor
+    Convolution kernel.
+    A matrix or kernels ([ndim, ndim]) if `shears` or `div`,
+    else a vector of kernels ([ndim]) .
+"""
+
+# We also implement variants that adds to or subtracts from an input tensor
+def flow_kernel_add(inp: Tensor, ...): ...
+def flow_kernel_add_(inp: Tensor, ...): ...
+def flow_kernel_sub(inp: Tensor, ...): ...
+def flow_kernel_sub_(inp: Tensor, ...): ...
+```
+
+```python
+def flow_diag(
+    shape: list[int], weight: Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""Return the diagonal of a regularization matrix.
+
+Parameters
+----------
+shape : list[int]
+    Shape of the tensor
+weight : (*batch, *spatial) tensor, optional
+    Weight map, to spatially modulate the regularization.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, ndim) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (*batch, *spatial, ndim) tensor
+"""
+
+# We also implement variants that adds to or subtracts from an input tensor
+def flow_diag_add(inp: Tensor, ...): ...
+def flow_diag_add_(inp: Tensor, ...): ...
+def flow_diag_sub(inp: Tensor, ...): ...
+def flow_diag_sub_(inp: Tensor, ...): ...
+```
+
+```python
+def flow_relax_(
+    vel: Tensor, hes: Tensor, grd: Tensor, weight: Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1, nb_iter: int = 1,
+    ) -> Tensor: ...
+"""Perform relaxation iterations.
+
+Parameters
+----------
+vel : (*batch, *spatial, ndim) tensor
+    Warm start.
+hes : (*batch, *spatial, ndim*(ndim+1)//2) tensor
+    Input symmetric Hessian, in voxels.
+grd : (*batch, *spatial, ndim) tensor
+    Input gradient, in voxels.
+weight : (*batch, *spatial) tensor, optional
+    Weight map, to spatially modulate the regularization.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+nb_iter : int
+    Number of iterations
+
+Returns
+-------
+vel : (*batch, *spatial, ndim) tensor
+"""
+```
+
+```python
+
+def flow_precond(
+    mat: Tensor, vec: Tensor, weight : Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""
+Apply the preconditioning `(M + diag(R)) \ v`
+
+Parameters
+----------
+mat : (*batch, *spatial, DD) tensor
+    DD == 1 | D | D*(D+1)//2 | D*D
+    Preconditioning matrix `M`
+vec : (*batch, *spatial, D) tensor
+    Point `v` at which to solve the system.
+weight : (*batch, *spatial) tensor, optional
+    Regularization weight map.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, D) tensor
+    Output placeholder.
+
+Returns
+-------
+out : (*batch, *spatial, D) tensor
+    Preconditioned vector.
+
+"""
+```
+
+```python
+def flow_forward(
+    mat: Tensor, vec: Tensor, weight : Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""
+Apply the forward matrix-vector product `(M + R) @ v`
+
+Parameters
+----------
+mat : (*batch, *spatial, DD) tensor
+    DD == 1 | D | D*(D+1)//2 | D*D
+vec : (*batch, *spatial, D) tensor
+    Point `v` at which to solve the system.
+weight : (*batch, *spatial) tensor, optional
+    Regularization weight map.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, D) tensor
+    Output placeholder.
+
+Returns
+-------
+out : (*batch, *spatial, D) tensor
+    Preconditioned vector.
+
 """
 ```

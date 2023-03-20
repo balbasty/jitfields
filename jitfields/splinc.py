@@ -1,9 +1,14 @@
+__all__ = [
+    'spline_coeff', 'spline_coeff_',
+    'spline_coeff_nd', 'spline_coeff_nd_'
+]
+
 import torch.autograd
-from .common.bounds import convert_bound
-from .common.spline import convert_order
+from .bindings.common.bounds import convert_bound, cnames as boundnames
+from .bindings.common.spline import convert_order
 from .utils import try_import, ensure_list
-cuda_splinc = try_import('jitfields.cuda', 'splinc')
-cpu_splinc = try_import('jitfields.cpp', 'splinc')
+cuda_splinc = try_import('jitfields.bindings.cuda', 'splinc')
+cpu_splinc = try_import('jitfields.bindings.cpp', 'splinc')
 
 
 def spline_coeff_(inp, order, bound='dct2', dim=-1):
@@ -27,6 +32,7 @@ def spline_coeff_(inp, order, bound='dct2', dim=-1):
     """
     order = convert_order.get(order, order)
     bound = convert_bound.get(bound, bound)
+    checkbound(order, bound)
     return SplineCoeff_.apply(inp, order, bound, dim)
 
 
@@ -73,6 +79,7 @@ def spline_coeff_nd_(inp, order, bound='dct2', ndim=None):
     """
     order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
     bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
+    checkbound(order, bound)
     return SplineCoeffND_.apply(inp, order, bound, ndim)
 
 
@@ -96,6 +103,17 @@ def spline_coeff_nd(inp, order, bound='dct2', ndim=None):
         Spline coefficients
     """
     return spline_coeff_nd_(inp.clone(), order, bound, ndim)
+
+
+bounds_ok = ('dct1', 'dct2', 'dft', 'replicate')
+bounds_ok_int = list(map(lambda x: convert_bound[x], bounds_ok))
+
+
+def checkbound(order, bound):
+    if any(o != 1 and b not in bounds_ok_int for o, b in zip(order, bound)):
+        bound = tuple(boundnames[b].lower() for b in bound)
+        raise ValueError(f'`spline_coeff` only implemented for bounds '
+                         f'{bounds_ok} but got: {bound}')
 
 
 class SplineCoeff_(torch.autograd.Function):
