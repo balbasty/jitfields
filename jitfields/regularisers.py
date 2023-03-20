@@ -1,20 +1,20 @@
 __all__ = [
-    'grid_vel2mom',
-    'grid_vel2mom_add', 'grid_vel2mom_add_',
-    'grid_vel2mom_sub', 'grid_vel2mom_sub_',
-    'grid_kernel',
-    'grid_kernel_add', 'grid_kernel_add_',
-    'grid_kernel_sub', 'grid_kernel_sub_',
-    'grid_diag',
-    'grid_diag_add', 'grid_diag_add_',
-    'grid_diag_sub', 'grid_diag_sub_',
-    'grid_precond', 'grid_precond_',
-    'grid_forward',
-    'grid_relax_',
+    'flow_matvec',
+    'flow_matvec_add', 'flow_matvec_add_',
+    'flow_matvec_sub', 'flow_matvec_sub_',
+    'flow_kernel',
+    'flow_kernel_add', 'flow_kernel_add_',
+    'flow_kernel_sub', 'flow_kernel_sub_',
+    'flow_diag',
+    'flow_diag_add', 'flow_diag_add_',
+    'flow_diag_sub', 'flow_diag_sub_',
+    'flow_precond', 'flow_precond_',
+    'flow_forward',
+    'flow_relax_',
 
-    'field_vel2mom',
-    'field_vel2mom_add', 'field_vel2mom_add_',
-    'field_vel2mom_sub', 'field_vel2mom_sub_',
+    'field_matvec',
+    'field_matvec_add', 'field_matvec_add_',
+    'field_matvec_sub', 'field_matvec_sub_',
     'field_kernel',
     'field_kernel_add', 'field_kernel_add_',
     'field_kernel_sub', 'field_kernel_sub_',
@@ -32,9 +32,9 @@ cuda_impl = try_import('jitfields.bindings.cuda', 'regularisers')
 cpu_impl = try_import('jitfields.bindings.cpp', 'regularisers')
 
 
-def grid_vel2mom(vel, weight=None,
-                 absolute=0, membrane=0, bending=0, shears=0, div=0,
-                 bound='dft', voxel_size=1, out=None):
+def flow_matvec(vel, weight=None,
+                absolute=0, membrane=0, bending=0, shears=0, div=0,
+                bound='dft', voxel_size=1, out=None):
     """Apply a spatial regularization matrix.
 
     Parameters
@@ -70,10 +70,10 @@ def grid_vel2mom(vel, weight=None,
     if weight is not None:
         vel, weight = broadcast(vel, weight[..., None], skip_last=1)
         weight = weight[..., 0]
-        fn = impl.grid_vel2mom_rls
+        fn = impl.flow_matvec_rls
         weight = [weight]
     else:
-        fn = impl.grid_vel2mom
+        fn = impl.flow_matvec
         weight = []
 
     # allocate output
@@ -90,10 +90,10 @@ def grid_vel2mom(vel, weight=None,
     return out
 
 
-def grid_vel2mom_add(inp, vel, weight=None,
-                     absolute=0, membrane=0, bending=0, shears=0, div=0,
-                     bound='dft', voxel_size=1, out=None, _sub=False):
-    """See `grid_vel2mom`"""
+def flow_matvec_add(inp, vel, weight=None,
+                    absolute=0, membrane=0, bending=0, shears=0, div=0,
+                    bound='dft', voxel_size=1, out=None, _sub=False):
+    """See `flow_matvec`"""
     impl = cuda_impl if vel.is_cuda else cpu_impl
 
     # broadcast
@@ -102,10 +102,10 @@ def grid_vel2mom_add(inp, vel, weight=None,
         vel, weight = broadcast(vel, weight[..., None], skip_last=1)
         inp, vel = broadcast(inp, vel)
         weight = weight[..., 0]
-        fn = impl.grid_vel2mom_rls
+        fn = impl.flow_matvec_rls
         weight = [weight]
     else:
-        fn = impl.grid_vel2mom
+        fn = impl.flow_matvec
         weight = []
 
     # allocate output
@@ -125,10 +125,10 @@ def grid_vel2mom_add(inp, vel, weight=None,
     return out
 
 
-def grid_vel2mom_add_(inp, vel, weight=None,
-                      absolute=0, membrane=0, bending=0, shears=0, div=0,
-                      bound='dft', voxel_size=1, _sub=False):
-    """See `grid_vel2mom`"""
+def flow_matvec_add_(inp, vel, weight=None,
+                     absolute=0, membrane=0, bending=0, shears=0, div=0,
+                     bound='dft', voxel_size=1, _sub=False):
+    """See `flow_matvec`"""
     impl = cuda_impl if vel.is_cuda else cpu_impl
 
     # broadcast
@@ -137,10 +137,10 @@ def grid_vel2mom_add_(inp, vel, weight=None,
         vel, weight = broadcast(vel, weight[..., None], skip_last=1)
         inp, vel = broadcast(inp, vel)
         weight = weight[..., 0]
-        fn = impl.grid_vel2mom_rls
+        fn = impl.flow_matvec_rls
         weight = [weight]
     else:
-        fn = impl.grid_vel2mom
+        fn = impl.flow_matvec
         weight = []
 
     bound = ensure_list(bound, vel.shape[-1])
@@ -154,25 +154,25 @@ def grid_vel2mom_add_(inp, vel, weight=None,
     return inp
 
 
-def grid_vel2mom_sub(inp, vel, weight=None,
+def flow_matvec_sub(inp, vel, weight=None,
                      absolute=0, membrane=0, bending=0, shears=0, div=0,
                      bound='dft', voxel_size=1, out=None):
-    """See `grid_vel2mom`"""
-    return grid_vel2mom_add(inp, vel, weight,
+    """See `flow_matvec`"""
+    return flow_matvec_add(inp, vel, weight,
                             absolute, membrane, bending, shears, div,
                             bound, voxel_size, out, True)
 
 
-def grid_vel2mom_sub_(inp, vel, weight=None,
+def flow_matvec_sub_(inp, vel, weight=None,
                       absolute=0, membrane=0, bending=0, shears=0, div=0,
                       bound='dft', voxel_size=1):
-    """See `grid_vel2mom`"""
-    return grid_vel2mom_add_(inp, vel, weight,
+    """See `flow_matvec`"""
+    return flow_matvec_add_(inp, vel, weight,
                              absolute, membrane, bending, shears, div,
                              bound, voxel_size, True)
 
 
-def grid_kernel(shape,
+def flow_kernel(shape,
                 absolute=0, membrane=0, bending=0, shears=0, div=0,
                 bound='dft', voxel_size=1, out=None, **backend):
     """Return the kernel of a Toeplitz regularization matrix.
@@ -224,16 +224,16 @@ def grid_kernel(shape,
 
     # forward
     impl = cuda_impl if out.is_cuda else cpu_impl
-    impl.grid_kernel(out, bound, voxel_size,
+    impl.flow_kernel(out, bound, voxel_size,
                      absolute, membrane, bending, shears, div)
 
     return out
 
 
-def grid_kernel_add(inp,
+def flow_kernel_add(inp,
                     absolute=0, membrane=0, bending=0, shears=0, div=0,
                     bound='dft', voxel_size=1, out=None, _sub=False):
-    """See `grid_kernel`"""
+    """See `flow_kernel`"""
     # allocate output
     if out is None:
         out = inp.clone()
@@ -245,45 +245,45 @@ def grid_kernel_add(inp,
 
     # forward
     impl = cuda_impl if out.is_cuda else cpu_impl
-    impl.grid_kernel(out, bound, voxel_size,
+    impl.flow_kernel(out, bound, voxel_size,
                      absolute, membrane, bending, shears, div,
                      'sub' if _sub else 'add')
 
     return out
 
 
-def grid_kernel_add_(inp,
+def flow_kernel_add_(inp,
                      absolute=0, membrane=0, bending=0, shears=0, div=0,
                      bound='dft', voxel_size=1, _sub=False):
-    """See `grid_kernel`"""
+    """See `flow_kernel`"""
     bound = ensure_list(bound, inp.shape[-1])
     voxel_size = ensure_list(voxel_size, inp.shape[-1])
 
     # forward
     impl = cuda_impl if inp.is_cuda else cpu_impl
-    impl.grid_kernel(inp, bound, voxel_size,
+    impl.flow_kernel(inp, bound, voxel_size,
                      absolute, membrane, bending, shears, div,
                      'sub' if _sub else 'add')
     return inp
 
 
-def grid_kernel_sub(inp,
+def flow_kernel_sub(inp,
                     absolute=0, membrane=0, bending=0, shears=0, div=0,
                     bound='dft', voxel_size=1, out=None):
-    """See `grid_kernel`"""
-    return grid_kernel_add(inp, absolute, membrane, bending, shears, div,
+    """See `flow_kernel`"""
+    return flow_kernel_add(inp, absolute, membrane, bending, shears, div,
                            bound, voxel_size, out)
 
 
-def grid_kernel_sub_(inp,
+def flow_kernel_sub_(inp,
                      absolute=0, membrane=0, bending=0, shears=0, div=0,
                      bound='dft', voxel_size=1):
-    """See `grid_kernel`"""
-    return grid_kernel_add_(inp, absolute, membrane, bending, shears, div,
+    """See `flow_kernel`"""
+    return flow_kernel_add_(inp, absolute, membrane, bending, shears, div,
                             bound, voxel_size)
 
 
-def grid_diag(shape, weight=None,
+def flow_diag(shape, weight=None,
               absolute=0, membrane=0, bending=0, shears=0, div=0,
               bound='dft', voxel_size=1, out=None, **backend):
     """Return the diagonal of a regularization matrix.
@@ -331,7 +331,7 @@ def grid_diag(shape, weight=None,
 
     # forward
     impl = cuda_impl if out.is_cuda else cpu_impl
-    fn = impl.grid_diag_rls if weight else impl.grid_diag
+    fn = impl.flow_diag_rls if weight else impl.flow_diag
 
     bound = ensure_list(bound, out.shape[-1])
     voxel_size = ensure_list(voxel_size, out.shape[-1])
@@ -342,19 +342,19 @@ def grid_diag(shape, weight=None,
     return out
 
 
-def grid_diag_add(inp, weight=None,
+def flow_diag_add(inp, weight=None,
                   absolute=0, membrane=0, bending=0, shears=0, div=0,
                   bound='dft', voxel_size=1, out=None, _sub=False):
-    """See `grid_diag`"""
+    """See `flow_diag`"""
     impl = cuda_impl if inp.is_cuda else cpu_impl
 
     if weight is not None:
-        fn = impl.grid_diag_rls
+        fn = impl.flow_diag_rls
         inp, weight = broadcast(inp, weight[..., None], skip_last=1)
         weight = weight[..., 0]
         weight = [weight]
     else:
-        fn = impl.grid_diag
+        fn = impl.flow_diag
         weight = []
 
     # allocate output
@@ -374,19 +374,19 @@ def grid_diag_add(inp, weight=None,
     return out
 
 
-def grid_diag_add_(inp, weight=None,
+def flow_diag_add_(inp, weight=None,
                    absolute=0, membrane=0, bending=0, shears=0, div=0,
                    bound='dft', voxel_size=1, _sub=False):
-    """See `grid_diag`"""
+    """See `flow_diag`"""
     impl = cuda_impl if inp.is_cuda else cpu_impl
 
     if weight is not None:
-        fn = impl.grid_diag_rls
+        fn = impl.flow_diag_rls
         inp, weight = broadcast(inp, weight[..., None], skip_last=1)
         weight = weight[..., 0]
         weight = [weight]
     else:
-        fn = impl.grid_diag
+        fn = impl.flow_diag
         weight = []
 
     bound = ensure_list(bound, inp.shape[-1])
@@ -400,37 +400,37 @@ def grid_diag_add_(inp, weight=None,
     return inp
 
 
-def grid_diag_sub(inp, weight=None,
+def flow_diag_sub(inp, weight=None,
                   absolute=0, membrane=0, bending=0, shears=0, div=0,
                   bound='dft', voxel_size=1, out=None):
-    """See `grid_diag`"""
-    return grid_diag_add(inp, weight,
+    """See `flow_diag`"""
+    return flow_diag_add(inp, weight,
                          absolute, membrane, bending, shears, div,
                          bound, voxel_size, out, True)
 
 
-def grid_diag_sub_(inp, weight=None,
+def flow_diag_sub_(inp, weight=None,
                    absolute=0, membrane=0, bending=0, shears=0, div=0,
                    bound='dft', voxel_size=1, _sub=False):
-    """See `grid_diag`"""
-    return grid_diag_add_(inp, weight,
+    """See `flow_diag`"""
+    return flow_diag_add_(inp, weight,
                           absolute, membrane, bending, shears, div,
                           bound, voxel_size, True)
 
 
-def grid_relax_(vel, hes, grd, weight=None,
+def flow_relax_(vel, hes, grd, weight=None,
                 absolute=0, membrane=0, bending=0, shears=0, div=0,
                 bound='dft', voxel_size=1, nb_iter=1):
-    """Apply a spatial regularization matrix.
+    """Perform relaxation iterations.
 
     Parameters
     ----------
     vel : (*batch, *spatial, ndim) tensor
-        Input displacement field, in voxels.
+        Warm start.
     hes : (*batch, *spatial, ndim*(ndim+1)//2) tensor
-        Input displacement field, in voxels.
+        Input symmetric Hessian, in voxels.
     grd : (*batch, *spatial, ndim) tensor
-        Input displacement field, in voxels.
+        Input gradient, in voxels.
     weight : (*batch, *spatial) tensor, optional
         Weight map, to spatially modulate the regularization.
     absolute : float
@@ -463,10 +463,10 @@ def grid_relax_(vel, hes, grd, weight=None,
     if weight is not None:
         vel, weight = broadcast(vel, weight[..., None], skip_last=1)
         weight = weight[..., 0]
-        fn = impl.grid_relax_rls_
+        fn = impl.flow_relax_rls_
         weight = [weight]
     else:
-        fn = impl.grid_relax_
+        fn = impl.flow_relax_
         weight = []
 
     bound = ensure_list(bound, vel.shape[-1])
@@ -479,7 +479,7 @@ def grid_relax_(vel, hes, grd, weight=None,
     return vel
 
 
-def grid_precond(mat, vec, weight=None,
+def flow_precond(mat, vec, weight=None,
                  absolute=0, membrane=0, bending=0, shears=0, div=0,
                  bound='dft', voxel_size=1, out=None):
     """Apply the preconditioning `(M + diag(R)) \ v`
@@ -518,25 +518,25 @@ def grid_precond(mat, vec, weight=None,
     """
     ndim = vec.shape[-1]
     shape = vec.shape[-ndim-1:-1]
-    diag = grid_diag(shape, weight,
+    diag = flow_diag(shape, weight,
                      absolute, membrane, bending, shears, div,
                      bound, voxel_size)
     return sym_solve(mat, vec, diag, out=out)
 
 
-def grid_precond_(mat, vec, weight=None,
+def flow_precond_(mat, vec, weight=None,
                   absolute=0, membrane=0, bending=0, shears=0, div=0,
                   bound='dft', voxel_size=1):
-    """See `grid_precond`"""
+    """See `flow_precond`"""
     ndim = vec.shape[-1]
     shape = vec.shape[-ndim-1:-1]
-    diag = grid_diag(shape, weight,
+    diag = flow_diag(shape, weight,
                      absolute, membrane, bending, shears, div,
                      bound, voxel_size)
     return sym_solve_(mat, vec, diag)
 
 
-def grid_forward(mat, vec, weight=None,
+def flow_forward(mat, vec, weight=None,
                  absolute=0, membrane=0, bending=0, shears=0, div=0,
                  bound='dft', voxel_size=1, out=None):
     """Apply the forward matrix-vector product `(M + R) @ v`
@@ -573,13 +573,13 @@ def grid_forward(mat, vec, weight=None,
 
     """
     out = sym_matvec(mat, vec, out=out)
-    out = grid_vel2mom_add_(out, vec, weight,
+    out = flow_matvec_add_(out, vec, weight,
                             absolute, membrane, bending, shears, div,
                             bound, voxel_size)
     return out
 
 
-def field_vel2mom(ndim, vec, weight=None,
+def field_matvec(ndim, vec, weight=None,
                   absolute=0, membrane=0, bending=0,
                   bound='dft', voxel_size=1, out=None):
     """Apply a spatial regularization matrix.
@@ -615,10 +615,10 @@ def field_vel2mom(ndim, vec, weight=None,
     if weight is not None:
         vec, weight = broadcast(vec, weight[..., None], skip_last=1)
         weight = weight[..., 0]
-        fn = impl.field_vel2mom_rls
+        fn = impl.field_matvec_rls
         weight = [weight]
     else:
-        fn = impl.field_vel2mom
+        fn = impl.field_matvec
         weight = []
 
     # allocate output
@@ -639,10 +639,10 @@ def field_vel2mom(ndim, vec, weight=None,
     return out
 
 
-def field_vel2mom_add(ndim, inp, vec, weight=None,
+def field_matvec_add(ndim, inp, vec, weight=None,
                       absolute=0, membrane=0, bending=0,
                       bound='dft', voxel_size=1, out=None, _sub=False):
-    """See `field_vel2mom`"""
+    """See `field_matvec`"""
     impl = cuda_impl if vec.is_cuda else cpu_impl
 
     # broadcast
@@ -651,10 +651,10 @@ def field_vel2mom_add(ndim, inp, vec, weight=None,
         vec, weight = broadcast(vec, weight[..., None], skip_last=1)
         inp, vec = broadcast(inp, vec)
         weight = weight[..., 0]
-        fn = impl.field_vel2mom_rls
+        fn = impl.field_matvec_rls
         weight = [weight]
     else:
-        fn = impl.field_vel2mom
+        fn = impl.field_matvec
         weight = []
 
     # allocate output
@@ -678,10 +678,10 @@ def field_vel2mom_add(ndim, inp, vec, weight=None,
     return out
 
 
-def field_vel2mom_add_(ndim, inp, vec, weight=None,
+def field_matvec_add_(ndim, inp, vec, weight=None,
                        absolute=0, membrane=0, bending=0,
                        bound='dft', voxel_size=1, _sub=False):
-    """See `field_vel2mom`"""
+    """See `field_matvec`"""
     impl = cuda_impl if vec.is_cuda else cpu_impl
 
     # broadcast
@@ -690,10 +690,10 @@ def field_vel2mom_add_(ndim, inp, vec, weight=None,
         vec, weight = broadcast(vec, weight[..., None], skip_last=1)
         inp, vec = broadcast(inp, vec)
         weight = weight[..., 0]
-        fn = impl.field_vel2mom_rls
+        fn = impl.field_matvec_rls
         weight = [weight]
     else:
-        fn = impl.field_vel2mom
+        fn = impl.field_matvec
         weight = []
 
     nc = vec.shape[-1]
@@ -711,20 +711,20 @@ def field_vel2mom_add_(ndim, inp, vec, weight=None,
     return inp
 
 
-def field_vel2mom_sub(ndim, inp, vel, weight=None,
+def field_matvec_sub(ndim, inp, vel, weight=None,
                       absolute=0, membrane=0, bending=0,
                       bound='dft', voxel_size=1, out=None):
-    """See `field_vel2mom`"""
-    return field_vel2mom_add(ndim, inp, vel, weight,
+    """See `field_matvec`"""
+    return field_matvec_add(ndim, inp, vel, weight,
                              absolute, membrane, bending,
                              bound, voxel_size, out, True)
 
 
-def field_vel2mom_sub_(ndim, inp, vel, weight=None,
+def field_matvec_sub_(ndim, inp, vel, weight=None,
                        absolute=0, membrane=0, bending=0,
                        bound='dft', voxel_size=1):
-    """See `field_vel2mom`"""
-    return field_vel2mom_add_(ndim, inp, vel, weight,
+    """See `field_matvec`"""
+    return field_matvec_add_(ndim, inp, vel, weight,
                               absolute, membrane, bending,
                               bound, voxel_size, True)
 
@@ -793,7 +793,7 @@ def field_kernel(shape,
 def field_kernel_add(ndim, inp,
                      absolute=0, membrane=0, bending=0,
                      bound='dft', voxel_size=1, out=None, _sub=False):
-    """See `grid_kernel`"""
+    """See `flow_kernel`"""
     # allocate output
     if out is None:
         out = inp.clone()
@@ -809,7 +809,7 @@ def field_kernel_add(ndim, inp,
 
     # forward
     impl = cuda_impl if out.is_cuda else cpu_impl
-    impl.grid_kernel(out, bound, voxel_size,
+    impl.flow_kernel(out, bound, voxel_size,
                      absolute, membrane, bending,
                      'sub' if _sub else 'add')
 
@@ -819,7 +819,7 @@ def field_kernel_add(ndim, inp,
 def field_kernel_add_(ndim, inp,
                       absolute=0, membrane=0, bending=0,
                       bound='dft', voxel_size=1, _sub=False):
-    """See `grid_kernel`"""
+    """See `flow_kernel`"""
     nc = inp.shape[-1]
     bound = ensure_list(bound, ndim)
     voxel_size = ensure_list(voxel_size, ndim)
@@ -829,7 +829,7 @@ def field_kernel_add_(ndim, inp,
 
     # forward
     impl = cuda_impl if inp.is_cuda else cpu_impl
-    impl.grid_kernel(inp, bound, voxel_size,
+    impl.flow_kernel(inp, bound, voxel_size,
                      absolute, membrane, bending,
                      'sub' if _sub else 'add')
     return inp
@@ -917,7 +917,7 @@ def field_diag(shape, weight=None,
 def field_diag_add(ndim, inp, weight=None,
                    absolute=0, membrane=0, bending=0,
                    bound='dft', voxel_size=1, out=None, _sub=False):
-    """See `grid_diag`"""
+    """See `flow_diag`"""
     impl = cuda_impl if inp.is_cuda else cpu_impl
 
     if weight is not None:
@@ -953,7 +953,7 @@ def field_diag_add(ndim, inp, weight=None,
 def field_diag_add_(ndim, inp, weight=None,
                     absolute=0, membrane=0, bending=0,
                     bound='dft', voxel_size=1, _sub=False):
-    """See `grid_diag`"""
+    """See `flow_diag`"""
     impl = cuda_impl if inp.is_cuda else cpu_impl
 
     if weight is not None:
@@ -1093,7 +1093,7 @@ def field_forward(ndim, mat, vec, weight=None,
 
     """
     out = sym_matvec(mat, vec, out=out)
-    out = field_vel2mom_add_(ndim, out, vec, weight,
+    out = field_matvec_add_(ndim, out, vec, weight,
                              absolute, membrane, bending,
                              bound, voxel_size)
     return out

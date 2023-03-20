@@ -1,11 +1,11 @@
-#ifndef JF_REGULARISERS_GRID_UTILS
-#define JF_REGULARISERS_GRID_UTILS
+#ifndef JF_REGULARISERS_FLOW_UTILS
+#define JF_REGULARISERS_FLOW_UTILS
 #include "../../cuda_switch.h"
 #include "../../bounds.h"
 #include "../../utils.h"
 
 namespace jf {
-namespace reg_grid {
+namespace reg_flow {
 
 const bound::type B0 = bound::type::NoCheck;
 const int zero  = 0;
@@ -14,7 +14,7 @@ const int two   = 2;
 const int three = 3;
 
 template <int, typename, typename, typename, bound::type...>
-struct RegGrid {};
+struct RegFlow {};
 
 //----------------------------------------------------------------------
 //          Helpers to implement generic variants that either
@@ -122,7 +122,7 @@ bool patch3(const offset_t loc[N], offset_t n)
     return acc == n % mul;
 }
 
-} // namespace reg_grid
+} // namespace reg_flow
 } // namespace jf
 
-#endif // JF_REGULARISERS_GRID_UTILS
+#endif // JF_REGULARISERS_FLOW_UTILS

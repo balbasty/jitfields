@@ -38,6 +38,7 @@ def restrict(out, x, factor, anchor, order, bound):
 
     shift, scale = get_shift_scale(anchor, x.shape[-ndim:], out.shape[-ndim:], factor)
 
+    out.zero_()
     cux = to_cupy(x)
     cuy = to_cupy(out)
 

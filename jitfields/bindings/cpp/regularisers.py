@@ -5,11 +5,11 @@ import numpy as np
 from .utils import include
 
 include()
-cppyy.include('reg_grid.hpp')
+cppyy.include('reg_flow.hpp')
 # cppyy.include('reg_field_static_3d.hpp')
 
 
-def grid_vel2mom(out, inp, bound, voxel_size,
+def flow_matvec(out, inp, bound, voxel_size,
                  absolute, membrane, bending, shears, div,
                  op=''):
     """
@@ -33,7 +33,7 @@ def grid_vel2mom(out, inp, bound, voxel_size,
     ndim = out.shape[-1]
     nbatch = out.ndim - ndim - 1
     if ndim > 3:
-        raise ValueError('grid_vel2mom only implemented up to dimension 3')
+        raise ValueError('flow_matvec only implemented up to dimension 3')
 
     np_inp = inp.numpy()
     np_out = out.numpy()
@@ -58,23 +58,23 @@ def grid_vel2mom(out, inp, bound, voxel_size,
 
     if bending:
         if div or shears:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_all')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_all')[template])
             func(np_out, np_inp, shape, outstride, instride,
                  voxel_size, absolute, membrane, bending, shears, div)
         else:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_bending')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_bending')[template])
             func(np_out, np_inp, shape, outstride, instride,
                  voxel_size, absolute, membrane, bending)
     elif div or shears:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_lame')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_lame')[template])
         func(np_out, np_inp, shape, outstride, instride,
              voxel_size, absolute, membrane, shears, div)
     elif membrane:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_membrane')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_membrane')[template])
         func(np_out, np_inp, shape, outstride, instride,
              voxel_size, absolute, membrane)
     elif absolute:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_absolute')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_absolute')[template])
         func(np_out, np_inp, shape, outstride, instride,
              voxel_size, absolute)
     elif op == '=':
@@ -83,7 +83,7 @@ def grid_vel2mom(out, inp, bound, voxel_size,
     return out
 
 
-def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
+def flow_matvec_rls(out, inp, wgt, bound, voxel_size,
                      absolute, membrane, bending, shears, div,
                      op=''):
     """
@@ -108,7 +108,7 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     ndim = out.shape[-1]
     nbatch = out.ndim - ndim - 1
     if ndim > 3:
-        raise ValueError('grid_vel2mom_rls only implemented up to dimension 3')
+        raise ValueError('flow_matvec_rls only implemented up to dimension 3')
 
     np_inp = inp.numpy()
     np_out = out.numpy()
@@ -135,23 +135,23 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
 
     if bending:
         if div or shears:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_all_jrls')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_all_jrls')[template])
             func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
                  voxel_size, absolute, membrane, bending, shears, div)
         else:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_bending_jrls')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_bending_jrls')[template])
             func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
                  voxel_size, absolute, membrane, bending)
     elif div or shears:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_lame_jrls')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_lame_jrls')[template])
         func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
              voxel_size, absolute, membrane, shears, div)
     elif membrane:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_membrane_jrls')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_membrane_jrls')[template])
         func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
              voxel_size, absolute, membrane)
     elif absolute:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'vel2mom_absolute_jrls')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'matvec_absolute_jrls')[template])
         func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
              voxel_size, absolute)
     elif op == '=':
@@ -160,7 +160,7 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     return out
 
 
-def grid_kernel(out, bound, voxel_size,
+def flow_kernel(out, bound, voxel_size,
                 absolute, membrane, bending, shears, div,
                 op=''):
     """
@@ -183,7 +183,7 @@ def grid_kernel(out, bound, voxel_size,
     ndim = out.shape[-1]
     nbatch = out.ndim - ndim - 1 - int(shears or div)
     if ndim > 3:
-        raise ValueError('grid_kernel only implemented up to dimension 3')
+        raise ValueError('flow_kernel only implemented up to dimension 3')
 
     np_out = out.numpy()
 
@@ -208,30 +208,30 @@ def grid_kernel(out, bound, voxel_size,
         out.zero_()
     if bending:
         if div or shears:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'kernel_all')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'kernel_all')[template])
             func(np_out, shape, stride,
                  voxel_size, absolute, membrane, bending, shears, div)
         else:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'kernel_bending')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'kernel_bending')[template])
             func(np_out, shape, stride,
                  voxel_size, absolute, membrane, bending)
     elif div or shears:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'kernel_lame')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'kernel_lame')[template])
         func(np_out, shape, stride,
              voxel_size, absolute, membrane, shears, div)
     elif membrane:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'kernel_membrane')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'kernel_membrane')[template])
         func(np_out, shape, stride,
              voxel_size, absolute, membrane)
     elif absolute:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'kernel_absolute')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'kernel_absolute')[template])
         func(np_out, shape, stride,
              voxel_size, absolute)
 
     return out
 
 
-def grid_diag(out, bound, voxel_size,
+def flow_diag(out, bound, voxel_size,
               absolute, membrane, bending, shears, div,
               op=''):
     """
@@ -254,7 +254,7 @@ def grid_diag(out, bound, voxel_size,
     ndim = out.shape[-1]
     nbatch = out.ndim - ndim - 1
     if ndim > 3:
-        raise ValueError('grid_diag only implemented up to dimension 3')
+        raise ValueError('flow_diag only implemented up to dimension 3')
 
     np_out = out.numpy()
 
@@ -279,30 +279,30 @@ def grid_diag(out, bound, voxel_size,
         out.zero_()
     if bending:
         if div or shears:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_all')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_all')[template])
             func(np_out, shape, stride,
                  voxel_size, absolute, membrane, bending, shears, div)
         else:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_bending')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_bending')[template])
             func(np_out, shape, stride,
                  voxel_size, absolute, membrane, bending)
     elif div or shears:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_lame')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_lame')[template])
         func(np_out, shape, stride,
              voxel_size, absolute, membrane, shears, div)
     elif membrane:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_membrane')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_membrane')[template])
         func(np_out, shape, stride,
              voxel_size, absolute, membrane)
     elif absolute:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_absolute')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_absolute')[template])
         func(np_out, shape, stride,
              voxel_size, absolute)
 
     return out
 
 
-def grid_diag_rls(out, wgt, bound, voxel_size,
+def flow_diag_rls(out, wgt, bound, voxel_size,
                   absolute, membrane, bending, shears, div,
                   op=''):
     """
@@ -326,7 +326,7 @@ def grid_diag_rls(out, wgt, bound, voxel_size,
     ndim = out.shape[-1]
     nbatch = out.ndim - ndim - 1
     if ndim > 3:
-        raise ValueError('vel2mom only implemented up to dimension 3')
+        raise ValueError('matvec only implemented up to dimension 3')
 
     np_out = out.numpy()
     np_wgt = wgt.numpy()
@@ -353,30 +353,30 @@ def grid_diag_rls(out, wgt, bound, voxel_size,
         out.zero_()
     if bending:
         if div or shears:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_all')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_all')[template])
             func(np_out, np_wgt, shape, stride, wgtstride,
                  voxel_size, absolute, membrane, bending, shears, div)
         else:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_bending')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_bending')[template])
             func(np_out, np_wgt, shape, stride, wgtstride,
                  voxel_size, absolute, membrane, bending)
     elif div or shears:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_lame')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_lame')[template])
         func(np_out, np_wgt, shape, stride, wgtstride,
              voxel_size, absolute, membrane, shears, div)
     elif membrane:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_membrane')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_membrane')[template])
         func(np_out, np_wgt, shape, stride, wgtstride,
              voxel_size, absolute, membrane)
     elif absolute:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'diag_absolute')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'diag_absolute')[template])
         func(np_out, np_wgt, shape, stride, wgtstride,
              voxel_size, absolute)
 
     return out
 
 
-def grid_relax_(sol, hes, grd, niter, bound, voxel_size,
+def flow_relax_(sol, hes, grd, niter, bound, voxel_size,
                 absolute, membrane, bending, shears, div):
     """
     Parameters
@@ -400,7 +400,7 @@ def grid_relax_(sol, hes, grd, niter, bound, voxel_size,
     ndim = sol.shape[-1]
     nbatch = sol.ndim - ndim - 1
     if ndim > 3:
-        raise ValueError('grid_relax_ only implemented up to dimension 3')
+        raise ValueError('flow_relax_ only implemented up to dimension 3')
 
     np_sol = sol.numpy()
     np_hes = hes.numpy()
@@ -426,30 +426,30 @@ def grid_relax_(sol, hes, grd, niter, bound, voxel_size,
 
     if bending:
         if div or shears:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_all_')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_all_')[template])
             func(np_sol, np_hes, np_grd, shape, solstride, hesstride, grdstride,
                  voxel_size, absolute, membrane, bending, shears, div, niter)
         else:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_bending_')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_bending_')[template])
             func(np_sol, np_hes, np_grd, shape, solstride, hesstride, grdstride,
                  voxel_size, absolute, membrane, bending, niter)
     elif div or shears:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_lame_')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_lame_')[template])
         func(np_sol, np_hes, np_grd, shape, solstride, hesstride, grdstride,
              voxel_size, absolute, membrane, shears, div, niter)
     elif membrane:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_membrane_')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_membrane_')[template])
         func(np_sol, np_hes, np_grd, shape, solstride, hesstride, grdstride,
              voxel_size, absolute, membrane, niter)
     elif absolute:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_absolute_')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_absolute_')[template])
         func(np_sol, np_hes, np_grd, shape, solstride, hesstride, grdstride,
              voxel_size, absolute, niter)
 
     return sol
 
 
-def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
+def flow_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
                     absolute, membrane, bending, shears, div):
     """
     Parameters
@@ -474,7 +474,7 @@ def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
     ndim = sol.shape[-1]
     nbatch = sol.ndim - ndim - 1
     if ndim > 3:
-        raise ValueError('grid_relax_rls_ only implemented up to dimension 3')
+        raise ValueError('flow_relax_rls_ only implemented up to dimension 3')
 
     np_sol = sol.numpy()
     np_hes = hes.numpy()
@@ -502,27 +502,27 @@ def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
 
     if bending:
         if div or shears:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_all_jrls_')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_all_jrls_')[template])
             func(np_sol, np_hes, np_grd, np_wgt,
                  shape, solstride, hesstride, grdstride, wgtstride,
                  voxel_size, absolute, membrane, bending, shears, div, niter)
         else:
-            func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_bending_jrls_')[template])
+            func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_bending_jrls_')[template])
             func(np_sol, np_hes, np_grd, np_wgt,
                  shape, solstride, hesstride, grdstride, wgtstride,
                  voxel_size, absolute, membrane, bending, niter)
     elif div or shears:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_lame_jrls_')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_lame_jrls_')[template])
         func(np_sol, np_hes, np_grd, np_wgt,
              shape, solstride, hesstride, grdstride, wgtstride,
              voxel_size, absolute, membrane, shears, div, niter)
     elif membrane:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_membrane_jrls_')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_membrane_jrls_')[template])
         func(np_sol, np_hes, np_grd, np_wgt,
              shape, solstride, hesstride, grdstride, wgtstride,
              voxel_size, absolute, membrane, niter)
     elif absolute:
-        func = cwrap(getattr(cppyy.gbl.jf.reg_grid, 'relax_absolute_jrls_')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_flow, 'relax_absolute_jrls_')[template])
         func(np_sol, np_hes, np_grd, np_wgt,
              shape, solstride, hesstride, grdstride, wgtstride,
              voxel_size, absolute, niter)
@@ -530,7 +530,7 @@ def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
     return sol
 
 
-def field_vel2mom(out, inp, bound, voxel_size,
+def field_matvec(out, inp, bound, voxel_size,
                   absolute, membrane, bending,
                   op=''):
     """
@@ -551,7 +551,7 @@ def field_vel2mom(out, inp, bound, voxel_size,
     """
     ndim = len(voxel_size)
     if ndim > 3:
-        raise ValueError('vel2mom only implemented up to dimension 3')
+        raise ValueError('matvec only implemented up to dimension 3')
     nc = out.shape[-1]
 
     np_inp = inp.numpy()
@@ -578,15 +578,15 @@ def field_vel2mom(out, inp, bound, voxel_size,
     op = (op + '_') if op in ('add', 'sub') else ''
 
     if any(bending):
-        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}vel2mom_bending_{ndim}d')[template], 'vel2mom')
+        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}matvec_bending_{ndim}d')[template], 'matvec')
         func(np_out, np_inp, shape, outstride, instride,
              *voxel_size, absolute, membrane, bending)
     elif any(membrane):
-        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}vel2mom_membrane_{ndim}d')[template], 'vel2mom')
+        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}matvec_membrane_{ndim}d')[template], 'matvec')
         func(np_out, np_inp, shape, outstride, instride,
              *voxel_size, absolute, membrane)
     elif any(absolute):
-        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}vel2mom_absolute_{ndim}d')[template], 'vel2mom')
+        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}matvec_absolute_{ndim}d')[template], 'matvec')
         func(np_out, np_inp, shape, outstride, instride, absolute)
     elif not op:
         out.zero_()
@@ -594,7 +594,7 @@ def field_vel2mom(out, inp, bound, voxel_size,
     return out
 
 
-def field_vel2mom_rls(out, inp, wgt, bound, voxel_size,
+def field_matvec_rls(out, inp, wgt, bound, voxel_size,
                       absolute, membrane, bending,
                       op=''):
     """
@@ -616,7 +616,7 @@ def field_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     """
     ndim = len(voxel_size)
     if ndim > 3:
-        raise ValueError('vel2mom only implemented up to dimension 3')
+        raise ValueError('matvec only implemented up to dimension 3')
     nc = out.shape[-1]
 
     joint = 'j' if wgt.shape[-1] == 1 else ''
@@ -650,15 +650,15 @@ def field_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     op = (op + '_') if op in ('add', 'sub') else ''
 
     if any(bending):
-        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}vel2mom_bending_{joint}rls_{ndim}d')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}matvec_bending_{joint}rls_{ndim}d')[template])
         func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
              *voxel_size, absolute, membrane, bending)
     elif any(membrane):
-        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}vel2mom_membrane_{joint}rls_{ndim}d')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}matvec_membrane_{joint}rls_{ndim}d')[template])
         func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
              *voxel_size, absolute, membrane)
     elif any(absolute):
-        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}vel2mom_absolute_{joint}rls_{ndim}d')[template])
+        func = cwrap(getattr(cppyy.gbl.jf.reg_field.stat, f'{op}matvec_absolute_{joint}rls_{ndim}d')[template])
         func(np_out, np_inp, np_wgt, shape, outstride, instride, wgtstride,
              absolute)
     elif not op:
@@ -687,7 +687,7 @@ def field_kernel(out, bound, voxel_size,
     """
     ndim = len(voxel_size)
     if ndim > 3:
-        raise ValueError('vel2mom only implemented up to dimension 3')
+        raise ValueError('matvec only implemented up to dimension 3')
     nc = out.shape[-1]
 
     np_out = out.numpy()
@@ -749,7 +749,7 @@ def field_diag(out, bound, voxel_size,
     """
     ndim = len(voxel_size)
     if ndim > 3:
-        raise ValueError('vel2mom only implemented up to dimension 3')
+        raise ValueError('matvec only implemented up to dimension 3')
     nc = out.shape[-1]
 
     np_out = out.numpy()
@@ -813,7 +813,7 @@ def field_diag_rls(out, wgt, bound, voxel_size,
     """
     ndim = len(voxel_size)
     if ndim > 3:
-        raise ValueError('vel2mom only implemented up to dimension 3')
+        raise ValueError('matvec only implemented up to dimension 3')
     nc = out.shape[-1]
 
     joint = 'j' if wgt.shape[-1] == 1 else ''

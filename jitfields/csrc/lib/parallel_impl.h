@@ -44,7 +44,7 @@ inline size_t get_parallel_threads() { return get_num_threads(); }
 inline size_t set_parallel_threads(int nthreads) { return set_num_threads(); }
 }
 #elif JF_CAN_USE_OPENMP
-#include "omp.h"
+#include <omp.h>
 namespace jf {
 inline size_t get_parallel_threads() { return omp_get_max_threads(); }
 inline size_t set_parallel_threads(int nthreads)

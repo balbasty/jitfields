@@ -21,14 +21,14 @@ def get_kernel(key):
     return template
 
 
-reg_kernels = CachedKernel('reg_grid.cu', get_kernel)
+reg_kernels = CachedKernel('reg_flow.cu', get_kernel)
 
 
 def fixop(op):
     return '+' if op in ('add', '+') else '-' if op in ('sub', '-') else '='
 
 
-def grid_vel2mom(out, inp, bound, voxel_size,
+def flow_matvec(out, inp, bound, voxel_size,
                  absolute, membrane, bending, shears, div,
                  op=''):
     """
@@ -53,7 +53,7 @@ def grid_vel2mom(out, inp, bound, voxel_size,
     nbatch = out.ndim - ndim - 1
     numel = out.shape[:-1].numel()
     if ndim > 3:
-        raise ValueError('grid_vel2mom only implemented up to dimension 3')
+        raise ValueError('flow_matvec only implemented up to dimension 3')
 
     np_inp = to_cupy(inp)
     np_out = to_cupy(out)
@@ -81,7 +81,7 @@ def grid_vel2mom(out, inp, bound, voxel_size,
     shears = asreduce(shears)
     div = asreduce(div)
 
-    func = 'vel2mom_'
+    func = 'matvec_'
     if bending:
         if div or shears:
             func += 'all'
@@ -107,7 +107,7 @@ def grid_vel2mom(out, inp, bound, voxel_size,
     return out
 
 
-def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
+def flow_matvec_rls(out, inp, wgt, bound, voxel_size,
                      absolute, membrane, bending, shears, div,
                      op=''):
     """
@@ -133,7 +133,7 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     nbatch = out.ndim - ndim - 1
     numel = out.shape[:-1].numel()
     if ndim > 3:
-        raise ValueError('grid_vel2mom_rls only implemented up to dimension 3')
+        raise ValueError('flow_matvec_rls only implemented up to dimension 3')
 
     np_inp = to_cupy(inp)
     np_out = to_cupy(out)
@@ -163,7 +163,7 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     shears = asreduce(shears)
     div = asreduce(div)
 
-    func = 'vel2mom_'
+    func = 'matvec_'
     if bending:
         if div or shears:
             func += 'all'
@@ -190,7 +190,7 @@ def grid_vel2mom_rls(out, inp, wgt, bound, voxel_size,
     return out
 
 
-def grid_kernel(out, bound, voxel_size,
+def flow_kernel(out, bound, voxel_size,
                 absolute, membrane, bending, shears, div,
                 op=''):
     """
@@ -214,7 +214,7 @@ def grid_kernel(out, bound, voxel_size,
     nbatch = out.ndim - ndim - 1 - int(shears or div)
     numel = out.shape[:nbatch].numel()
     if ndim > 3:
-        raise ValueError('grid_kernel only implemented up to dimension 3')
+        raise ValueError('flow_kernel only implemented up to dimension 3')
 
     np_out = to_cupy(out)
 
@@ -268,7 +268,7 @@ def grid_kernel(out, bound, voxel_size,
     return out
 
 
-def grid_diag(out, bound, voxel_size,
+def flow_diag(out, bound, voxel_size,
               absolute, membrane, bending, shears, div,
               op=''):
     """
@@ -292,7 +292,7 @@ def grid_diag(out, bound, voxel_size,
     nbatch = out.ndim - ndim - 1
     numel = out.shape[:-1].numel()
     if ndim > 3:
-        raise ValueError('grid_diag only implemented up to dimension 3')
+        raise ValueError('flow_diag only implemented up to dimension 3')
 
     np_out = to_cupy(out)
 
@@ -346,7 +346,7 @@ def grid_diag(out, bound, voxel_size,
     return out
 
 
-def grid_diag_rls(out, wgt, bound, voxel_size,
+def flow_diag_rls(out, wgt, bound, voxel_size,
                   absolute, membrane, bending, shears, div,
                   op=''):
     """
@@ -371,7 +371,7 @@ def grid_diag_rls(out, wgt, bound, voxel_size,
     nbatch = out.ndim - ndim - 1
     numel = out.shape[:-1].numel()
     if ndim > 3:
-        raise ValueError('vel2mom only implemented up to dimension 3')
+        raise ValueError('matvec only implemented up to dimension 3')
 
     np_out = to_cupy(out)
     np_wgt = to_cupy(wgt)
@@ -428,7 +428,7 @@ def grid_diag_rls(out, wgt, bound, voxel_size,
     return out
 
 
-def grid_relax_(sol, hes, grd, niter, bound, voxel_size,
+def flow_relax_(sol, hes, grd, niter, bound, voxel_size,
                 absolute, membrane, bending, shears, div):
     """
     Parameters
@@ -453,7 +453,7 @@ def grid_relax_(sol, hes, grd, niter, bound, voxel_size,
     nbatch = sol.ndim - ndim - 1
     numel = sol.shape[:-1].numel()
     if ndim > 3:
-        raise ValueError('grid_relax_ only implemented up to dimension 3')
+        raise ValueError('flow_relax_ only implemented up to dimension 3')
 
     np_sol = to_cupy(sol)
     np_hes = to_cupy(hes)
@@ -514,7 +514,7 @@ def grid_relax_(sol, hes, grd, niter, bound, voxel_size,
     return sol
 
 
-def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
+def flow_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
                     absolute, membrane, bending, shears, div):
     """
     Parameters
@@ -540,7 +540,7 @@ def grid_relax_rls_(sol, hes, grd, wgt, niter, bound, voxel_size,
     nbatch = sol.ndim - ndim - 1
     numel = sol.shape[:-1].numel()
     if ndim > 3:
-        raise ValueError('grid_relax_rls_ only implemented up to dimension 3')
+        raise ValueError('flow_relax_rls_ only implemented up to dimension 3')
 
     np_sol = to_cupy(sol)
     np_hes = to_cupy(hes)

@@ -4,7 +4,6 @@ from .resize import *
 from .regularisers import *
 from .splinc import *
 from .sym import *
-from .solvers import *
 from .utils import identity_grid, add_identity_grid, add_identity_grid_
 
 try:

@@ -619,3 +619,269 @@ mat : (..., C*(C+1)//2) tensor
 
 """
 ```
+
+### Regularisers for dense flow fields
+
+```python
+def flow_matvec(
+    vel: Tensor, weight: Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""Apply a spatial regularization matrix.
+
+Parameters
+----------
+vel : (*batch, *spatial, ndim) tensor
+    Input displacement field, in voxels.
+weight : (*batch, *spatial) tensor, optional
+    Weight map, to spatially modulate the regularization.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, ndim) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (*batch, *spatial, ndim) tensor
+"""
+
+# We also implement variants that adds to or subtracts from an input tensor
+def flow_matvec_add(inp: Tensor, ...): ...
+def flow_matvec_add_(inp: Tensor, ...): ...
+def flow_matvec_sub(inp: Tensor, ...): ...
+def flow_matvec_sub_(inp: Tensor, ...): ...
+```
+
+```python
+def flow_kernel(
+    shape: list[int],
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""
+Return the kernel of a Toeplitz regularization matrix.
+
+Parameters
+----------
+shape : int or list[int]
+    Number of spatial dimensions or shape of the tensor
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears. Linear elastic energy's `mu`.
+div : float
+    Penalty on local volume changes. Linear elastic energy's `lambda`.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*shape, ndim, [ndim]) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (*shape, ndim, [ndim]) tensor
+    Convolution kernel.
+    A matrix or kernels ([ndim, ndim]) if `shears` or `div`,
+    else a vector of kernels ([ndim]) .
+"""
+
+# We also implement variants that adds to or subtracts from an input tensor
+def flow_kernel_add(inp: Tensor, ...): ...
+def flow_kernel_add_(inp: Tensor, ...): ...
+def flow_kernel_sub(inp: Tensor, ...): ...
+def flow_kernel_sub_(inp: Tensor, ...): ...
+```
+
+```python
+def flow_diag(
+    shape: list[int], weight: Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""Return the diagonal of a regularization matrix.
+
+Parameters
+----------
+shape : list[int]
+    Shape of the tensor
+weight : (*batch, *spatial) tensor, optional
+    Weight map, to spatially modulate the regularization.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, ndim) tensor, optional
+    Output placeholder
+
+Returns
+-------
+out : (*batch, *spatial, ndim) tensor
+"""
+
+# We also implement variants that adds to or subtracts from an input tensor
+def flow_diag_add(inp: Tensor, ...): ...
+def flow_diag_add_(inp: Tensor, ...): ...
+def flow_diag_sub(inp: Tensor, ...): ...
+def flow_diag_sub_(inp: Tensor, ...): ...
+```
+
+```python
+def flow_relax_(
+    vel: Tensor, hes: Tensor, grd: Tensor, weight: Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1, nb_iter: int = 1,
+    ) -> Tensor: ...
+"""Perform relaxation iterations.
+
+Parameters
+----------
+vel : (*batch, *spatial, ndim) tensor
+    Warm start.
+hes : (*batch, *spatial, ndim*(ndim+1)//2) tensor
+    Input symmetric Hessian, in voxels.
+grd : (*batch, *spatial, ndim) tensor
+    Input gradient, in voxels.
+weight : (*batch, *spatial) tensor, optional
+    Weight map, to spatially modulate the regularization.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+nb_iter : int
+    Number of iterations
+
+Returns
+-------
+vel : (*batch, *spatial, ndim) tensor
+"""
+```
+
+```python
+
+def flow_precond(
+    mat: Tensor, vec: Tensor, weight : Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""
+Apply the preconditioning `(M + diag(R)) \ v`
+
+Parameters
+----------
+mat : (*batch, *spatial, DD) tensor
+    DD == 1 | D | D*(D+1)//2 | D*D
+    Preconditioning matrix `M`
+vec : (*batch, *spatial, D) tensor
+    Point `v` at which to solve the system.
+weight : (*batch, *spatial) tensor, optional
+    Regularization weight map.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, D) tensor
+    Output placeholder.
+
+Returns
+-------
+out : (*batch, *spatial, D) tensor
+    Preconditioned vector.
+
+"""
+```
+
+```python
+def flow_forward(
+    mat: Tensor, vec: Tensor, weight : Optional[Tensor] = None,
+    absolute: float = 0, membrane: float = 0, bending: float = 0,
+    shears: float = 0, div: float = 0,
+    bound: list[str] = 'dft', voxel_size: list[float] = 1,
+    out: Optional[Tensor] = None) -> Tensor: ...
+"""
+Apply the forward matrix-vector product `(M + R) @ v`
+
+Parameters
+----------
+mat : (*batch, *spatial, DD) tensor
+    DD == 1 | D | D*(D+1)//2 | D*D
+vec : (*batch, *spatial, D) tensor
+    Point `v` at which to solve the system.
+weight : (*batch, *spatial) tensor, optional
+    Regularization weight map.
+absolute : float
+    Penalty on absolute values.
+membrane : float
+    Penalty on first derivatives.
+bending : float
+    Penalty on second derivatives.
+shears : float
+    Penalty on local shears.
+div : float
+    Penalty on local volume changes.
+bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dft'
+    Boundary conditions.
+voxel_size : [sequence of] float
+    Voxel size.
+out : (*batch, *spatial, D) tensor
+    Output placeholder.
+
+Returns
+-------
+out : (*batch, *spatial, D) tensor
+    Preconditioned vector.
+
+"""
+```

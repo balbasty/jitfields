@@ -1,12 +1,12 @@
-#ifndef JF_REGULARISERS_GRID_1D
-#define JF_REGULARISERS_GRID_1D
+#ifndef JF_REGULARISERS_FLOW_1D
+#define JF_REGULARISERS_FLOW_1D
 #include "../../cuda_switch.h"
 #include "../../bounds.h"
 #include "../../utils.h"
 #include "utils.h"
 
 namespace jf {
-namespace reg_grid {
+namespace reg_flow {
 
 //----------------------------------------------------------------------
 //          low-level kernels for anything regularization
@@ -14,7 +14,7 @@ namespace reg_grid {
 
 template <typename scalar_t, typename reduce_t, typename offset_t,
           bound::type BX>
-struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
+struct RegFlow<two, scalar_t, reduce_t, offset_t, BX> {
     using bound_utils_x = bound::utils<BX>;
     typedef scalar_t & (*OpType)(scalar_t &, const reduce_t &);
 
@@ -34,11 +34,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
         kernel[0] = absolute / vx;
     }
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     __device__ static inline void
-    vel2mom_absolute(
+    matvec_absolute(
         scalar_t * out, const scalar_t * inp,
         offset_t osc, offset_t isc, const reduce_t kernel[1])
     {
@@ -93,11 +93,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
         kernel[1]  = -membrane;
     }
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     __device__ static inline void
-    vel2mom_membrane(
+    matvec_membrane(
         scalar_t * out, const scalar_t * inp,
         const offset_t loc[1], const offset_t size[1], const offset_t stride[1],
         offset_t osc, offset_t isc, const reduce_t kernel[2])
@@ -208,11 +208,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
         kernel[2]  = w200 / vx;
     }
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     __device__ static inline void
-    vel2mom_bending(
+    matvec_bending(
         scalar_t * out, const scalar_t * inp,
         const offset_t loc[1], const offset_t size[1],
         const offset_t stride[1], offset_t osc, offset_t isc,
@@ -347,11 +347,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
         kernel[2]  = w200 / vx;
     }
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     __device__ static inline void
-    vel2mom_all(
+    matvec_all(
         scalar_t * out, const scalar_t * inp,
         const offset_t loc[1], const offset_t size[1],
         const offset_t stride[1], offset_t osc, offset_t isc,
@@ -477,11 +477,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
         kernel[0] = absolute - 2*kernel[1];
     }
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     __device__ static inline void
-    vel2mom_lame(
+    matvec_lame(
         scalar_t * out, const scalar_t * inp,
         const offset_t loc[1], const offset_t size[1],
         const offset_t stride[1], offset_t osc, offset_t isc,
@@ -564,11 +564,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
     //                         ABSOLUTE JRLS
     //------------------------------------------------------------------
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     static inline __device__
-    void vel2mom_absolute_jrls(
+    void matvec_absolute_jrls(
         scalar_t * out, const scalar_t * inp, const scalar_t * wgt,
         offset_t osc, offset_t isc, const reduce_t kernel[1])
     {
@@ -604,11 +604,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
             kernel[k] *= 0.5;
     }
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     __device__ static inline void
-    vel2mom_membrane_jrls(
+    matvec_membrane_jrls(
         scalar_t * out, const scalar_t * inp, const scalar_t * wgt,
         const offset_t loc[1], const offset_t size[1],
         const offset_t istride[1], const offset_t wstride[1],
@@ -720,11 +720,11 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
             kernel[k] *= 0.5;
     }
 
-    // --- vel2mom ---
+    // --- matvec ---
 
     template <OpType op = set>
     static inline __device__
-    void vel2mom_lame_jrls(
+    void matvec_lame_jrls(
         scalar_t * out, const scalar_t * inp, const scalar_t * wgt,
         const offset_t loc[1], const offset_t size[1],
         const offset_t istride[1], const offset_t wstride[1],
@@ -820,7 +820,7 @@ struct RegGrid<two, scalar_t, reduce_t, offset_t, BX> {
 
 };
 
-} // namespace reg_grid
+} // namespace reg_flow
 } // namespace jf
 
-#endif // JF_REGULARISERS_GRID_1D
+#endif // JF_REGULARISERS_FLOW_1D

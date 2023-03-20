@@ -1,13 +1,13 @@
 #include "../lib/cuda_switch.h"
 #include "../lib/posdef.h"
 #include "../lib/batch.h"
-#include "../lib/parallel.h"
 
 using namespace std;
 using namespace jf;
 using namespace jf::posdef;
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_matvec(scalar_t * out, const scalar_t * hes, const scalar_t * inp,
                 const offset_t * size,
                 const offset_t * stride_out,
@@ -37,6 +37,7 @@ void sym_matvec(scalar_t * out, const scalar_t * hes, const scalar_t * inp,
 }
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_matvec_backward(
     scalar_t * out, const scalar_t * grd, const scalar_t * inp,
     const offset_t * size,
@@ -67,6 +68,7 @@ void sym_matvec_backward(
 }
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_addmatvec_(scalar_t * out, const scalar_t * hes, const scalar_t * inp,
                     const offset_t * size,
                     const offset_t * stride_out,
@@ -96,6 +98,7 @@ void sym_addmatvec_(scalar_t * out, const scalar_t * hes, const scalar_t * inp,
 }
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_submatvec_(scalar_t * out, const scalar_t * hes, const scalar_t * inp,
                     const offset_t * size,
                     const offset_t * stride_out,
@@ -126,6 +129,7 @@ void sym_submatvec_(scalar_t * out, const scalar_t * hes, const scalar_t * inp,
 
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_solve(scalar_t * out, const scalar_t * inp,
                const scalar_t * hes, const scalar_t * wgt,
                const offset_t * size,
@@ -163,6 +167,7 @@ void sym_solve(scalar_t * out, const scalar_t * inp,
 
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_solve_(scalar_t * out,
                 const scalar_t * hes, const scalar_t * wgt,
                 const offset_t * size,
@@ -195,6 +200,7 @@ void sym_solve_(scalar_t * out,
 }
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_invert(scalar_t * out, const scalar_t * hes,
                 const offset_t * size,
                 const offset_t * stride_out,
@@ -222,6 +228,7 @@ void sym_invert(scalar_t * out, const scalar_t * hes,
 }
 
 template <int nbatch, int C, typename reduce_t, typename scalar_t, typename offset_t>
+__global__
 void sym_invert_(scalar_t * hes,
                  const offset_t * size,
                  const offset_t * stride)

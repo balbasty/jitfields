@@ -1,7 +1,7 @@
 from torch import Tensor
 
 
-def grid_vel2mom(
+def flow_matvec(
     out: Tensor, inp: Tensor, bound: list[int], voxel_size: list[float],
     absolute: float, membrane: float, bending: float, shears: float, div: float,
     op: str = '=') -> Tensor: ...
@@ -26,7 +26,7 @@ Returns
 out : (*batch, *spatial, ndim) tensor
 """
 
-def grid_vel2mom_rls(
+def flow_matvec_rls(
     out: Tensor, inp: Tensor, wgt: Tensor, bound: list[int], voxel_size: list[float],
     absolute: float, membrane: float, bending: float, shears: float, div: float,
     op: str = '=') -> Tensor: ...
@@ -52,7 +52,7 @@ Returns
 out : (*batch, *spatial, ndim) tensor
 """
 
-def grid_kernel(
+def flow_kernel(
     out: Tensor, bound: list[int], voxel_size: list[float],
     absolute: float, membrane: float, bending: float, shears: float, div: float,
     op: str = '=') -> Tensor: ...
@@ -76,7 +76,7 @@ Returns
 out : (*batch, *spatial, ndim) tensor
 """
 
-def grid_diag(
+def flow_diag(
     out: Tensor, bound: list[int], voxel_size: list[float],
     absolute: float, membrane: float, bending: float, shears: float, div: float,
     op: str = '=') -> Tensor: ...
@@ -100,7 +100,7 @@ Returns
 out : (*batch, *spatial, ndim) tensor
 """
 
-def grid_diag_rls(
+def flow_diag_rls(
     out: Tensor, wgt: Tensor, bound: list[int], voxel_size: list[float],
     absolute: float, membrane: float, bending: float, shears: float, div: float,
     op: str = '=') -> Tensor: ...
@@ -125,7 +125,7 @@ Returns
 out : (*batch, *spatial, ndim) tensor
 """
 
-def grid_relax_(
+def flow_relax_(
     sol: Tensor, hes: Tensor, grd: Tensor, niter: int,
     bound: list[int], voxel_size: list[float],
     absolute: float, membrane: float, bending: float, shears: float, div: float,
@@ -152,7 +152,7 @@ Returns
 sol : (*batch, *spatial, ndim) tensor
 """
 
-def grid_relax_rls_(
+def flow_relax_rls_(
     sol: Tensor, hes: Tensor, grd: Tensor, wgt: Tensor, niter: int,
     bound: list[int], voxel_size: list[float],
     absolute: float, membrane: float, bending: float, shears: float, div: float,
@@ -182,7 +182,7 @@ sol : (*batch, *spatial, ndim) tensor
 
 # ======================================================================
 
-def field_vel2mom(
+def field_matvec(
     out: Tensor, inp: Tensor, bound: list[int], voxel_size: list[float],
     absolute: list[float], membrane: list[float], bending: list[float],
     op: str = '=') -> Tensor: ...
@@ -205,7 +205,7 @@ Returns
 out : (*batch, *spatial, nc) tensor
 """
 
-def field_vel2mom_rls(
+def field_matvec_rls(
     out: Tensor, inp: Tensor, wgt: Tensor, bound: list[int], voxel_size: list[float],
     absolute: list[float], membrane: list[float], bending: list[float],
     op: str = '=') -> Tensor: ...
