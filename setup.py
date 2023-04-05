@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-from setuptools import setup, find_packages
+from setuptools import setup
 
-setup(
-    packages=find_packages(),
-    package_data={'jitfields': ['csrc/**/*']},
-)
+setup()
