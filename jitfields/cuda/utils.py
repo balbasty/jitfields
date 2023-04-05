@@ -4,8 +4,14 @@ import numpy as np
 from ..utils import prod
 import re
 from torch.utils.dlpack import to_dlpack
-import cupy as cp
 from cupy_backends.cuda.api.driver import CUDADriverError
+
+try:
+    from cupy import from_dlpack as cupy_from_dlpack, to_dlpack as cupy_to_dlpack
+except ImportError:
+    import cupy
+    from cupy import fromDlpack as cupy_from_dlpack
+    cupy_to_dlpack = cupy.ndarray.toDlpack
 
 _cuda_num_threads = os.environ.get('CUDA_NUM_THREADS', 1024)
 _num_threads = torch.get_num_threads()
@@ -82,4 +88,4 @@ def load_code(filename):
 
 def to_cupy(x):
     """Convert a torch tensor to cupy without copy"""
-    return cp.from_dlpack(to_dlpack(x))
+    return cupy_from_dlpack(to_dlpack(x))
