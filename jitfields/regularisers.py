@@ -574,14 +574,14 @@ def flow_forward(mat, vec, weight=None,
     """
     out = sym_matvec(mat, vec, out=out)
     out = flow_matvec_add_(out, vec, weight,
-                            absolute, membrane, bending, shears, div,
-                            bound, voxel_size)
+                           absolute, membrane, bending, shears, div,
+                           bound, voxel_size)
     return out
 
 
 def field_matvec(ndim, vec, weight=None,
-                  absolute=0, membrane=0, bending=0,
-                  bound='dft', voxel_size=1, out=None):
+                 absolute=0, membrane=0, bending=0,
+                 bound='dft', voxel_size=1, out=None):
     """Apply a spatial regularization matrix.
 
     Parameters
