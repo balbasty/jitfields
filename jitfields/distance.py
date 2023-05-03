@@ -5,34 +5,56 @@ __all__ = [
 ]
 
 import torch
+from torch import Tensor as tensor
+from typing import Optional
 from .utils import make_vector, try_import
+from .utils import OneOrSeveral
 cuda_dist = try_import('jitfields.bindings.cuda', 'distance')
 cpu_dist = try_import('jitfields.bindings.cpp', 'distance')
 
 
-def euclidean_distance_transform(x, ndim=None, vx=1, dtype=None):
+def euclidean_distance_transform(
+    x: tensor,
+    ndim: Optional[int] = None,
+    vx: OneOrSeveral[float] = 1,
+    dtype: Optional[torch.dtype] = None,
+) -> tensor:
     """Compute the Euclidean distance transform of a binary image
 
     Parameters
     ----------
-    x : (..., *spatial) tensor
-        Input tensor
-    ndim : int, default=`x.ndim`
-        Number of spatial dimensions
-    vx : [sequence of] float, default=1
-        Voxel size
+    x : `(..., *spatial) tensor`
+        Input tensor, with shape `(..., *spatial)`.
+    ndim : `int`, default=`x.ndim`
+        Number of spatial dimensions. Default: all.
+    vx : `[sequence of] float`, default=1
+        Voxel size.
+    dtype : `torch.dtype`, optional
+        Ouptut data type. Default is same as `x` if it has a floating
+        point data type, else `torch.get_default_dtype()`.
 
     Returns
     -------
-    d : (..., *spatial) tensor
-        Distance map
+    d : `(..., *spatial) tensor`
+        Distance map, with shape `(..., *spatial)`.
 
     References
     ----------
-    ..[1] "Distance Transforms of Sampled Functions"
-          Pedro F. Felzenszwalb & Daniel P. Huttenlocher
-          Theory of Computing (2012)
-          https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
+    1. Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
+    [*Distance transforms of sampled functions.*](https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
+    _Theory of computing_, 8(1), pp.415-428.
+
+            @article{felzenszwalb2012distance,
+              title={Distance transforms of sampled functions},
+              author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
+              journal={Theory of computing},
+              volume={8},
+              number={1},
+              pages={415--428},
+              year={2012},
+              publisher={Theory of Computing Exchange},
+              url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
+            }
     """
     if x.is_cuda:
         edt_1d_ = cuda_dist.edt_1d_
@@ -56,33 +78,48 @@ def euclidean_distance_transform(x, ndim=None, vx=1, dtype=None):
     return x
 
 
-def l1_distance_transform(x, ndim=None, vx=1, dtype=None):
+def l1_distance_transform(
+    x: tensor,
+    ndim: Optional[int] = None,
+    vx: OneOrSeveral[float] = 1,
+    dtype: Optional[torch.dtype] = None,
+) -> tensor:
     """Compute the L1 distance transform of a binary image
 
     Parameters
     ----------
-    x : (..., *spatial) tensor
-        Input tensor
-    ndim : int, default=`x.ndim`
-        Number of spatial dimensions
-    vx : [sequence of] float, default=1
-        Voxel size
-    dtype : torch.dtype
-        Datatype of the distance map.
-        By default, use x.dtype if it is a floating point type,
-        otherwise use the default floating point type.
+    x : `(..., *spatial) tensor`
+        Input tensor, with shape `(..., *spatial)`.
+    ndim : `int`, default=`x.ndim`
+        Number of spatial dimensions. Default: all.
+    vx : `[sequence of] float`, default=1
+        Voxel size.
+    dtype : `torch.dtype`, optional
+        Ouptut data type. Default is same as `x` if it has a floating
+        point data type, else `torch.get_default_dtype()`.
 
     Returns
     -------
-    d : (..., *spatial) tensor
-        Distance map
+    d : `(..., *spatial) tensor`
+        Distance map, with shape `(..., *spatial)`.
 
     References
     ----------
-    ..[1] "Distance Transforms of Sampled Functions"
-          Pedro F. Felzenszwalb & Daniel P. Huttenlocher
-          Theory of Computing (2012)
-          https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
+    1. Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
+    [*Distance transforms of sampled functions.*](https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
+    _Theory of computing_, 8(1), pp.415-428.
+
+            @article{felzenszwalb2012distance,
+              title={Distance transforms of sampled functions},
+              author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
+              journal={Theory of computing},
+              volume={8},
+              number={1},
+              pages={415--428},
+              year={2012},
+              publisher={Theory of Computing Exchange},
+              url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
+            }
     """
     if x.is_cuda:
         l1dt_1d_ = cuda_dist.l1dt_1d_
@@ -105,24 +142,38 @@ def signed_distance_transform(x, ndim=None, vx=1, dtype=None):
 
     Parameters
     ----------
-    x : (..., *spatial) tensor
-        Input tensor
-    ndim : int, default=`x.ndim`
-        Number of spatial dimensions
-    vx : [sequence of] float, default=1
-        Voxel size
+    x : `(..., *spatial) tensor`
+        Input tensor, with shape `(..., *spatial)`.
+    ndim : `int`, default=`x.ndim`
+        Number of spatial dimensions. Default: all.
+    vx : `[sequence of] float`, default=1
+        Voxel size.
+    dtype : `torch.dtype`, optional
+        Ouptut data type. Default is same as `x` if it has a floating
+        point data type, else `torch.get_default_dtype()`.
 
     Returns
     -------
-    d : (..., *spatial) tensor
-        Distance map
+    d : `(..., *spatial) tensor`
+        Distance map, with shape `(..., *spatial)`.
 
     References
     ----------
-    ..[1] "Distance Transforms of Sampled Functions"
-          Pedro F. Felzenszwalb & Daniel P. Huttenlocher
-          Theory of Computing (2012)
-          https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
+    1. Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
+    [*Distance transforms of sampled functions.*](https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
+    _Theory of computing_, 8(1), pp.415-428.
+
+            @article{felzenszwalb2012distance,
+              title={Distance transforms of sampled functions},
+              author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
+              journal={Theory of computing},
+              volume={8},
+              number={1},
+              pages={415--428},
+              year={2012},
+              publisher={Theory of Computing Exchange},
+              url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
+            }
     """
     x = x > 0
     d = euclidean_distance_transform(x, ndim, vx, dtype)

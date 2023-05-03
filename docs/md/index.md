@@ -14,7 +14,7 @@ We currently implement:
 
 - Euclidean distance transforms (substitute for `scipy.ndimage.distance_transform_edt`).
 - B-spline sampling/interpolation up to order 7 (substitute for `scipy.ndimage.zoom`, 
-  `scipy.ndimage.filter`, `scipy.ndimage.map_coordinates`).
+  `scipy.ndimage.spline_filter`, `scipy.ndimage.map_coordinates`).
 - Finite difference regularisers for dense displacement fields and vector fields.
 - Linear algebra operations for batches of symmetric matrices with compact storage.
 

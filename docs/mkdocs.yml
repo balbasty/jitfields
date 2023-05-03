@@ -38,6 +38,7 @@ nav:
     - flows: api/regularisers_flows.md
     - fields: api/regularisers_fields.md
   - sym: api/sym.md
+  - distance: api/distance.md
   - types: api/typing.md
 
 watch:
