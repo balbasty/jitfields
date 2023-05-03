@@ -78,7 +78,7 @@ out : (*batch, C*(C+1)//2)) tensor
 
 def sym_solve(out: Tensor, inp: Tensor, mat: Tensor, wgt: Optional[Tensor] = None,
               dtype: DType = None) -> Tensor: ...
-"""
+r"""
 Solve the linear system `(mat + diag(wgt)) \ inp`
 
 Parameters
@@ -95,7 +95,7 @@ out : (*batch, C) tensor
 
 def sym_solve_(inp: Tensor, mat: Tensor, wgt: Optional[Tensor] = None,
                dtype: DType = None) -> Tensor: ...
-"""
+r"""
 Solve the linear system `(mat + diag(wgt)) \ inp` inplace
 
 Parameters

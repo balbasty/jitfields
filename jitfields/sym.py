@@ -7,251 +7,388 @@ __all__ = [
 ]
 
 import torch
+from torch import Tensor
+from typing import Optional
 from .utils import try_import, broadcast
 cuda_sym = try_import('jitfields.bindings.cuda', 'sym')
 cpu_sym = try_import('jitfields.bindings.cpp', 'sym')
 
 
-def sym_matvec(mat, vec, dtype=None, out=None):
+def sym_matvec(
+    mat: Tensor,
+    vec: Tensor,
+    dtype: Optional[torch.dtype] = None,
+    out: Optional[Tensor] = None,
+) -> Tensor:
     """Matrix-vector product for compact symmetric matrices
 
-        `out = mat @ vec`
+    Equivalent to `out = mat @ vec`.
 
     Parameters
     ----------
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
-        The matrix should be saved as a vector containing the diagonal
-        followed by the rows of the upper triangle.
-    vec : (..., C) tensor
-        Vector
-    dtype : torch.dtype, optional
+    mat : `(..., CC) tensor`
+        Symmetric matrix with compact storage, with shape `(..., CC)`,
+        where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
+
+        - If `CC == 1`, the matrix is a scaled identity.
+        - If `CC == C`, the matrix is diagonal.
+        - If `CC == C*(C+1)//2`, the matrix should be saved as a vector
+        containing the diagonal followed by the rows of the upper triangle.
+        - If `CC == C*C`, the matrix is a flattened dense matrix.
+    vec : `(..., C) tensor`
+        Vector with shape `(..., C)`.
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
-    out : (..., C) tensor, optional
-        Output placeholder
+    out : `(..., C) tensor`, optional
+        Output placeholder, with shape `(..., C)`.
 
     Returns
     -------
     out : (..., C) tensor
-        Matrix-vector product
+        Matrix-vector product, with shape `(..., C)`.
 
     """
+    nc = vec.shape[-1]
+    nc2 = mat.shape[-1]
     mat, vec = _broadcast_matvec(mat, vec)
     out = _allocate_out(vec, out)
-    return MatVec.apply(mat, vec, dtype, out)
+    if nc2 == (nc*(nc+1))//2:
+        return MatVec.apply(mat, vec, dtype, out)
+    elif nc2 == nc*nc:
+        if out is not None:
+            out = out.unsqueeze(-1)
+        mat = mat.reshape([*mat.shape[:-1], nc, nc])
+        return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze(-1)
+    else:
+        return torch.mul(mat, vec, out=out)
 
 
-def sym_addmatvec(inp, mat, vec, dtype=None, out=None):
+def sym_addmatvec(
+    inp: Tensor,
+    mat: Tensor,
+    vec: Tensor,
+    dtype: Optional[torch.dtype] = None,
+    out: Optional[Tensor] = None,
+) -> Tensor:
     """Add a matrix-vector product for compact symmetric matrices
 
-        `out = inp + mat @ vec`
+    Equivalent to `out = inp + mat @ vec`
 
     Parameters
     ----------
-    inp : (..., C) tensor
-        Vector to which the matrix-vector product is added
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
-        The matrix should be saved as a vector containing the diagonal
-        followed by the rows of the upper triangle.
-    vec : (..., C) tensor
-        Vector used in the matrix-vector product
-    dtype : torch.dtype, optional
+    inp : `(..., C) tensor`
+        Vector to which the matrix-vector product is added.
+        With shape `(..., C)`.
+    mat : `(..., CC) tensor`
+        Symmetric matrix with compact storage, with shape `(..., CC)`,
+        where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
+
+        - If `CC == 1`, the matrix is a scaled identity.
+        - If `CC == C`, the matrix is diagonal.
+        - If `CC == C*(C+1)//2`, the matrix should be saved as a vector
+        containing the diagonal followed by the rows of the upper triangle.
+        - If `CC == C*C`, the matrix is a flattened dense matrix.
+    vec : `(..., C) tensor`
+        Vector with shape `(..., C)`.
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
-    out : (..., C) tensor, optional
-        Output placeholder
+    out : `(..., C) tensor`, optional
+        Output placeholder, with shape `(..., C)`.
+
 
     Returns
     -------
-    out : (..., C) tensor
-        Added matrix-vector product
+    out : `(..., C) tensor`
+        Added matrix-vector product, with shape `(..., C)`.
 
     """
+    nc = vec.shape[-1]
+    nc2 = mat.shape[-1]
     inp, vec = _broadcast_vecvec(inp, vec)
     mat, vec = _broadcast_matvec(mat, vec)
     mat, inp = _broadcast_matvec(mat, inp)
     out = _allocate_out(inp, out)
-    return AddMatVec.apply(inp, mat, vec, dtype, out)
+    if nc2 == (nc*(nc+1))//2:
+        return AddMatVec.apply(inp, mat, vec, dtype, out)
+    elif nc2 == nc*nc:
+        if out is not None:
+            out = out.unsqueeze(-1)
+        return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze(-1).add_(inp)
+    else:
+        return torch.mul(mat, vec, out=out).add_(inp)
 
 
-def sym_addmatvec_(inp, mat, vec, dtype=None):
+def sym_addmatvec_(
+    inp: Tensor,
+    mat: Tensor,
+    vec: Tensor,
+    dtype: Optional[torch.dtype] = None,
+) -> Tensor:
     """Inplace add a matrix-vector product for compact symmetric matrices
 
-        `inp += mat @ vec`
+    Equivalent to `inp += mat @ vec`
 
     Parameters
     ----------
-    inp : (..., C) tensor
-        Vector to which the matrix-vector product is added
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
-        The matrix should be saved as a vector containing the diagonal
-        followed by the rows of the upper triangle.
-    vec : (..., C) tensor
-        Vector used in the matrix-vector product
-    dtype : torch.dtype, optional
+    inp : `(..., C) tensor`
+        Vector to which the matrix-vector product is added.
+        With shape `(..., C)`.
+    mat : `(..., CC) tensor`
+        Symmetric matrix with compact storage, with shape `(..., CC)`,
+        where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
+
+        - If `CC == 1`, the matrix is a scaled identity.
+        - If `CC == C`, the matrix is diagonal.
+        - If `CC == C*(C+1)//2`, the matrix should be saved as a vector
+        containing the diagonal followed by the rows of the upper triangle.
+        - If `CC == C*C`, the matrix is a flattened dense matrix.
+    vec : `(..., C) tensor`
+        Vector with shape `(..., C)`.
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
+
 
     Returns
     -------
-    inp : (..., C) tensor
-        Added matrix-vector product
+    inp : `(..., C) tensor`
+        Added matrix-vector product, with shape `(..., C)`.
 
     """
+    nc = vec.shape[-1]
+    nc2 = mat.shape[-1]
     inp, vec = _broadcast_vecvec(inp, vec)
     mat, vec = _broadcast_matvec(mat, vec)
     mat, inp = _broadcast_matvec(mat, inp)
-    return AddMatVec_.apply(inp, mat, vec, dtype)
+    if nc2 == (nc*(nc+1))//2:
+        return AddMatVec_.apply(inp, mat, vec, dtype)
+    elif nc2 == nc*nc:
+        return inp.add_(torch.matmul(mat, vec.unsqueeze(-1)))
+    else:
+        return inp.addcmul_(mat, vec)
 
 
-def sym_submatvec(inp, mat, vec, dtype=None, out=None):
+def sym_submatvec(
+    inp: Tensor,
+    mat: Tensor,
+    vec: Tensor,
+    dtype: Optional[torch.dtype] = None,
+    out: Optional[Tensor] = None,
+) -> Tensor:
     """Subtract a matrix-vector product for compact symmetric matrices
 
-        `out = inp - mat @ vec`
+    Equivalent to `out = inp - mat @ vec`
 
     Parameters
     ----------
-    inp : (..., C) tensor
-        Vector to which the matrix-vector product is added
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
-        The matrix should be saved as a vector containing the diagonal
-        followed by the rows of the upper triangle.
-    vec : (..., C) tensor
-        Vector used in the matrix-vector product
-    dtype : torch.dtype, optional
+    inp : `(..., C) tensor`
+        Vector to which the matrix-vector product is added.
+        With shape `(..., C)`.
+    mat : `(..., CC) tensor`
+        Symmetric matrix with compact storage, with shape `(..., CC)`,
+        where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
+
+        - If `CC == 1`, the matrix is a scaled identity.
+        - If `CC == C`, the matrix is diagonal.
+        - If `CC == C*(C+1)//2`, the matrix should be saved as a vector
+        containing the diagonal followed by the rows of the upper triangle.
+        - If `CC == C*C`, the matrix is a flattened dense matrix.
+    vec : `(..., C) tensor`
+        Vector with shape `(..., C)`.
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
-    out : (..., C) tensor, optional
-        Output placeholder
+    out : `(..., C) tensor`, optional
+        Output placeholder, with shape `(..., C)`.
+
 
     Returns
     -------
-    out : (..., C) tensor
-        Subtracted matrix-vector product
+    out : `(..., C) tensor`
+        Subtracted matrix-vector product, with shape `(..., C)`.
 
     """
+    nc = vec.shape[-1]
+    nc2 = mat.shape[-1]
     inp, vec = _broadcast_vecvec(inp, vec)
     mat, vec = _broadcast_matvec(mat, vec)
     mat, inp = _broadcast_matvec(mat, inp)
     out = _allocate_out(inp, out)
-    return SubMatVec.apply(inp, mat, vec, dtype, out)
+    if nc2 == (nc*(nc+1))//2:
+        return SubMatVec.apply(inp, mat, vec, dtype, out)
+    elif nc2 == nc*nc:
+        if out is not None:
+            out = out.unsqueeze(-1)
+        return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze(-1).neg_().add_(inp)
+    else:
+        return torch.mul(mat, vec, out=out).neg_().add_(inp)
 
 
-def sym_submatvec_(inp, mat, vec, dtype=None):
+def sym_submatvec_(
+    inp: Tensor,
+    mat: Tensor,
+    vec: Tensor,
+    dtype: Optional[torch.dtype] = None,
+) -> Tensor:
     """Inplace subtract a matrix-vector product for compact symmetric matrices
 
-        `inp -= mat @ vec`
+    Equivalent to `inp -= mat @ vec`
 
     Parameters
     ----------
-    inp : (..., C) tensor
-        Vector to which the matrix-vector product is added
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
-        The matrix should be saved as a vector containing the diagonal
-        followed by the rows of the upper triangle.
-    vec : (..., C) tensor
-        Vector used in the matrix-vector product
-    dtype : torch.dtype, optional
+    inp : `(..., C) tensor`
+        Vector to which the matrix-vector product is added.
+        With shape `(..., C)`.
+    mat : `(..., CC) tensor`
+        Symmetric matrix with compact storage, with shape `(..., CC)`,
+        where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
+
+        - If `CC == 1`, the matrix is a scaled identity.
+        - If `CC == C`, the matrix is diagonal.
+        - If `CC == C*(C+1)//2`, the matrix should be saved as a vector
+        containing the diagonal followed by the rows of the upper triangle.
+        - If `CC == C*C`, the matrix is a flattened dense matrix.
+    vec : `(..., C) tensor`
+        Vector with shape `(..., C)`.
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
+
 
     Returns
     -------
-    inp : (..., C) tensor
-        Subtracted matrix-vector product
+    inp : `(..., C) tensor`
+        Subtracted matrix-vector product, with shape `(..., C)`.
 
     """
+    nc = vec.shape[-1]
+    nc2 = mat.shape[-1]
     inp, vec = _broadcast_vecvec(inp, vec)
     mat, vec = _broadcast_matvec(mat, vec)
     mat, inp = _broadcast_matvec(mat, inp)
-    return SubMatVec_.apply(inp, mat, vec, dtype)
+    if nc2 == (nc*(nc+1))//2:
+        return SubMatVec_.apply(inp, mat, vec, dtype)
+    elif nc2 == nc*nc:
+        return inp.sub_(torch.matmul(mat, vec.unsqueeze(-1)))
+    else:
+        return inp.addcmul_(mat, vec, value=-1)
 
 
 def sym_solve(mat, vec, diag=None, dtype=None, out=None):
     """Solve the symmetric linear system
 
-        `out = (mat + diag).inverse() @ vec`
+    Equivalent to `out = (mat + diag).inverse() @ vec`
 
-    !! Does not backpropagate through `mat` !!
+    Notes
+    -----
+    - !! Does not backpropagate through `mat`
 
     Parameters
     ----------
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
-        The matrix should be saved as a vector containing the diagonal
-        followed by the rows of the upper triangle.
-    vec : (..., C) tensor
-        Vector
-    diag : (..., C) tensor
-        Diagonal regularizer
-    dtype : torch.dtype, optional
+    mat : `(..., CC) tensor`
+        Symmetric matrix with compact storage, with shape `(..., CC)`,
+        where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
+
+        - If `CC == 1`, the matrix is a scaled identity.
+        - If `CC == C`, the matrix is diagonal.
+        - If `CC == C*(C+1)//2`, the matrix should be saved as a vector
+        containing the diagonal followed by the rows of the upper triangle.
+        - If `CC == C*C`, the matrix is a flattened dense matrix.
+    vec : `(..., C) tensor`
+        Vector with shape `(..., C)`.
+    diag : `(..., C) tensor`
+        Diagonal regularizer, with shape `(..., C)`.
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
-    out : (..., C) tensor, optional
-        Output placeholder
+    out : `(..., C) tensor`, optional
+        Output placeholder, with shape `(..., C)`.
 
     Returns
     -------
-    out : (..., C) tensor
-        Solution of the linear system
+    out : `(..., C) tensor`
+        Solution of the linear system, with shape `(..., C)`.
 
     """
+    nc = vec.shape[-1]
+    nc2 = mat.shape[-1]
     mat, vec = _broadcast_matvec(mat, vec)
     out = _allocate_out(vec, out)
-    return Solve.apply(mat, vec, diag, dtype, out)
+    if nc2 == (nc*(nc+1))//2:
+        return Solve.apply(mat, vec, diag, dtype, out)
+    elif nc2 == nc*nc:
+        if out is not None:
+            out = out.unsqueeze(-1)
+        return torch.solve(mat, vec.unsqueeze(-1), out=out).squeeze(-1)
+    else:
+        return torch.div(vec, mat, out=out)
 
 
 def sym_solve_(mat, vec, diag=None, dtype=None):
     """Solve the symmetric linear system in-place
 
-        `vec = mat.inverse() @ vec`
+    Equivalent to `vec = mat.inverse() @ vec`
 
-    !! Does not backpropagate through `mat` !!
+    Notes
+    -----
+    - !! Does not backpropagate through `mat`
 
     Parameters
     ----------
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
-        The matrix should be saved as a vector containing the diagonal
-        followed by the rows of the upper triangle.
-    vec : (..., C) tensor
-        Vector
-    diag : (..., C) tensor
-        Diagonal regularizer
-    dtype : torch.dtype, optional
+    mat : `(..., CC) tensor`
+        Symmetric matrix with compact storage, with shape `(..., CC)`,
+        where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
+
+        - If `CC == 1`, the matrix is a scaled identity.
+        - If `CC == C`, the matrix is diagonal.
+        - If `CC == C*(C+1)//2`, the matrix should be saved as a vector
+        containing the diagonal followed by the rows of the upper triangle.
+        - If `CC == C*C`, the matrix is a flattened dense matrix.
+    vec : `(..., C) tensor`
+        Vector with shape `(..., C)`.
+    diag : `(..., C) tensor`
+        Diagonal regularizer, with shape `(..., C)`.
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
 
     Returns
     -------
     vec : (..., C) tensor
-        Solution of the linear system
+        Solution of the linear system, with shape `(..., C)`.
 
     """
+    nc = vec.shape[-1]
+    nc2 = mat.shape[-1]
     mat, vec = _broadcast_matvec(mat, vec)
-    return Solve_.apply(mat, vec, diag, dtype)
+    if nc2 == (nc*(nc+1))//2:
+        return Solve_.apply(mat, vec, diag, dtype)
+    elif nc2 == nc*nc:
+        sol = torch.solve(mat, vec.unsqueeze(-1)).squeeze(-1)
+        return vec.copy_(sol)
+    else:
+        return vec.div_(mat)
 
 
 def sym_invert(mat, dtype=None, out=None):
     """Invert a compact symmetric matrix
 
-        `out = mat.inverse()`
+    Equivalent to `out = mat.inverse()`
 
-    !! Does not backpropagate through `mat` !!
+    Notes
+    -----
+    - !! Does not backpropagate through `mat`
 
     Parameters
     ----------
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
+    mat : `(..., C*(C+1)//2) tensor`
+        Symmetric matrix with compact storage, with shape `(..., C*(C+1)//2)`.
         The matrix should be saved as a vector containing the diagonal
         followed by the rows of the upper triangle.
     dtype : torch.dtype, optional
         Data type used to carry the computation. By default, same as input.
-    out : (..., C*(C+1)//2) tensor, optional
-        Output placeholder
+    out : `(..., C*(C+1)//2) tensor`, optional
+        Output placeholder, with shape `(..., C*(C+1)//2)`.
 
     Returns
     -------
-    mat : (..., C*(C+1)//2) tensor
-        Inverse matrix
+    mat : `(..., C*(C+1)//2) tensor`
+        Inverse matrix, with shape `(..., C*(C+1)//2)`.
 
     """
     if mat.requires_grad:
@@ -265,23 +402,25 @@ def sym_invert(mat, dtype=None, out=None):
 def sym_invert_(mat, dtype=None):
     """Invert a compact symmetric matrix in-place
 
-        `mat = mat.inverse()`
+    Equivalent to `mat = mat.inverse()`
 
-    !! Does not backpropagate through `mat` !!
+    Notes
+    -----
+    - !! Does not backpropagate through `mat`
 
     Parameters
     ----------
-    mat : (..., C*(C+1)//2) tensor
-        Symmetric matrix with compact storage.
+    mat : `(..., C*(C+1)//2) tensor`
+        Symmetric matrix with compact storage, with shape `(..., C*(C+1)//2)`.
         The matrix should be saved as a vector containing the diagonal
         followed by the rows of the upper triangle.
-    dtype : torch.dtype, optional
+    dtype : `torch.dtype`, optional
         Data type used to carry the computation. By default, same as input.
 
     Returns
     -------
-    mat : (..., C*(C+1)//2) tensor
-        Inverse matrix
+    mat : `(..., C*(C+1)//2) tensor`
+        Inverse matrix, with shape `(..., C*(C+1)//2)`.
 
     """
     if mat.requires_grad:

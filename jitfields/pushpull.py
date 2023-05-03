@@ -1,44 +1,90 @@
+"""
+## Overview
+This module contains a function (`pull`) for sampling values at arbitrary
+coordinates into a continuous function encoded by regularly spaced splines.
+
+The numerical adjoint of this function (`push`) is also defined. The
+operation performed by the adjoint is commonly known as "splatting" in
+computer visions, since it associates each input value with a coordinate
+into the output volume.
+
+The `count` function is equivalent to applying `push` to an image of
+`ones`, but uses a faster implementation.
+
+Finally, `grad` is related to `pull`, as it allows to sample the directional
+gradients of the continuous function at arbitrary locations.
+
+## Notes
+
+In all cases, the last dimension of `grid` assumes a "left to right" order
+of indices, such that if the shape of `inp` is `(Nx, Ny, Nz, Nc)`, each
+element in  `grid` contains the indices `(x, y, z)`.
+This differs from PyTorch, where indices `(x, y, z)` index into a tensor
+ordered as `(Nb, Nc, Nz, Ny, Nx)`.
+
+Furthermore, indices are expressed in voxels, and are therefore expected
+in the range `(0, N-1)`. Indices outside of this range are dealt with using
+one of the boundary conditions that are implemented. This again differs
+form PyTorch, where indices are in the normalized range `(-1, 1)`.
+"""
 __all__ = ['pull', 'push', 'count', 'grad']
 
 import torch
+from torch import Tensor
+from typing import Optional, Sequence
 from .utils import try_import, ensure_list
+from .utils import OneOrSeveral, BoundType, OrderType, ExtrapolateType
 from .splinc import spline_coeff_nd, spline_coeff_nd_
 from .bindings.common.bounds import convert_bound
 from .bindings.common.spline import convert_order
 cuda_pushpull = try_import('jitfields.bindings.cuda', 'pushpull')
 cpu_pushpull = try_import('jitfields.bindings.cpp', 'pushpull')
 
-foo = 0
 
-def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
-         out=None):
+def pull(
+    inp: Tensor,
+    grid: Tensor,
+    order: OneOrSeveral[OrderType] = 2,
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    extrapolate: ExtrapolateType = True,
+    prefilter: bool = False,
+    out: Optional[Tensor] = None,
+) -> Tensor:
     """Sample a tensor using spline interpolation
+
+    Notes
+    -----
+    By default, `inp` is assumed to contain the coefficients of a
+    continuous function encoded by regularly spaced cubic splines.
+    Instead, when `prefilter` is `True`, `pull` interpolates the values
+    of `inp`. To this end, `inp` is first converted to spline coefficients
+    (_i.e._, prefiltered).
 
     Parameters
     ----------
-    inp : (..., *inshape, channel) tensor
-        Input tensor
-    grid : (..., *outshape, ndim) tensor
-        Tensor of coordinates into `inp`
-    order : [sequence of] {0..7}, default=2
-        Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
-        How to deal with out-of-bound values.
-    extrapolate : bool or {'center', 'edge'}
-        - True: use bound to extrapolate out-of-bound value
-        - False or 'center': do not extrapolate values that fall outside
+    inp : `(..., *inshape, channel) tensor`
+        Input tensor with shape `(..., *inshape, channel)`.
+    grid : `(..., *outshape, ndim) tensor`
+        Tensor of coordinates into `inp`, with shape `(..., *outshape, ndim)`.
+    order : `[sequence of] {0..7}`, default=2
+        Interpolation order (per dimension).
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+        How to deal with out-of-bound values (per dimension).
+    extrapolate : `bool or {'center', 'edge'}`
+        - `True`: use bound to extrapolate out-of-bound value
+        - `False` or `'center'`: do not extrapolate values that fall outside
           of the centers of the first and last voxels.
-        - 'edge': do not extrapolate values that fall outside
+        - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
-    prefilter : bool, default=True
+    prefilter : `bool, default=True
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "spline sampling".
 
     Returns
     -------
-    out : (..., *outshape, channel) tensor
-        Pulled tensor
+    out : `(..., *outshape, channel) tensor`
+        Pulled tensor, with shape `(..., *outshape, channel)`.
 
     """
     ndim = grid.shape[-1]
@@ -51,35 +97,101 @@ def pull(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
     return Pull.apply(inp, grid, order, bound, extrapolate, out)
 
 
-def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True,
-         prefilter=False, out=None):
+def grad(
+    inp: Tensor,
+    grid: Tensor,
+    order: OneOrSeveral[OrderType] = 2,
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    extrapolate: ExtrapolateType = True,
+    prefilter: bool = False,
+    out: Optional[Tensor] = None,
+):
+    """Sample the spatial gradients of a tensor using spline interpolation
+
+    Notes
+    -----
+    By default, `inp` is assumed to contain the coefficients of a
+    continuous function encoded by regularly spaced cubic splines.
+    Instead, when `prefilter` is `True`, `grad` interpolates the values
+    of `inp`. To this end, `inp` is first converted to spline coefficients
+    (_i.e._, prefiltered).
+
+    Parameters
+    ----------
+    inp : `(..., *inshape, channel) tensor`
+        Input tensor, with shape `(..., *inshape, channel)`.
+    grid : `(..., *outshape, ndim) tensor`
+        Tensor of coordinates into `inp`, with shape `(..., *outshape, ndim)`.
+    order : [sequence of] {0..7}, default=2
+        Interpolation order (per dimension).
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+        How to deal with out-of-bound values (per dimension).
+    extrapolate : `bool or {'center', 'edge'}`
+        - `True`: use bound to extrapolate out-of-bound value
+        - `False` or `'center'`: do not extrapolate values that fall outside
+          of the centers of the first and last voxels.
+        - `'edge'`: do not extrapolate values that fall outside
+           of the edges of the first and last voxels.
+    prefilter : `bool`, default=True
+        Whether to first compute interpolating coefficients.
+        Must be true for proper interpolation, otherwise this
+        function merely performs a non-interpolating "spline sampling".
+
+    Returns
+    -------
+    out : `(..., *outshape, channel, ndim) tensor`
+        Pulled gradients, with shape `(..., *outshape, channel, ndim)`.
+
+    """
+    ndim = grid.shape[-1]
+    if ndim > 3:
+        raise NotImplementedError("Not implemented for spatial dim > 3")
+    if prefilter:
+        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+    inp, grid = _broadcast_pull(inp, grid)
+    order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
+    return Grad.apply(inp, grid, order, bound, extrapolate, out)
+
+
+def push(
+    inp: Tensor,
+    grid: Tensor,
+    shape: Optional[Sequence[int]] = None,
+    order: OneOrSeveral[OrderType] = 2,
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    extrapolate: ExtrapolateType = True,
+    prefilter: bool = False,
+    out: Optional[Tensor] = None,
+) -> Tensor:
     """Splat a tensor using spline interpolation
 
     Parameters
     ----------
-    inp : (..., *inshape, channel) tensor
-        Input tensor
-    grid : (..., *inshape, ndim) tensor
-        Tensor of coordinates into `inp`
-    shape : sequence[int], default=inshape
-        Output spatial shape
-    order : [sequence of] {0..7}, default=2
-        Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
-        How to deal with out-of-bound values.
-    extrapolate : bool or {'center', 'edge'}
-        - True: use bound to extrapolate out-of-bound value
-        - False or 'center': do not extrapolate values that fall outside
+    inp : `(..., *inshape, channel) tensor`
+        Input tensor, with shape `(..., *inshape, channel)`.
+    grid : `(..., *inshape, ndim) tensor`
+        Tensor of coordinates into `inp`, with shape `(..., *inshape, ndim)`.
+    shape : `sequence[int]`, default=`inshape`
+        Output spatial shape. Default is `inshape`.
+    order : `[sequence of] {0..7}`, default=2
+        Interpolation order (per dimension).
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+        How to deal with out-of-bound values (per dimension).
+    extrapolate : `bool or {'center', 'edge'}`
+        - `True`: use bound to extrapolate out-of-bound value
+        - `False` or `'center'`: do not extrapolate values that fall outside
           of the centers of the first and last voxels.
-        - 'edge': do not extrapolate values that fall outside
+        - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
-    prefilter : bool, default=True
+    prefilter : `bool`, default=True
         Whether to compute interpolating coefficients at the end.
+        If the value for `prefilter` is matched across `pull` and `push`,
+        they are adjoint of each other.
 
     Returns
     -------
-    out : (..., *shape, channel) tensor
-        Pulled tensor
+    out : `(..., *shape, channel) tensor`
+        Pushed tensor, with shape `(..., *shape, channel)`.
 
     """
     ndim = grid.shape[-1]
@@ -94,31 +206,37 @@ def push(inp, grid, shape=None, order=2, bound='dct2', extrapolate=True,
     return inp
 
 
-def count(grid, shape=None, order=2, bound='dct2', extrapolate=True,
-          out=None):
+def count(
+    grid: Tensor,
+    shape: Optional[Sequence[int]] = None,
+    order: OneOrSeveral[OrderType] = 2,
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    extrapolate: ExtrapolateType = True,
+    out: Optional[Tensor] = None,
+):
     """Splat ones using spline interpolation
 
     Parameters
     ----------
-    grid : (..., *inshape, ndim) tensor
-        Tensor of coordinates
-    shape : sequence[int], default=inshape
-        Output spatial shape
-    order : [sequence of] {0..7}, default=2
-        Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
-        How to deal with out-of-bound values.
-    extrapolate : bool or {'center', 'edge'}
-        - True: use bound to extrapolate out-of-bound value
-        - False or 'center': do not extrapolate values that fall outside
+    grid : `(..., *inshape, ndim) tensor`
+        Tensor of coordinates, with shape `(..., *inshape, ndim)`
+    shape : `sequence[int]`, default=`inshape`
+        Output spatial shape. Default is `inshape`.
+    order : `[sequence of] {0..7}`, default=2
+        Interpolation order (per dimension).
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+        How to deal with out-of-bound values (per dimension).
+    extrapolate : `bool or {'center', 'edge'}`
+        - `True`: use bound to extrapolate out-of-bound value
+        - `False` or `'center'`: do not extrapolate values that fall outside
           of the centers of the first and last voxels.
-        - 'edge': do not extrapolate values that fall outside
+        - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
 
     Returns
     -------
-    out : (..., *shape) tensor
-        Pulled tensor
+    out : `(..., *shape) tensor`
+        Pushed ones, with shape `(..., *shape)`.
 
     """
     ndim = grid.shape[-1]
@@ -127,47 +245,6 @@ def count(grid, shape=None, order=2, bound='dct2', extrapolate=True,
     shape = list(shape or grid.shape[-ndim-1:-1])
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     return Count.apply(grid, shape, order, bound, extrapolate, out)
-
-
-def grad(inp, grid, order=2, bound='dct2', extrapolate=True, prefilter=False,
-         out=None):
-    """Sample the spatial gradients of a tensor using spline interpolation
-
-    Parameters
-    ----------
-    inp : (..., *inshape, channel) tensor
-        Input tensor
-    grid : (..., *outshape, ndim) tensor
-        Tensor of coordinates into `inp`
-    order : [sequence of] {0..7}, default=2
-        Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
-        How to deal with out-of-bound values.
-    extrapolate : bool or {'center', 'edge'}
-        - True: use bound to extrapolate out-of-bound value
-        - False or 'center': do not extrapolate values that fall outside
-          of the centers of the first and last voxels.
-        - 'edge': do not extrapolate values that fall outside
-           of the edges of the first and last voxels.
-    prefilter : bool, default=True
-        Whether to first compute interpolating coefficients.
-        Must be true for proper interpolation, otherwise this
-        function merely performs a non-interpolating "spline sampling".
-
-    Returns
-    -------
-    out : (..., *outshape, channel, ndim) tensor
-        Pulled gradients
-
-    """
-    ndim = grid.shape[-1]
-    if ndim > 3:
-        raise NotImplementedError("Not implemented for spatial dim > 3")
-    if prefilter:
-        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
-    inp, grid = _broadcast_pull(inp, grid)
-    order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
-    return Grad.apply(inp, grid, order, bound, extrapolate, out)
 
 
 class Pull(torch.autograd.Function):

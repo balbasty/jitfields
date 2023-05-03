@@ -1,54 +1,66 @@
 __all__ = ['resize', 'restrict']
 
 import torch
+from torch import Tensor
+from typing import Optional
+import math as pymath
 from .bindings.common.bounds import convert_bound
 from .bindings.common.spline import convert_order
 from .utils import try_import, ensure_list, prod
+from .utils import OneOrSeveral, AnchorType, OrderType, BoundType
 from .splinc import spline_coeff_nd
-import math as pymath
 cuda_resize = try_import('jitfields.bindings.cuda', 'resize')
 cpu_resize = try_import('jitfields.bindings.cpp', 'resize')
 cuda_restrict = try_import('jitfields.bindings.cuda', 'restrict')
 cpu_restrict = try_import('jitfields.bindings.cpp', 'restrict')
 
 
-def resize(x, factor=None, shape=None, ndim=None,
-           anchor='e', order=2, bound='dct2', prefilter=True, out=None):
+def resize(
+    x: Tensor,
+    factor: Optional[OneOrSeveral[float]] = None,
+    shape: Optional[OneOrSeveral[int]] = None,
+    ndim: Optional[int] = None,
+    anchor: AnchorType = 'edge',
+    order: OneOrSeveral[OrderType] = 2,
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    prefilter: bool = True,
+    out: Optional[Tensor] = None,
+) -> Tensor:
     """Resize a tensor using spline interpolation
 
     Parameters
     ----------
-    x : (..., *inshape) tensor
-        Input  tensor
-    factor : [sequence of] float, optional
+    x : `(..., *inshape) tensor`
+        Input  tensor, with shape `(..., *inshape)`.
+    factor : `[sequence of] float`, optional
         Factor by which to resize the tensor (> 1 == bigger)
         One of factor or shape must be provided.
-    shape : [sequence of] float, optional
+    shape : `[sequence of] float`, optional
         Shape of output tensor.
         One of factor or shape must be provided.
-    ndim : int, optional
+    ndim : `int`, optional
         Number if spatial dimensions.
         If not provided, try to guess from factor or shape.
-        If guess fails, assume ndim = x.dim().
-    anchor : {'edge', 'center'} or None
+        If guess fails, assume `ndim = x.dim()`.
+    anchor : `{'edge', 'center'} or None`
         What feature should be aligned across the input and output tensors.
         If 'edge' or 'center', the effective scaling factor may slightly
         differ from the requested scaling factor.
         If None, the center of the (0, 0) voxel is aligned, and the
         requested factor is exactly applied.
-    order : [sequence of] {0..7}, default=2
+    order : `[sequence of] {0..7}`, default=2
         Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
         How to deal with out-of-bound values.
-    prefilter : bool, default=True
+    prefilter : `bool`, default=True
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "prolongation".
 
     Returns
     -------
-    x : (..., *shape) tensor
-        Resized tensor
+    x : `(..., *shape) tensor`
+        Resized tensor, with shape `(..., *shape)`.
 
     """
     if not ndim:
@@ -85,39 +97,48 @@ def resize(x, factor=None, shape=None, ndim=None,
     return _Resize.apply(x, factor, shape, ndim, anchor, order, bound, out)
 
 
-def restrict(x, factor=None, shape=None, ndim=None,
-             anchor='e', order=1, bound='dct2', reduce_sum=False, out=None):
+def restrict(
+    x: Tensor,
+    factor: Optional[OneOrSeveral[float]] = None,
+    shape: Optional[OneOrSeveral[int]] = None,
+    ndim: Optional[int] = None,
+    anchor: AnchorType = 'edge',
+    order: OneOrSeveral[OrderType] = 1,
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    reduce_sum: bool = False,
+    out: Optional[Tensor] = None,
+) -> Tensor:
     """Restrict (adjoint of resize) a tensor using spline interpolation
 
     Parameters
     ----------
-    x : (..., *inshape) tensor
-        Input  tensor
-    factor : [sequence of] float, optional
+    x : `(..., *inshape) tensor`
+        Input  tensor, with shape `(..., *inshape)`.
+    factor : `[sequence of] float`, optional
         Factor by which to resize the tensor (> 1 == smaller)
         One of factor or shape must be provided.
-    shape : [sequence of] float, optional
+    shape : `[sequence of] float`, optional
         Shape of output tensor.
         One of factor or shape must be provided.
-    ndim : int, optional
+    ndim : `int`, optional
         Number if spatial dimensions.
         If not provided, try to guess from factor or shape.
         If guess fails, assume ndim = x.dim().
-    anchor : {'edge', 'center'} or None
+    anchor : `{'edge', 'center'} or None`
         What feature should be aligned across the input and output tensors.
         If 'edge' or 'center', the effective scaling factor may slightly
         differ from the requested scaling factor.
         If None, the center of the (0, 0) voxel is aligned, and the
         requested factor is exactly applied.
-    order : [sequence of] {0..7}, default=2
+    order : `[sequence of] {0..7}`, default=2
         Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
         How to deal with out-of-bound values.
 
     Returns
     -------
-    x : (..., *shape) tensor
-        restricted tensor
+    x : `(..., *shape) tensor`
+        Restricted tensor, with shape `(..., *shape)`.
 
     """
     if not ndim:

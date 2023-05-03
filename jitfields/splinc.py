@@ -4,30 +4,69 @@ __all__ = [
 ]
 
 import torch.autograd
+from torch import Tensor
+from typing import Optional
 from .bindings.common.bounds import convert_bound, cnames as boundnames
 from .bindings.common.spline import convert_order
 from .utils import try_import, ensure_list
+from .utils import OrderType, BoundType, OneOrSeveral
 cuda_splinc = try_import('jitfields.bindings.cuda', 'splinc')
 cpu_splinc = try_import('jitfields.bindings.cpp', 'splinc')
 
 
-def spline_coeff_(inp, order, bound='dct2', dim=-1):
+def spline_coeff(
+    inp: Tensor,
+    order: OrderType,
+    bound: BoundType = 'dct2',
+    dim: int = -1,
+) -> Tensor:
     """Compute the interpolating spline coefficients, along a single dimension.
 
     Parameters
     ----------
-    inp : tensor
+    inp : `tensor`
         Input tensor
-    order : {0..7}, default=2
+    order : `{0..7}`, default=2
         Interpolation order.
-    bound : {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
+    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
         Boundary conditions.
-    dim : int, default=-1
+    dim : `int`, default=-1
         Dimension along which to filter
 
     Returns
     -------
-    coeff : tensor
+    coeff : `tensor`
+        Spline coefficients
+    """
+    return spline_coeff_(inp.clone(), order, bound, dim)
+
+
+def spline_coeff_(
+    inp: Tensor,
+    order: OrderType,
+    bound: BoundType = 'dct2',
+    dim: int = -1,
+) -> Tensor:
+    """Compute the interpolating spline coefficients, along a single dimension.
+
+    Notes
+    -----
+    This function operates inplace.
+
+    Parameters
+    ----------
+    inp : `tensor`
+        Input tensor
+    order : `{0..7}`, default=2
+        Interpolation order.
+    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+        Boundary conditions.
+    dim : `int`, default=-1
+        Dimension along which to filter
+
+    Returns
+    -------
+    coeff : `tensor`
         Spline coefficients
     """
     order = convert_order.get(order, order)
@@ -36,73 +75,65 @@ def spline_coeff_(inp, order, bound='dct2', dim=-1):
     return SplineCoeff_.apply(inp, order, bound, dim)
 
 
-def spline_coeff(inp, order, bound='dct2', dim=-1):
-    """Compute the interpolating spline coefficients, along a single dimension.
-
-    Parameters
-    ----------
-    inp : tensor
-        Input tensor
-    order : {0..7}, default=2
-        Interpolation order.
-    bound : {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
-        Boundary conditions.
-    dim : int, default=-1
-        Dimension along which to filter
-
-    Returns
-    -------
-    coeff : tensor
-        Spline coefficients
-    """
-    return spline_coeff_(inp.clone(), order, bound, dim)
-
-
-def spline_coeff_nd_(inp, order, bound='dct2', ndim=None):
+def spline_coeff_nd(
+    inp: Tensor,
+    order: OneOrSeveral[OrderType],
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    ndim: Optional[int] = None,
+) -> Tensor:
     """Compute the interpolating spline coefficients, along the last N dimensions.
 
     Parameters
     ----------
-    inp : (..., *spatial) tensor
-        Input tensor
-    order : [sequence of] {0..7}, default=2
-        Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
-        Boundary conditions.
-    ndim : int, default=`inp.dim()`
-        Number of spatial dimensions
+    inp : `(..., *spatial) tensor`
+        Input tensor, with shape `(..., *spatial)`.
+    order : `[sequence of] {0..7}`, default=2
+        Interpolation order (per dimension).
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+        Boundary conditions (per dimension).
+    ndim : `int`, default=`inp.dim()`
+        Number of spatial dimensions. Defaults: all.
 
     Returns
     -------
-    coeff : (..., *spatial) tensor
-        Spline coefficients
+    coeff : `(..., *spatial) tensor`
+        Spline coefficients, with shape `(..., *spatial)`.
+    """
+    return spline_coeff_nd_(inp.clone(), order, bound, ndim)
+
+
+def spline_coeff_nd_(
+    inp: Tensor,
+    order: OneOrSeveral[OrderType],
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    ndim: Optional[int] = None,
+) -> Tensor:
+    """Compute the interpolating spline coefficients, along the last N dimensions.
+
+    Notes
+    -----
+    This function operates inplace.
+
+    Parameters
+    ----------
+    inp : `(..., *spatial) tensor`
+        Input tensor, with shape `(..., *spatial)`.
+    order : `[sequence of] {0..7}`, default=2
+        Interpolation order (per dimension).
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+        Boundary conditions (per dimension).
+    ndim : `int`, default=`inp.dim()`
+        Number of spatial dimensions. Defaults: all.
+
+    Returns
+    -------
+    coeff : `(..., *spatial) tensor`
+        Spline coefficients, with shape `(..., *spatial)`.
     """
     order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
     bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
     checkbound(order, bound)
     return SplineCoeffND_.apply(inp, order, bound, ndim)
-
-
-def spline_coeff_nd(inp, order, bound='dct2', ndim=None):
-    """Compute the interpolating spline coefficients, along the last N dimensions.
-
-    Parameters
-    ----------
-    inp : (..., *spatial) tensor
-        Input tensor
-    order : [sequence of] {0..7}, default=2
-        Interpolation order.
-    bound : [sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}, default='dct2'
-        Boundary conditions.
-    ndim : int, default=`inp.dim()`
-        Number of spatial dimensions
-
-    Returns
-    -------
-    coeff : (..., *spatial) tensor
-        Spline coefficients
-    """
-    return spline_coeff_nd_(inp.clone(), order, bound, ndim)
 
 
 bounds_ok = ('dct1', 'dct2', 'dft', 'replicate')
