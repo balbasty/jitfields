@@ -1,0 +1,45 @@
+site_name: jitfields
+site_url: https://jitfields.readthedocs.io
+repo_url: https://github.com/balbasty/jitfields
+edit_uri: blob/main/docs/md
+site_dir: html
+docs_dir: md
+theme: 
+  name: material
+plugins:
+- mkdocstrings:
+    handlers:
+      python:
+        paths: [..]
+        options:
+          docstring_style: numpy
+          merge_init_into_class: True
+          separate_signature: True
+          members_order: source
+          show_source: False
+          show_root_heading: True
+markdown_extensions:
+- pymdownx.arithmatex:
+    generic: true
+extra_javascript:
+- javascripts/mathjax.js
+- https://polyfill.io/v3/polyfill.min.js?features=es6
+- https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+- Home: home.md
+- Installation: install.md
+- Getting Started: start.md
+- API: 
+  - pushpull: api/pushpull.md
+  - resize: api/resize.md
+  - splinc: api/splinc.md
+  - regularisers:
+    - flows: api/regularisers_flows.md
+    - fields: api/regularisers_fields.md
+  - sym: api/sym.md
+  - types: api/typing.md
+
+watch:
+- ../jitfields
+

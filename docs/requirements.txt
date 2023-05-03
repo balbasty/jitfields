@@ -1,0 +1,5 @@
+mkdocs
+mkdocs-gitbook
+mkdocstrings[python]>=0.18
+pytkdocs[numpy-style]
+
