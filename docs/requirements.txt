@@ -1,5 +1,4 @@
 mkdocs
-mkdocs-gitbook
+mkdocs-material
 mkdocstrings[python]>=0.18
-pytkdocs[numpy-style]
 
