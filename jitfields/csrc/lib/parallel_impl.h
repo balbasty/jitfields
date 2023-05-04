@@ -37,7 +37,6 @@
 #define JF_CAN_USE_OPENMP 0
 #endif
 
-#include <iostream>
 #if JF_CAN_USE_FUTURE
 #include "threadpool.h"
 namespace jf {
