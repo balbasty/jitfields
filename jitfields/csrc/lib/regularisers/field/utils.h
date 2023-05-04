@@ -13,11 +13,8 @@ const int one   = 1;
 const int two   = 2;
 const int three = 3;
 
-template <int D, bound::type BX=B0, bound::type BY=BX, bound::type BZ=BY>
+template <int C, int D, typename, typename, typename, bound::type...>
 struct RegField {};
-
-template <int C, int D, bound::type BX=B0, bound::type BY=BX, bound::type BZ=BY>
-struct RegFieldStatic {};
 
 //----------------------------------------------------------------------
 //          Helpers to implement generic variants that either
@@ -74,6 +71,56 @@ struct Op<'-', scalar_t, reduce_t> {
     typedef scalar_t & (*FuncType)(scalar_t &, const reduce_t &);
     static constexpr FuncType f = isub;
 };
+
+//----------------------------------------------------------------------
+//                  Helpers to implement the loops
+//----------------------------------------------------------------------
+
+template <int N, typename U>
+__device__ inline
+U center_offset(const U * size, const U * stride)
+{
+    U offset = 0;
+#   pragma unroll
+    for (int d=0; d < N; ++d)
+        offset += (size[d]-1)/2 * stride[d];
+    return offset;
+}
+
+template <int N, typename offset_t>
+__device__ inline
+bool patch1(const offset_t loc[N], offset_t n)
+{
+    offset_t acc = 0;
+#   pragma unroll
+    for (int d=0; d < N; ++d)
+        acc += loc[d];
+    return acc % 2 == n % 2;
+}
+
+template <int N, typename offset_t>
+__device__ inline
+bool patch2(const offset_t loc[N], offset_t n)
+{
+    offset_t acc = 0;
+    offset_t mul = 1;
+#   pragma unroll
+    for (int d=0; d < N; ++d, mul *= 2)
+        acc += (loc[d] % 2) * mul;
+    return acc == n % mul;
+}
+
+template <int N, typename offset_t>
+__device__ inline
+bool patch3(const offset_t loc[N], offset_t n)
+{
+    offset_t acc = 0;
+    offset_t mul = 1;
+#   pragma unroll
+    for (int d=0; d < N; ++d, mul *= 3)
+        acc += (loc[d] % 3) * mul;
+    return acc == n % mul;
+}
 
 } // namespace reg_field
 } // namespace jf

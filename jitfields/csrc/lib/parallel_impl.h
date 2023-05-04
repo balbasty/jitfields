@@ -37,13 +37,16 @@
 #define JF_CAN_USE_OPENMP 0
 #endif
 
+#include <iostream>
 #if JF_CAN_USE_FUTURE
 #include "threadpool.h"
 namespace jf {
 inline size_t get_parallel_threads() { return get_num_threads(); }
 inline size_t set_parallel_threads(int nthreads) { return set_num_threads(); }
+inline std::string get_parallel_backend() { return "native"; }
 }
 #elif JF_CAN_USE_OPENMP
+#pragma cling load("libomp").
 #include <omp.h>
 namespace jf {
 inline size_t get_parallel_threads() { return omp_get_max_threads(); }
@@ -52,11 +55,13 @@ inline size_t set_parallel_threads(int nthreads)
     omp_set_num_threads(nthreads);
     return omp_get_max_threads();
 }
+inline std::string get_parallel_backend() { return "omp"; }
 }
 #else
 namespace jf {
 inline size_t get_parallel_threads() { return 1; }
 inline size_t set_parallel_threads(int nthreads) { return 1; }
+inline std::string get_parallel_backend() { return "none"; }
 }
 #endif
 

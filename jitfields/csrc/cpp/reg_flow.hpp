@@ -46,15 +46,14 @@ void matvec_absolute(
     Impl::make_kernel_absolute(kernel, absolute, voxel_size);
 
     parallel_for(0, numel, GRAIN_SIZE, [&](long start, long end) {
-        for (offset_t i=start; i < end; ++i)
-        {
-            offset_t inp_offset = index2offset<nall>(i, size, stride_inp);
-            offset_t out_offset = index2offset<nall>(i, size, stride_out);
+    for (offset_t i=start; i < end; ++i)
+    {
+        offset_t inp_offset = index2offset<nall>(i, size, stride_inp);
+        offset_t out_offset = index2offset<nall>(i, size, stride_out);
 
-            Impl::template matvec_absolute<opfunc>(
-                out + out_offset, inp + inp_offset, osc, isc, kernel);
-        }
-    });
+        Impl::template matvec_absolute<opfunc>(
+            out + out_offset, inp + inp_offset, osc, isc, kernel);
+    }});
 }
 
 // --- ABSOLUTE: kernel ------------------------------------------------

@@ -26,4 +26,5 @@ def init_device(device):
     else:
         assert device == 'cpu'
         set_num_threads(param)
-    return torch.device(device)
+    device = torch.device(device)
+    return device

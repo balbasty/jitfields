@@ -2,7 +2,6 @@ import torch
 from torch.autograd import gradcheck
 from jitfields.pushpull import pull, push, count, grad
 from jitfields.utils import identity_grid
-from jitfields.bindings.common.bounds import cnames as boundnames
 from .utils import test_devices, init_device
 import inspect
 import pytest

@@ -14,7 +14,7 @@ namespace reg_flow {
 
 template <typename scalar_t, typename reduce_t, typename offset_t,
           bound::type BX>
-struct RegFlow<two, scalar_t, reduce_t, offset_t, BX> {
+struct RegFlow<one, scalar_t, reduce_t, offset_t, BX> {
     using bound_utils_x = bound::utils<BX>;
     typedef scalar_t & (*OpType)(scalar_t &, const reduce_t &);
 
@@ -30,8 +30,7 @@ struct RegFlow<two, scalar_t, reduce_t, offset_t, BX> {
         reduce_t * kernel, reduce_t absolute, const reduce_t voxel_size[1])
     {
         reduce_t vx = voxel_size[0];
-        vx = 1./(vx*vx);
-        kernel[0] = absolute / vx;
+        kernel[0] = absolute * (vx*vx);
     }
 
     // --- matvec ---
@@ -121,7 +120,7 @@ struct RegFlow<two, scalar_t, reduce_t, offset_t, BX> {
             };
 
             op(*out, kernel[0] * center +
-                     kernel[1] * (get(x0, fx0) + get(x1, fx1));
+                     kernel[1] * (get(x0, fx0) + get(x1, fx1)));
         };
 
         conv(out, inp, kernel);
@@ -296,7 +295,7 @@ struct RegFlow<two, scalar_t, reduce_t, offset_t, BX> {
 
         auto setdiag = [&](scalar_t & out, const reduce_t * kernel) {
             reduce_t w000 = kernel[0],
-                     w100 = kernel[1]
+                     w100 = kernel[1],
                      w200 = kernel[2];
             w000 -= w100 * (fx0 + fx1) + w200 * (fx00 + fx11);
             op(out, w000);

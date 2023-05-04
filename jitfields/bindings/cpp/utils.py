@@ -2,7 +2,6 @@ import ctypes
 import numbers
 import cppyy
 import os
-
 import numpy as np
 
 
@@ -37,49 +36,10 @@ def as_ctype(x):
     return x
 
 
-# def cwrap(func):
-#     """Decorator to automatically cast inputs to a cppyy function"""
-#     # from time import time
-#     def call(*args):
-#         args = list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
-#         # tic = time()
-#         out = func(*args)
-#         # print('internal:', (time() - tic) * 1e3, 'ms')
-#         return out
-#     return call
-
-
-def cwrap(func, tag='call'):
+def cwrap(func):
     """Decorator to automatically cast inputs to a cppyy function"""
-    def prep(*args):
-        return list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
-
     def call(*args):
-        args = prep(*args)
+        args = list(map(lambda x: x if isinstance(x, (int, float)) else as_ctype(x), args))
         out = func(*args)
         return out
-    def restrict(*args):
-        args = prep(*args)
-        out = func(*args)
-        return out
-    def resize(*args):
-        args = prep(*args)
-        out = func(*args)
-        return out
-    def matvec(*args):
-        args = prep(*args)
-        out = func(*args)
-        return out
-    def solve(*args):
-        args = prep(*args)
-        out = func(*args)
-        return out
-    def solve_(*args):
-        args = prep(*args)
-        out = func(*args)
-        return out
-    def vel2mom(*args):
-        args = prep(*args)
-        out = func(*args)
-        return out
-    return locals()[tag]
+    return call

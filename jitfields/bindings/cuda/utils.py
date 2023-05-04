@@ -135,7 +135,7 @@ class CachedKernel:
             expr = key2expr(key)
             module = cp.RawModule(
                 code=str(self.code),
-                options=('--std=c++14', '-default-device '),
+                options=('--std=c++14', '-default-device'),
                 name_expressions=(expr,))
             kernel = module.get_function(expr)
             if int(os.environ.get('JF_CACHE_KERNELS', '1')):

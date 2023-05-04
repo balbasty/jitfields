@@ -41,12 +41,13 @@ __all__ = [
     'field_diag_sub', 'field_diag_sub_',
     'field_precond', 'field_precond_',
     'field_forward',
+    'field_relax_',
 ]
 
 import torch
 from torch import Tensor
 from typing import Optional
-from .utils import try_import, ensure_list, broadcast
+from .utils import try_import, ensure_list, broadcast, make_vector
 from .utils import BoundType, OneOrSeveral
 from .sym import sym_solve, sym_solve_, sym_matvec
 cuda_impl = try_import('jitfields.bindings.cuda', 'regularisers')
@@ -60,7 +61,7 @@ def field_matvec(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -102,8 +103,7 @@ def field_matvec(
 
     # broadcast
     if weight is not None:
-        vec, weight = broadcast(vec, weight[..., None], skip_last=1)
-        weight = weight[..., 0]
+        vec, weight = broadcast(vec, weight, skip_last=1)
         fn = impl.field_matvec_rls
         weight = [weight]
     else:
@@ -116,10 +116,10 @@ def field_matvec(
 
     nc = vec.shape[-1]
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     # forward
     fn(out, vec, *weight, bound, voxel_size,
@@ -136,7 +136,7 @@ def field_matvec_add(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     _sub: bool = False,
@@ -147,9 +147,8 @@ def field_matvec_add(
     # broadcast
     inp, vec = broadcast(inp, vec)
     if weight is not None:
-        vec, weight = broadcast(vec, weight[..., None], skip_last=1)
+        vec, weight = broadcast(vec, weight, skip_last=1)
         inp, vec = broadcast(inp, vec)
-        weight = weight[..., 0]
         fn = impl.field_matvec_rls
         weight = [weight]
     else:
@@ -164,10 +163,10 @@ def field_matvec_add(
 
     nc = vec.shape[-1]
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     # forward
     fn(out, vec, *weight, bound, voxel_size,
@@ -185,7 +184,7 @@ def field_matvec_add_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     _sub: bool = False,
 ) -> Tensor:
@@ -195,9 +194,8 @@ def field_matvec_add_(
     # broadcast
     inp, vec = broadcast(inp, vec)
     if weight is not None:
-        vec, weight = broadcast(vec, weight[..., None], skip_last=1)
+        vec, weight = broadcast(vec, weight, skip_last=1)
         inp, vec = broadcast(inp, vec)
-        weight = weight[..., 0]
         fn = impl.field_matvec_rls
         weight = [weight]
     else:
@@ -206,10 +204,10 @@ def field_matvec_add_(
 
     nc = vec.shape[-1]
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     # forward
     fn(inp, vec, *weight, bound, voxel_size,
@@ -227,7 +225,7 @@ def field_matvec_sub(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -245,7 +243,7 @@ def field_matvec_sub_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_matvec`"""
@@ -259,7 +257,7 @@ def field_kernel(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     **backend,
@@ -309,10 +307,16 @@ def field_kernel(
         out = torch.empty(shape, **backend)
 
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
+
+    minshape = (1 if (sum(membrane) == sum(bending) == 0) else
+                3 if (sum(bending) == 0) else 5)
+    if any(s < minshape for s in out.shape[-ndim-1:-1]):
+        raise ValueError(f'Output spatial shape is smaller than the kernel. '
+                         f'Spatial shape must be at least {[minshape]*ndim}.')
 
     # forward
     impl = cuda_impl if out.is_cuda else cpu_impl
@@ -328,7 +332,7 @@ def field_kernel_add(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     _sub: bool = False,
@@ -342,10 +346,10 @@ def field_kernel_add(
 
     nc = inp.shape[-1]
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     # forward
     impl = cuda_impl if out.is_cuda else cpu_impl
@@ -362,17 +366,17 @@ def field_kernel_add_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     _sub: bool = False,
 ) -> Tensor:
     """See `flow_kernel`"""
     nc = inp.shape[-1]
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     # forward
     impl = cuda_impl if inp.is_cuda else cpu_impl
@@ -388,7 +392,7 @@ def field_kernel_sub(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -403,7 +407,7 @@ def field_kernel_sub_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_kernel`"""
@@ -417,7 +421,7 @@ def field_diag(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     **backend,
@@ -452,7 +456,7 @@ def field_diag(
     ndim = len(shape)
 
     if weight is not None:
-        batch = weight.shape[:-ndim]
+        batch = weight.shape[:-ndim-1]
         backend = dict(dtype=weight.dtype, device=weight.device)
         weight = [weight]
     else:
@@ -466,6 +470,8 @@ def field_diag(
         membrane = ensure_list(membrane)
         bending = ensure_list(bending)
         nc = max(len(absolute), len(membrane), len(bending))
+        if weight:
+            nc = max(nc, weight[0].shape[-1])
         out = torch.empty([*batch, *shape, nc], **backend)
 
     # forward
@@ -473,10 +479,10 @@ def field_diag(
     fn = impl.field_diag_rls if weight else impl.field_diag
 
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     fn(out, *weight, bound, voxel_size,
        absolute, membrane, bending)
@@ -491,7 +497,7 @@ def field_diag_add(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     _sub: bool = False,
@@ -501,8 +507,7 @@ def field_diag_add(
 
     if weight is not None:
         fn = impl.field_diag_rls
-        inp, weight = broadcast(inp, weight[..., None], skip_last=1)
-        weight = weight[..., 0]
+        inp, weight = broadcast(inp, weight, skip_last=1)
         weight = [weight]
     else:
         fn = impl.field_diag
@@ -516,10 +521,10 @@ def field_diag_add(
 
     nc = inp.shape[-1]
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     # forward
     fn(out, *weight, bound, voxel_size,
@@ -536,11 +541,11 @@ def field_diag_add_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     _sub: bool = False,
 ) -> Tensor:
-    """See `flow_diag`"""
+    """See `field_diag`"""
     impl = cuda_impl if inp.is_cuda else cpu_impl
 
     if weight is not None:
@@ -553,10 +558,10 @@ def field_diag_add_(
 
     nc = inp.shape[-1]
     bound = ensure_list(bound, ndim)
-    voxel_size = ensure_list(voxel_size, ndim)
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
 
     # forward
     fn(inp, *weight, bound, voxel_size,
@@ -573,7 +578,7 @@ def field_diag_sub(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -590,7 +595,7 @@ def field_diag_sub_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_diag`"""
@@ -607,7 +612,7 @@ def field_precond(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -645,11 +650,7 @@ def field_precond(
         Preconditioned vector, with shape `(*batch, *spatial, C)`
 
     """
-    nc = vec.shape[-1]
     shape = vec.shape[-ndim-1:-1]
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
     diag = field_diag(shape, weight,
                       absolute, membrane, bending,
                       bound, voxel_size)
@@ -664,15 +665,11 @@ def field_precond_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_precond`"""
-    nc = vec.shape[-1]
     shape = vec.shape[-ndim-1:-1]
-    absolute = ensure_list(absolute, nc)
-    membrane = ensure_list(membrane, nc)
-    bending = ensure_list(bending, nc)
     diag = field_diag(shape, weight,
                       absolute, membrane, bending,
                       bound, voxel_size)
@@ -687,7 +684,7 @@ def field_forward(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType] = 'dft',
+    bound: OneOrSeveral[BoundType]= 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     ) -> Tensor:
@@ -726,6 +723,93 @@ def field_forward(
     """
     out = sym_matvec(mat, vec, out=out)
     out = field_matvec_add_(ndim, out, vec, weight,
-                             absolute, membrane, bending,
-                             bound, voxel_size)
+                            absolute, membrane, bending,
+                            bound, voxel_size)
     return out
+
+
+def field_relax_(
+        ndim: int,
+        field: Tensor,
+        hes: Tensor,
+        grd: Tensor,
+        weight: Optional[Tensor] = None,
+        absolute: OneOrSeveral[float] = 0,
+        membrane: OneOrSeveral[float] = 0,
+        bending: OneOrSeveral[float] = 0,
+        bound: OneOrSeveral[BoundType] = 'dct2',
+        voxel_size: OneOrSeveral[float] = 1,
+        nb_iter: int = 1,
+) -> Tensor:
+    """Perform relaxation iterations (inplace).
+
+    Parameters
+    ----------
+    ndim : `int`
+        Number of spatial dimensions
+    field : `(*batch, *spatial, nc) tensor`
+        Warm start, with shape `(*batch, *spatial, nc)`.
+    hes : `(*batch, *spatial, nc*(nc+1)//2) tensor`
+        Input symmetric Hessian, in voxels.
+        With shape `(*batch, *spatial, nc*(nc+1)//2)`.
+    grd : `(*batch, *spatial, nc) tensor`
+        Input gradient, in voxels.
+        With shape `(*batch, *spatial, nc)`.
+    weight : `(*batch, *spatial, 1|nc) tensor`, optional
+        Weight map, to spatially modulate the regularization.
+        With shape `(*batch, *spatial, 1|nc)`.
+    absolute : `[sequence of] float`
+        Penalty on absolute values.
+    membrane : `[sequence of] float`
+        Penalty on first derivatives.
+    bending : `[sequence of] float`
+        Penalty on second derivatives.
+    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+        Boundary conditions.
+    voxel_size : `[sequence of] float`
+        Voxel size.
+    nb_iter : `int`
+        Number of iterations
+
+    Returns
+    -------
+    flow : `(*batch, *spatial, nc) tensor`
+        Refined solution with shape `(*batch, *spatial, nc)` .
+    """
+    impl = cuda_impl if field.is_cuda else cpu_impl
+    nc = field.shape[-1]
+
+    # broadcast
+    hes, grd = broadcast(hes, grd, skip_last=1)
+    field, grd = broadcast(field, grd, skip_last=1)
+    hes, grd = broadcast(hes, grd, skip_last=1)
+    if weight is not None:
+        flow, weight = broadcast(field, weight, skip_last=1)
+        fn = impl.field_relax_rls_
+        weight = [weight]
+    else:
+        fn = impl.field_relax_
+        weight = []
+
+    absolute = make_vector(absolute, nc).tolist()
+    membrane = make_vector(membrane, nc).tolist()
+    bending = make_vector(bending, nc).tolist()
+
+    if sum(membrane) == sum(bending) == 0:
+        # closed form in one iteration: x = (H + R) \ g
+        if absolute == 0:
+            field = sym_solve(hes, grd, *weight, out=field)
+        elif weight:
+            field = sym_solve(hes, grd, weight[0] + absolute, out=field)
+        else:
+            field = sym_solve(hes, grd, out=field)
+        return field
+
+    bound = ensure_list(bound, ndim)
+    voxel_size = make_vector(voxel_size, ndim).tolist()
+
+    # forward
+    fn(field, hes, grd, *weight, nb_iter, bound, voxel_size,
+       absolute, membrane, bending)
+
+    return field

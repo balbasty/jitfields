@@ -323,15 +323,23 @@ def flow_kernel(
         ndim = len(shape)
         shape = list(shape)
     shape += [ndim]
+    ntrail = 1
     if shears or div:
         shape += [ndim]
+        ntrail += 1
 
     # allocate output
     if out is None:
         out = torch.empty(shape, **backend)
 
-    bound = ensure_list(bound, out.shape[-1])
-    voxel_size = ensure_list(voxel_size, out.shape[-1])
+    bound = ensure_list(bound, ndim)
+    voxel_size = ensure_list(voxel_size, ndim)
+
+    minshape = (1 if (shears == div == membrane == bending == 0) else
+                3 if (bending == 0) else 5)
+    if any(s < minshape for s in out.shape[-ndim-ntrail:-ntrail]):
+        raise ValueError(f'Output spatial shape is smaller than the kernel. '
+                         f'Spatial shape must be at least {[minshape]*ndim}.')
 
     # forward
     impl = cuda_impl if out.is_cuda else cpu_impl
@@ -834,6 +842,18 @@ def flow_relax_(
     else:
         fn = impl.flow_relax_
         weight = []
+
+    if membrane == bending == shears == div == 0:
+        if weight:
+            weight[0] = weight[0].unsqueeze(-1)
+        # closed form in one iteration: x = (H + R) \ g
+        if absolute == 0:
+            flow = sym_solve(hes, grd, *weight, out=flow)
+        elif weight:
+            flow = sym_solve(hes, grd, weight[0] + absolute, out=flow)
+        else:
+            flow = sym_solve(hes, grd, out=flow)
+        return flow
 
     bound = ensure_list(bound, flow.shape[-1])
     voxel_size = ensure_list(voxel_size, flow.shape[-1])
