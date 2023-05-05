@@ -270,7 +270,7 @@ void relax_membrane_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -303,7 +303,6 @@ void relax_membrane_(
             offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
             // gradient
-#           pragma unroll
             for (int c=0; c<C; ++c)
                 val[c] = grd[grd_offset + gsc*c];
 
@@ -479,7 +478,7 @@ void relax_bending_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -645,7 +644,7 @@ void relax_absolute_rls_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -808,7 +807,7 @@ void relax_absolute_jrls_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -984,7 +983,7 @@ void relax_membrane_rls_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1166,7 +1165,7 @@ void relax_membrane_jrls_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1351,7 +1350,7 @@ void relax_bending_rls_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1535,7 +1534,7 @@ void relax_bending_jrls_(
 {
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 

@@ -278,13 +278,13 @@ void relax_membrane_(
     const reduce_t * _voxel_size,   // [*spatial] vector
     const reduce_t absolute[C],
     const reduce_t membrane[C],
-    int n)
+    int niter)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -310,7 +310,7 @@ void relax_membrane_(
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
-        if (!patch1<ndim>(loc, n))
+        if (!patch1<ndim>(loc, niter))
             continue;
         offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
         offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
@@ -491,13 +491,13 @@ void relax_bending_(
     const reduce_t absolute[C],
     const reduce_t membrane[C],
     const reduce_t bending[C],
-    int n=1)
+    int niter=1)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -517,20 +517,20 @@ void relax_bending_(
     constexpr int CC = posdef::utils<posdef::type::Sym, offset_t, C>::work_size;
 
     offset_t loc[ndim];
-    scalar_t val[ndim], diag[ndim];
+    scalar_t val[C], diag[C];
     reduce_t buf[CC ? CC : 1];
 
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
-        if (!patch3<ndim>(loc, n))
+        if (!patch3<ndim>(loc, niter))
             continue;
         offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
         offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
 
         // gradient
-        for (int d=0; d<ndim; ++d)
-            val[d] = grd[grd_offset + gsc*d];
+        for (int c=0; c<C; ++c)
+            val[c] = grd[grd_offset + gsc*c];
 
         // minus convolution
         Impl::template matvec_bending<isub>(
@@ -560,6 +560,7 @@ void relax_bending_(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void matvec_absolute_rls(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -574,7 +575,7 @@ void matvec_absolute_rls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -606,6 +607,7 @@ void matvec_absolute_rls(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_absolute_rls(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const scalar_t * wgt,           // (*batch, *spatial, channels) tensor
@@ -618,7 +620,7 @@ void diag_absolute_rls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -646,6 +648,7 @@ void diag_absolute_rls(
 template <int nbatch, int ndim, int C,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_absolute_rls_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -662,8 +665,8 @@ void relax_absolute_rls_(
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -725,6 +728,7 @@ void relax_absolute_rls_(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void matvec_absolute_jrls(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -739,7 +743,7 @@ void matvec_absolute_jrls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -770,6 +774,7 @@ void matvec_absolute_jrls(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_absolute_jrls(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const scalar_t * wgt,           // (*batch, *spatial, channels) tensor
@@ -782,7 +787,7 @@ void diag_absolute_jrls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -809,6 +814,7 @@ void diag_absolute_jrls(
 template <int nbatch, int ndim, int C,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_absolute_jrls_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -825,8 +831,8 @@ void relax_absolute_jrls_(
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1000,13 +1006,13 @@ void relax_membrane_rls_(
     const reduce_t * _voxel_size,   // [*spatial] vector
     const reduce_t absolute[C],
     const reduce_t membrane[C],
-    int n=1)
+    int niter=1)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1034,7 +1040,7 @@ void relax_membrane_rls_(
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
-        if (!patch1<ndim>(loc, n))
+        if (!patch1<ndim>(loc, niter))
             continue;
         offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
         offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
@@ -1185,13 +1191,13 @@ void relax_membrane_jrls_(
     const reduce_t * _voxel_size,   // [*spatial] vector
     const reduce_t absolute[C],
     const reduce_t membrane[C],
-    int n=1)
+    int niter=1)
 {
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1218,7 +1224,7 @@ void relax_membrane_jrls_(
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
-        if (!patch1<ndim>(loc, n))
+        if (!patch1<ndim>(loc, niter))
             continue;
         offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
         offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
@@ -1258,6 +1264,7 @@ void relax_membrane_jrls_(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void matvec_bending_rls(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -1275,7 +1282,7 @@ void matvec_bending_rls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -1310,6 +1317,7 @@ void matvec_bending_rls(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_bending_rls(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const scalar_t * wgt,           // (*batch, *spatial, channels) tensor
@@ -1325,7 +1333,7 @@ void diag_bending_rls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -1356,6 +1364,7 @@ void diag_bending_rls(
 template <int nbatch, int ndim, int C,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_bending_rls_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -1375,8 +1384,8 @@ void relax_bending_rls_(
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1404,7 +1413,7 @@ void relax_bending_rls_(
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
-        if (!patch3<ndim>(loc, n))
+        if (!patch3<ndim>(loc, niter))
             continue;
         offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
         offset_t hes_offset = index2offset<nall>(i, size, stride_hes);
@@ -1444,6 +1453,7 @@ void relax_bending_rls_(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void matvec_bending_jrls(
     scalar_t * out,                 // (*batch, *spatial, C) tensor
     const scalar_t * inp,           // (*batch, *spatial, C) tensor
@@ -1461,7 +1471,7 @@ void matvec_bending_jrls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -1495,6 +1505,7 @@ void matvec_bending_jrls(
 template <int nbatch, int ndim, int C, char op,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void diag_bending_jrls(
     scalar_t * out,                 // (*batch, *spatial, channels) tensor
     const scalar_t * wgt,           // (*batch, *spatial, channels) tensor
@@ -1510,7 +1521,7 @@ void diag_bending_jrls(
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
     static constexpr auto opfunc = Op<op, scalar_t, reduce_t>::f;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
 
     // copy vectors to the stack
     offset_t size[nall+1];        fillfrom<nall+1>(size,       _size);
@@ -1540,6 +1551,7 @@ void diag_bending_jrls(
 template <int nbatch, int ndim, int C,
           typename reduce_t, typename scalar_t, typename offset_t,
           bound::type... BOUND>
+__global__
 void relax_bending_jrls_(
     scalar_t * sol,                 // (*batch, *spatial, C) tensor
     const scalar_t * hes,           // (*batch, *spatial, K) tensor
@@ -1559,8 +1571,8 @@ void relax_bending_jrls_(
     offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
     offset_t index_stride = blockDim.x * gridDim.x;
     static constexpr int nall = nbatch + ndim;
-    using Impl = RegField<C, C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
-    using PosDef = posdef::utils<posdef::type::Sym, offset_t, ndim>;
+    using Impl = RegField<C, ndim, scalar_t, reduce_t, offset_t, BOUND...>;
+    using PosDef = posdef::utils<posdef::type::Sym, offset_t, C>;
     using Strided = posdef::internal::StridedPointer<scalar_t, offset_t>;
     using StridedConst = posdef::internal::StridedPointer<const scalar_t, offset_t>;
 
@@ -1587,7 +1599,7 @@ void relax_bending_jrls_(
     for (offset_t i=index; index < numel; index += index_stride, i=index)
     {
         offset_t sol_offset = index2offset_v2<ndim,nall>(i, size, stride_sol, loc);
-        if (!patch3<ndim>(loc, n))
+        if (!patch3<ndim>(loc, niter))
             continue;
         offset_t grd_offset = index2offset<nall>(i, size, stride_grd);
         offset_t hes_offset = index2offset<nall>(i, size, stride_hes);

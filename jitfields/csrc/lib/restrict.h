@@ -9,7 +9,6 @@ namespace restrict {
 
 const spline::type Z = spline::type::Nearest;
 const spline::type L = spline::type::Linear;
-const bound::type B0 = bound::type::NoCheck;
 const int zero  = 0;
 const int one   = 1;
 const int two   = 2;
@@ -24,18 +23,15 @@ const int three = 3;
 // D - Number of spatial dimensions
 // U - Upper bound on the restriction factor
 // IX, IY, IZ - Interpolation order
-// BX, BY, BZ - Boundary conditions
 template <int D, int U=zero,
-          spline::type IX=Z,  bound::type BX=B0,
-          spline::type IY=IX, bound::type BY=BX,
-          spline::type IZ=IY, bound::type BZ=BY>
+          spline::type IX=Z, spline::type IY=IX, spline::type IZ=IY>
 struct Multiscale
 {
     template <typename scalar_t, typename offset_t, typename reduce_t>
     static __device__
     void restrict(scalar_t * out, const scalar_t * inp,
                   const offset_t * coord, const offset_t * size, const offset_t * stride,
-                  const spline::type * inter, const bound::type * bnd,
+                  const spline::type * inter,
                   const reduce_t * scl,  reduce_t shift, signed char sgn = 1)
     {
         offset_t numel = 1;
@@ -80,10 +76,9 @@ struct Multiscale
  **********************************************************************/
 
  /***                              ANY                              ***/
-template <int U, spline::type I, bound::type B>
-struct Multiscale<one, U, I, B>
+template <int U, spline::type I>
+struct Multiscale<one, U, I>
 {
-    using bound_utils = bound::utils<B>;
     using spline_utils = spline::utils<I>;
     static const int spline_order = static_cast<int>(I);
 
@@ -114,46 +109,43 @@ struct Multiscale<one, U, I, B>
     }
 };
 
-// /***                      LINEAR + BOUND 2                         ***/
-//template <bound::type B>
-//struct Multiscale<one, two, L, B> {
-//    using bound_utils = bound::utils<B>;
-//    using spline_utils = spline::utils<L>;
-//
-//    template <typename scalar_t, typename offset_t, typename reduce_t>
-//    static __device__
-//    void restrict(scalar_t * out, const scalar_t * inp,
-//                  const offset_t loc[1], const offset_t size[1],
-//                  const offset_t stride[1], const reduce_t scl[1],
-//                  reduce_t shift, signed char sgn = 1)
-//    {
-//        offset_t w = loc[0], nw = size[0], sw = stride[0];
-//        reduce_t wscl = scl[0];
-//        reduce_t x = (w + shift) * wscl - shift;
-//        offset_t ix1 = static_cast<offset_t>(floor(x));
-//        offset_t ix0 =  ix1 - 1, ix2 = ix1 + 1, ix3 = ix1 + 2;
-//
-//        reduce_t acc = static_cast<reduce_t>(0);
-//        if (0 <= ix0 && ix0 < nw) {
-//            reduce_t dx0 = spline_utils::weight((x - ix0) / wscl);
-//            acc += static_cast<reduce_t>(inp[ix0*sw]) * dx0;
-//        }
-//        if (0 <= ix1 && ix1 < nw) {
-//            reduce_t dx1 = spline_utils::weight((x - ix1) / wscl);
-//            acc += static_cast<reduce_t>(inp[ix1*sw]) * dx1;
-//        }
-//        if (0 <= ix2 && ix2 < nw) {
-//            reduce_t dx2 = spline_utils::weight((ix2 - x) / wscl);
-//            acc += static_cast<reduce_t>(inp[ix2*sw]) * dx2;
-//        }
-//        if (0 <= ix3 && ix3 < nw) {
-//            reduce_t dx3 = spline_utils::weight((ix3 - x) / wscl);
-//            acc += static_cast<reduce_t>(inp[ix3*sw]) * dx3;
-//        }
-//
-//        bound::add(out, static_cast<offset_t>(0), acc, sgn);
-//    }
-//};
+
+/***                      LINEAR + BOUND 2                         ***/
+template <>
+struct Multiscale<one, two, L> {
+    using spline_utils = spline::utils<L>;
+
+    template <typename scalar_t, typename offset_t, typename reduce_t>
+    static __device__
+    void restrict(scalar_t * out, const scalar_t * inp,
+                  const offset_t loc[1], const offset_t size[1],
+                  const offset_t stride[1], const reduce_t scl[1],
+                  reduce_t shift, signed char sgn = 1)
+    {
+        offset_t w = loc[0], nw = size[0], sw = stride[0];
+        reduce_t wscl = scl[0];
+
+        reduce_t x = (w + shift) * wscl - shift;
+        offset_t ix1 = static_cast<offset_t>(floor(x));
+        offset_t ix0 =  ix1 - 1, ix2 = ix1 + 1, ix3 = ix1 + 2;
+        reduce_t dx1 = spline_utils::weight((x - ix1) / wscl);
+        reduce_t dx0 = spline_utils::weight((x - ix0) / wscl);
+        reduce_t dx2 = spline_utils::weight((ix2 - x) / wscl);
+        reduce_t dx3 = spline_utils::weight((ix3 - x) / wscl);
+
+        auto accum1d = [&]()
+        {
+            reduce_t acc = static_cast<reduce_t>(0);
+            if (0 <= ix0 && ix0 < nw) acc += static_cast<reduce_t>(inp[ix0*sw]) * dx0;
+            if (0 <= ix1 && ix1 < nw) acc += static_cast<reduce_t>(inp[ix1*sw]) * dx1;
+            if (0 <= ix2 && ix2 < nw) acc += static_cast<reduce_t>(inp[ix2*sw]) * dx2;
+            if (0 <= ix3 && ix3 < nw) acc += static_cast<reduce_t>(inp[ix3*sw]) * dx3;
+            return acc;
+        };
+
+        bound::add(out, static_cast<offset_t>(0), accum1d(), sgn);
+    }
+};
 
 /***********************************************************************
  *
@@ -161,14 +153,10 @@ struct Multiscale<one, U, I, B>
  *
  **********************************************************************/
 
- /***                              ANY                              ***/
-template <int U,
-          spline::type IX, bound::type BX,
-          spline::type IY, bound::type BY>
-struct Multiscale<two, U, IX, BX, IY, BY> {
-    using bound_utils_x  = bound::utils<BX>;
+/***                              ANY                              ***/
+template <int U, spline::type IX, spline::type IY>
+struct Multiscale<two, U, IX, IY> {
     using spline_utils_x = spline::utils<IX>;
-    using bound_utils_y  = bound::utils<BY>;
     using spline_utils_y = spline::utils<IY>;
     static const int spline_order_x = static_cast<int>(IX);
     static const int spline_order_y = static_cast<int>(IY);
@@ -214,6 +202,63 @@ struct Multiscale<two, U, IX, BX, IY, BY> {
     }
 };
 
+
+/***                      LINEAR + BOUND 2                         ***/
+template <>
+struct Multiscale<two, two, L> {
+    using spline_utils = spline::utils<L>;
+
+    template <typename scalar_t, typename offset_t, typename reduce_t>
+    static __device__
+    void restrict(scalar_t * out, const scalar_t * inp,
+                  const offset_t loc[2], const offset_t size[2],
+                  const offset_t stride[2], const reduce_t scl[2],
+                  reduce_t shift, signed char sgn = 1)
+    {
+        offset_t w = loc[0], nw = size[0], sw = stride[0];
+        offset_t h = loc[1], nh = size[1], sh = stride[1];
+        reduce_t wscl = scl[0], hscl = scl[1];
+
+        reduce_t x = (w + shift) * wscl - shift;
+        offset_t ix1 = static_cast<offset_t>(floor(x));
+        offset_t ix0 =  ix1 - 1, ix2 = ix1 + 1, ix3 = ix1 + 2;
+        reduce_t dx1 = spline_utils::weight((x - ix1) / wscl);
+        reduce_t dx0 = spline_utils::weight((x - ix0) / wscl);
+        reduce_t dx2 = spline_utils::weight((ix2 - x) / wscl);
+        reduce_t dx3 = spline_utils::weight((ix3 - x) / wscl);
+
+        reduce_t y = (h + shift) * hscl - shift;
+        offset_t iy1 = static_cast<offset_t>(floor(y));
+        offset_t iy0 =  iy1 - 1, iy2 = iy1 + 1, iy3 = iy1 + 2;
+        reduce_t dy1 = spline_utils::weight((y - iy1) / hscl);
+        reduce_t dy0 = spline_utils::weight((y - iy0) / hscl);
+        reduce_t dy2 = spline_utils::weight((iy2 - y) / hscl);
+        reduce_t dy3 = spline_utils::weight((iy3 - y) / hscl);
+
+        auto accum1d = [&](offset_t i)
+        {
+            reduce_t acc = static_cast<reduce_t>(0);
+            if (0 <= ix0 && ix0 < nw) acc += static_cast<reduce_t>(inp[i+ix0*sw]) * dx0;
+            if (0 <= ix1 && ix1 < nw) acc += static_cast<reduce_t>(inp[i+ix1*sw]) * dx1;
+            if (0 <= ix2 && ix2 < nw) acc += static_cast<reduce_t>(inp[i+ix2*sw]) * dx2;
+            if (0 <= ix3 && ix3 < nw) acc += static_cast<reduce_t>(inp[i+ix3*sw]) * dx3;
+            return acc;
+        };
+
+        auto accum2d = [&]()
+        {
+            reduce_t acc = static_cast<reduce_t>(0);
+            if (0 <= iy0 && iy0 < nh) acc += accum1d(iy0*sh) * dy0;
+            if (0 <= iy1 && iy1 < nh) acc += accum1d(iy1*sh) * dy1;
+            if (0 <= iy2 && iy2 < nh) acc += accum1d(iy2*sh) * dy2;
+            if (0 <= iy3 && iy3 < nh) acc += accum1d(iy3*sh) * dy3;
+            return acc;
+        };
+
+        bound::add(out, static_cast<offset_t>(0), accum2d(), sgn);
+    }
+};
+
 /***********************************************************************
  *
  *                                  3D
@@ -221,14 +266,8 @@ struct Multiscale<two, U, IX, BX, IY, BY> {
  **********************************************************************/
 
  /***                              ANY                              ***/
-template <int U,
-          spline::type IX, bound::type BX,
-          spline::type IY, bound::type BY,
-          spline::type IZ, bound::type BZ>
-struct Multiscale<three, U, IX, BX, IY, BY, IZ, BZ> {
-    using bound_utils_x = bound::utils<BX>;
-    using bound_utils_y = bound::utils<BY>;
-    using bound_utils_z = bound::utils<BZ>;
+template <int U, spline::type IX, spline::type IY, spline::type IZ>
+struct Multiscale<three, U, IX, IY, IZ> {
     using spline_utils_x = spline::utils<IX>;
     using spline_utils_y = spline::utils<IY>;
     using spline_utils_z = spline::utils<IZ>;
@@ -289,12 +328,8 @@ struct Multiscale<three, U, IX, BX, IY, BY, IZ, BZ> {
 
 
 /***                      LINEAR + BOUND 2                         ***/
-
-template <bound::type BX, bound::type BY, bound::type BZ>
-struct Multiscale<three, two, L, BX, L, BY, L, BZ> {
-    using bound_utils_x = bound::utils<BX>;
-    using bound_utils_y = bound::utils<BY>;
-    using bound_utils_z = bound::utils<BZ>;
+template <>
+struct Multiscale<three, two, L> {
     using spline_utils = spline::utils<L>;
 
     template <typename scalar_t, typename offset_t, typename reduce_t>
@@ -316,14 +351,6 @@ struct Multiscale<three, two, L, BX, L, BY, L, BZ> {
         reduce_t dx0 = spline_utils::weight((x - ix0) / wscl);
         reduce_t dx2 = spline_utils::weight((ix2 - x) / wscl);
         reduce_t dx3 = spline_utils::weight((ix3 - x) / wscl);
-        signed char sx3 = bound_utils_x::sign(ix3, nw);
-        signed char sx2 = bound_utils_x::sign(ix2, nw);
-        signed char sx0 = bound_utils_x::sign(ix0, nw);
-        signed char sx1 = bound_utils_x::sign(ix1, nw);
-        ix3 = bound_utils_x::index(ix3, nw) * sw;
-        ix2 = bound_utils_x::index(ix2, nw) * sw;
-        ix0 = bound_utils_x::index(ix0, nw) * sw;
-        ix1 = bound_utils_x::index(ix1, nw) * sw;
 
         reduce_t y = (h + shift) * hscl - shift;
         offset_t iy1 = static_cast<offset_t>(floor(y));
@@ -332,14 +359,6 @@ struct Multiscale<three, two, L, BX, L, BY, L, BZ> {
         reduce_t dy0 = spline_utils::weight((y - iy0) / hscl);
         reduce_t dy2 = spline_utils::weight((iy2 - y) / hscl);
         reduce_t dy3 = spline_utils::weight((iy3 - y) / hscl);
-        signed char sy3 = bound_utils_y::sign(iy3, nh);
-        signed char sy2 = bound_utils_y::sign(iy2, nh);
-        signed char sy0 = bound_utils_y::sign(iy0, nh);
-        signed char sy1 = bound_utils_y::sign(iy1, nh);
-        iy3 = bound_utils_y::index(iy3, nh) * sh;
-        iy2 = bound_utils_y::index(iy2, nh) * sh;
-        iy0 = bound_utils_y::index(iy0, nh) * sh;
-        iy1 = bound_utils_y::index(iy1, nh) * sh;
 
         reduce_t z = (d + shift) * dscl - shift;
         offset_t iz1 = static_cast<offset_t>(floor(z));
@@ -351,31 +370,34 @@ struct Multiscale<three, two, L, BX, L, BY, L, BZ> {
 
         auto accum1d = [&](offset_t i)
         {
-          reduce_t acc = static_cast<reduce_t>(0);
-          if (0 < ix0 && ix0 < nw) acc += static_cast<reduce_t>(inp[i+ix0]) * dx0;
-          if (0 < ix1 && ix1 < nw) acc += static_cast<reduce_t>(inp[i+ix1]) * dx1;
-          if (0 < ix2 && ix2 < nw) acc += static_cast<reduce_t>(inp[i+ix2]) * dx2;
-          if (0 < ix3 && ix3 < nw) acc += static_cast<reduce_t>(inp[i+ix3]) * dx3;
-          return acc;
+            reduce_t acc = static_cast<reduce_t>(0);
+            if (0 <= ix0 && ix0 < nw) acc += static_cast<reduce_t>(inp[i+ix0*sw]) * dx0;
+            if (0 <= ix1 && ix1 < nw) acc += static_cast<reduce_t>(inp[i+ix1*sw]) * dx1;
+            if (0 <= ix2 && ix2 < nw) acc += static_cast<reduce_t>(inp[i+ix2*sw]) * dx2;
+            if (0 <= ix3 && ix3 < nw) acc += static_cast<reduce_t>(inp[i+ix3*sw]) * dx3;
+            return acc;
         };
 
         auto accum2d = [&](offset_t i)
         {
-          reduce_t acc = static_cast<reduce_t>(0);
-          if (0 < iy0 && iy0 < nh) acc += accum1d(iy0 + i) * dy0;
-          if (0 < iy1 && iy1 < nh) acc += accum1d(iy1 + i) * dy1;
-          if (0 < iy2 && iy2 < nh) acc += accum1d(iy2 + i) * dy2;
-          if (0 < iy3 && iy3 < nh) acc += accum1d(iy3 + i) * dy3;
-          return acc;
+            reduce_t acc = static_cast<reduce_t>(0);
+            if (0 <= iy0 && iy0 < nh) acc += accum1d(iy0*sh + i) * dy0;
+            if (0 <= iy1 && iy1 < nh) acc += accum1d(iy1*sh + i) * dy1;
+            if (0 <= iy2 && iy2 < nh) acc += accum1d(iy2*sh + i) * dy2;
+            if (0 <= iy3 && iy3 < nh) acc += accum1d(iy3*sh + i) * dy3;
+            return acc;
         };
 
-      reduce_t acc = static_cast<reduce_t>(0);
-      if (0 < iz0 && iz0 < nd) acc += accum2d(iz0) * dz0;
-      if (0 < iz1 && iz1 < nd) acc += accum2d(iz1) * dz1;
-      if (0 < iz2 && iz2 < nd) acc += accum2d(iz2) * dz2;
-      if (0 < iz3 && iz3 < nd) acc += accum2d(iz3) * dz3;
+        auto accum3d = [&]() {
+            reduce_t acc = static_cast<reduce_t>(0);
+            if (0 <= iz0 && iz0 < nd) acc += accum2d(iz0*sd) * dz0;
+            if (0 <= iz1 && iz1 < nd) acc += accum2d(iz1*sd) * dz1;
+            if (0 <= iz2 && iz2 < nd) acc += accum2d(iz2*sd) * dz2;
+            if (0 <= iz3 && iz3 < nd) acc += accum2d(iz3*sd) * dz3;
+            return acc;
+        };
 
-      bound::add(out, static_cast<offset_t>(0), acc, sgn);
+        bound::add(out, static_cast<offset_t>(0), accum3d(), sgn);
     }
 };
 

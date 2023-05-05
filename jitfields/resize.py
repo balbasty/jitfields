@@ -180,8 +180,8 @@ class _Resize(torch.autograd.Function):
     def forward(ctx, x, factor, shape, ndim, anchor, order, bound, out):
         resize = (cuda_resize if x.is_cuda else cpu_resize).resize
         ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound)
-        x = resize(out, x, factor, anchor, order, bound)
-        return x
+        out = resize(out, x, factor, anchor, order, bound)
+        return out
 
     @staticmethod
     def backward(ctx, grad):
@@ -197,12 +197,12 @@ class _Restrict(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, factor, shape, ndim, anchor, order, bound, reduce_sum, out):
         restrict = (cuda_restrict if x.is_cuda else cpu_restrict).restrict
-        x, scale = restrict(out, x, factor, anchor, order, bound)
+        out, scale = restrict(out, x, factor, anchor, order, bound)
         scale = prod(scale)
         ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound, reduce_sum, scale)
         if not reduce_sum:
-            x /= scale
-        return x
+            out /= scale
+        return out
 
     @staticmethod
     def backward(ctx, grad, *args):

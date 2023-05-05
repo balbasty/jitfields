@@ -84,7 +84,7 @@ void kernel(
 
         offset_t out_offset = sub2offset<nall>(sub, stride_out);
 
-        Multiscale<ndim, U, IX, BX, IY, BY, IZ, BZ>::restrict(
+        Multiscale<ndim, U, IX, IY, IZ>::restrict(
             out + out_offset, inp + inp_offset,
             loc + nbatch, size_inp + nbatch, stride_inp + nbatch,
             scale, shift, sgn);
@@ -169,6 +169,6 @@ void kernelnd(
         Multiscale<ndim>::restrict(
             out + out_offset, inp + inp_offset,
             loc + nbatch, size_inp + nbatch, stride_inp + nbatch,
-            order, bnd, scale, shift, sgn);
+            order, scale, shift, sgn);
     }
 }

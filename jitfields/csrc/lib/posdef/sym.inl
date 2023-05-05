@@ -83,7 +83,7 @@ struct utils<type::Sym, offset_t, C>: public common_sym<offset_t, C>
             reduce_t acc = static_cast<reduce_t>(0);
 #           pragma unroll
             for (offset_t cc = 0; cc < C; ++cc) {
-                offset_t k = sub2pak(C, c, cc);
+                offset_t k = sub2pak(c, cc);
                 internal::iaddcmul<reduce_t>(acc, h[k], i[cc]);
             }
             internal::iadd<reduce_t>(o[c], acc);
@@ -109,7 +109,7 @@ struct utils<type::Sym, offset_t, C>: public common_sym<offset_t, C>
             reduce_t acc = static_cast<reduce_t>(0);
 #           pragma unroll
             for (offset_t cc = 0; cc < C; ++cc) {
-                offset_t k = sub2pak(C, c, cc);
+                offset_t k = sub2pak(c, cc);
                 internal::iaddcmul<reduce_t>(acc, h[k], i[cc]);
             }
             internal::isub<reduce_t>(o[c], acc);
@@ -850,7 +850,7 @@ struct utils<type::Sym, offset_t, 3>: public common_sym<offset_t, 3>
 template <typename offset_t>
 struct utils<type::Sym, offset_t, 2>: public common_sym<offset_t, 2>
 {
-    using this_type = utils<type::Sym, offset_t, 3>;
+    using this_type = utils<type::Sym, offset_t, 2>;
     static constexpr bool need_buffer = false;
     static constexpr offset_t work_size = 0;
 
@@ -981,6 +981,116 @@ struct utils<type::Sym, offset_t, 2>: public common_sym<offset_t, 2>
        internal::set(o[0], i[0]);
        internal::set(o[1], i[2]);
        internal::set(o[2], i[1]);
+    }
+};
+
+
+// -----------------------------
+// Specialization for static 1x1
+// -----------------------------
+template <typename offset_t>
+struct utils<type::Sym, offset_t, 1>: public common_sym<offset_t, 1>
+{
+    using this_type = utils<type::Sym, offset_t, 1>;
+    static constexpr bool need_buffer = false;
+    static constexpr offset_t work_size = 0;
+
+    template <typename hptr_t, typename xptr_t, typename yptr_t,
+              typename reduce_t = typename internal::return_type<hptr_t, xptr_t, yptr_t>::value>
+    static inline __device__ void
+    matvec_backward(hptr_t h, xptr_t x, yptr_t y,
+                    reduce_t /*unused*/ = static_cast<reduce_t>(0))
+    {
+        reduce_t x0 = static_cast<reduce_t>(x[0]),
+                 y0 = static_cast<reduce_t>(y[0]);
+
+        internal::set(h[0], x0 * y0);
+    }
+
+    template <typename optr_t, typename hptr_t, typename iptr_t,
+              typename reduce_t = typename internal::return_type<hptr_t, optr_t, iptr_t>::value>
+    static inline __device__ void
+    matvec(optr_t o, hptr_t h, iptr_t i,
+           reduce_t /*unused*/ = static_cast<reduce_t>(0))
+    {
+        reduce_t x0  = static_cast<reduce_t>(i[0]),
+                 h00 = static_cast<reduce_t>(h[0]);
+
+        internal::set(o[0], h00 * x0);
+    }
+
+    template <typename optr_t, typename hptr_t, typename iptr_t,
+              typename reduce_t = typename internal::return_type<hptr_t, optr_t, iptr_t>::value>
+    static inline __device__ void
+    addmatvec_(optr_t o, hptr_t h, iptr_t i,
+               reduce_t /*unused*/ = static_cast<reduce_t>(0))
+    {
+        reduce_t x0  = static_cast<reduce_t>(i[0]),
+                 h00 = static_cast<reduce_t>(h[0]);
+
+        internal::iadd<reduce_t>(o[0], h00 * x0);
+    }
+
+    template <typename optr_t, typename hptr_t, typename iptr_t,
+              typename reduce_t = typename internal::return_type<hptr_t, optr_t, iptr_t>::value>
+    static inline __device__ void
+    submatvec_(optr_t o, hptr_t h, iptr_t i,
+               reduce_t /*unused*/ = static_cast<reduce_t>(0))
+    {
+        reduce_t x0  = static_cast<reduce_t>(i[0]),
+                 h00 = static_cast<reduce_t>(h[0]);
+
+        internal::isub<reduce_t>(o[0], h00 * x0);
+    }
+
+    template <typename vptr_t, typename hptr_t,
+              typename wptr_t = const void *, typename bptr_t = const void *,
+              typename reduce_t = typename internal::return_type<vptr_t, hptr_t, wptr_t, bptr_t>::value>
+    static inline __device__ void
+    solve_impl_(vptr_t v, hptr_t h,
+                wptr_t w = nullptr, bptr_t /*b*/ = nullptr,
+                reduce_t /*unused*/ = static_cast<reduce_t>(0))
+    {
+        reduce_t x0  = static_cast<reduce_t>(v[0]),
+                 h00 = static_cast<reduce_t>(h[0]);
+
+        if (w)
+        {
+            h00 += static_cast<reduce_t>(w[0]);
+        }
+
+        internal::set(v[0], x0 / h00);
+    }
+
+    template <typename optr_t, typename hptr_t,
+              typename bptr_t = const void *,
+              typename reduce_t = typename internal::return_type<
+                                  optr_t, hptr_t, bptr_t>::value>
+    static inline __device__
+    void invert(optr_t o, hptr_t h,
+                bptr_t /*b*/ = nullptr,
+                reduce_t /*unused*/ = static_cast<reduce_t>(0))
+    {
+        o[0] = h[0];
+        return invert_(o, nullptr, static_cast<reduce_t>(0));
+    }
+
+    template <typename hptr_t, typename bptr_t = const void *,
+              typename reduce_t = typename internal::return_type<hptr_t, bptr_t>::value>
+    static inline __device__
+    void invert_(hptr_t h,
+                 bptr_t /*b*/ = nullptr,
+                 reduce_t /*unused*/ = static_cast<reduce_t>(0))
+    {
+        reduce_t h00 = static_cast<reduce_t>(h[0]);
+        internal::set(h[0], static_cast<reduce_t>(1) / h00);
+    }
+
+    template <typename optr_t, typename iptr_t>
+    static inline __device__ void
+    fromfull(optr_t o, iptr_t i)
+    {
+       internal::set(o[0], i[0]);
     }
 };
 

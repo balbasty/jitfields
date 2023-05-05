@@ -711,7 +711,7 @@ def field_matvec_rls(out, inp, wgt, bound, voxel_size,
     nc = out.shape[-1]
     nbatch = out.ndim - ndim - 1
     numel = out.shape[:-1].numel()
-    joint = 'j' if wgt.size[-1] > 1 else ''
+    joint = 'j' if wgt.shape[-1] > 1 else ''
     if ndim > 3:
         raise ValueError('field_matvec_rls only implemented up to dimension 3')
 
