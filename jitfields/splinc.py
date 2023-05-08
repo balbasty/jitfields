@@ -9,7 +9,8 @@ from typing import Optional
 from .bindings.common.bounds import convert_bound, cnames as boundnames
 from .bindings.common.spline import convert_order
 from .utils import try_import, ensure_list
-from .utils import OrderType, BoundType, OneOrSeveral
+from .typing import OneOrSeveral, BoundType, OrderType
+
 cuda_splinc = try_import('jitfields.bindings.cuda', 'splinc')
 cpu_splinc = try_import('jitfields.bindings.cpp', 'splinc')
 

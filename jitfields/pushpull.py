@@ -33,7 +33,7 @@ import torch
 from torch import Tensor
 from typing import Optional, Sequence
 from .utils import try_import, ensure_list
-from .utils import OneOrSeveral, BoundType, OrderType, ExtrapolateType
+from .typing import OneOrSeveral, BoundType, OrderType, ExtrapolateType
 from .splinc import spline_coeff_nd, spline_coeff_nd_
 from .bindings.common.bounds import convert_bound
 from .bindings.common.spline import convert_order

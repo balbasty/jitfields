@@ -5,7 +5,7 @@ convert_bound = {
     'dct2': 3, 'reflect': 3,
     'dst1': 4, 'antimirror': 4,
     'dst2': 5, 'antireflect': 5,
-    'dft': 6, 'warp': 6, 'circular': 6,
+    'dft': 6, 'wrap': 6, 'circular': 6,
     'nocheck': 7,
 }
 

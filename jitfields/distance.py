@@ -8,7 +8,8 @@ import torch
 from torch import Tensor as tensor
 from typing import Optional
 from .utils import make_vector, try_import
-from .utils import OneOrSeveral
+from .typing import OneOrSeveral
+
 cuda_dist = try_import('jitfields.bindings.cuda', 'distance')
 cpu_dist = try_import('jitfields.bindings.cpp', 'distance')
 

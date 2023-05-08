@@ -7,7 +7,7 @@ import math as pymath
 from .bindings.common.bounds import convert_bound
 from .bindings.common.spline import convert_order
 from .utils import try_import, ensure_list, prod
-from .utils import OneOrSeveral, AnchorType, OrderType, BoundType
+from .typing import OneOrSeveral, BoundType, OrderType, AnchorType
 from .splinc import spline_coeff_nd
 cuda_resize = try_import('jitfields.bindings.cuda', 'resize')
 cpu_resize = try_import('jitfields.bindings.cpp', 'resize')
@@ -56,6 +56,8 @@ def resize(
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "prolongation".
+    out: `(..., *shape) tensor`, optional
+        Output placeholder.
 
     Returns
     -------
@@ -105,7 +107,7 @@ def restrict(
     anchor: AnchorType = 'edge',
     order: OneOrSeveral[OrderType] = 1,
     bound: OneOrSeveral[BoundType] = 'dct2',
-    reduce_sum: bool = False,
+    make_adjoint: bool = False,
     out: Optional[Tensor] = None,
 ) -> Tensor:
     """Restrict (adjoint of resize) a tensor using spline interpolation
@@ -134,6 +136,12 @@ def restrict(
         Interpolation order.
     bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
         How to deal with out-of-bound values.
+    make_adjoint : `bool`, default=False
+        Make `restrict` the numerical adjoint of `resize` by accumulating
+        values into the output tensor. Otherwise, normalize by `count`
+        to compute an average.
+    out: `(..., *shape) tensor`, optional
+        Output placeholder.
 
     Returns
     -------
@@ -170,7 +178,7 @@ def restrict(
 
     order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
     bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
-    x = _Restrict.apply(x, factor, shape, ndim, anchor, order, bound, reduce_sum, out)
+    x = _Restrict.apply(x, factor, shape, ndim, anchor, order, bound, make_adjoint, out)
     return x
 
 
@@ -195,20 +203,20 @@ class _Resize(torch.autograd.Function):
 class _Restrict(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, x, factor, shape, ndim, anchor, order, bound, reduce_sum, out):
+    def forward(ctx, x, factor, shape, ndim, anchor, order, bound, make_adjoint, out):
         restrict = (cuda_restrict if x.is_cuda else cpu_restrict).restrict
         out, scale = restrict(out, x, factor, anchor, order, bound)
         scale = prod(scale)
-        ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound, reduce_sum, scale)
-        if not reduce_sum:
+        ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound, make_adjoint, scale)
+        if not make_adjoint:
             out /= scale
         return out
 
     @staticmethod
     def backward(ctx, grad, *args):
-        inshape, factor, shape, ndim, anchor, order, bound, reduce_sum, scale = ctx.opt
+        inshape, factor, shape, ndim, anchor, order, bound, make_adjoint, scale = ctx.opt
         resize = (cuda_resize if grad.is_cuda else cpu_resize).resize
-        if not reduce_sum:
+        if not make_adjoint:
             grad = grad / scale
         out = grad.new_empty([*grad.shape[:-ndim], *inshape[-ndim:]])
         out = resize(out, grad, factor, anchor, order, bound)

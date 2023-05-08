@@ -1,23 +1,23 @@
 # Types
 
 ## `OneOrSeveral`
-::: jitfields.utils.OneOrSeveral
+::: jitfields.typing.OneOrSeveral
     options:
       show_root_heading: false
 ## `BoundType` 
-::: jitfields.utils.BoundType       
+::: jitfields.typing.BoundType
     options:
       show_root_heading: false
 ## `OrderType`
-::: jitfields.utils.OrderType       
+::: jitfields.typing.OrderType
     options:
       show_root_heading: false
 ## `ExtrapolateType`
-::: jitfields.utils.ExtrapolateType 
+::: jitfields.typing.ExtrapolateType
     options:
       show_root_heading: false
 ## `AnchorType`
-::: jitfields.utils.AnchorType
+::: jitfields.typing.AnchorType
     options:
       show_root_heading: false
 

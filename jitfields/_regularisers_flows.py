@@ -57,7 +57,7 @@ import torch
 from torch import Tensor
 from typing import Optional
 from .utils import try_import, ensure_list, broadcast
-from .utils import BoundType, OneOrSeveral
+from .typing import OneOrSeveral, BoundType
 from .sym import sym_solve, sym_solve_, sym_matvec
 cuda_impl = try_import('jitfields.bindings.cuda', 'regularisers')
 cpu_impl = try_import('jitfields.bindings.cpp', 'regularisers')
