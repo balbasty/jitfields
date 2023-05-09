@@ -76,7 +76,7 @@ def pull(
           of the centers of the first and last voxels.
         - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
-    prefilter : `bool, default=True
+    prefilter : `bool`, default=False
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "spline sampling".
@@ -132,7 +132,7 @@ def grad(
           of the centers of the first and last voxels.
         - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
-    prefilter : `bool`, default=True
+    prefilter : `bool`, default=False
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "spline sampling".
@@ -183,7 +183,7 @@ def push(
           of the centers of the first and last voxels.
         - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
-    prefilter : `bool`, default=True
+    prefilter : `bool`, default=False
         Whether to compute interpolating coefficients at the end.
         If the value for `prefilter` is matched across `pull` and `push`,
         they are adjoint of each other.
