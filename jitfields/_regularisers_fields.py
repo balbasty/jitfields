@@ -67,11 +67,10 @@ def field_matvec(
 ) -> Tensor:
     r"""Apply a spatial regularization matrix.
 
-    Notes
-    -----
-    This function computes the matrix-vector product
-    $\mathbf{L} \times \mathbf{f}$, where $\mathbf{f}$ is a scalar or
-    vector field and $\mathbf{L}$ encodes a finite-difference penalty.
+    !!! note
+        This function computes the matrix-vector product
+        $\mathbf{L} \times \mathbf{f}$, where $\mathbf{f}$ is a scalar or
+        vector field and $\mathbf{L}$ encodes a finite-difference penalty.
 
     Parameters
     ----------

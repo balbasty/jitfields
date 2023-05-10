@@ -301,9 +301,8 @@ def sym_solve(mat, vec, diag=None, dtype=None, out=None):
 
     Equivalent to `out = (mat + diag).inverse() @ vec`
 
-    Notes
-    -----
-    - !! Does not backpropagate through `mat`
+    !!! warning
+        Does not backpropagate through `mat`.
 
     Parameters
     ----------
@@ -350,9 +349,8 @@ def sym_solve_(mat, vec, diag=None, dtype=None):
 
     Equivalent to `vec = mat.inverse() @ vec`
 
-    Notes
-    -----
-    - !! Does not backpropagate through `mat`
+    !!! warning
+        Does not backpropagate through `mat`.
 
     Parameters
     ----------
@@ -395,9 +393,8 @@ def sym_invert(mat, dtype=None, out=None):
 
     Equivalent to `out = mat.inverse()`
 
-    Notes
-    -----
-    - !! Does not backpropagate through `mat`
+    !!! warning
+        Does not backpropagate through `mat`.
 
     Parameters
     ----------
@@ -429,9 +426,8 @@ def sym_invert_(mat, dtype=None):
 
     Equivalent to `mat = mat.inverse()`
 
-    Notes
-    -----
-    - !! Does not backpropagate through `mat`
+    !!! warning
+        Does not backpropagate through `mat`.
 
     Parameters
     ----------

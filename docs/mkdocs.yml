@@ -19,6 +19,9 @@ plugins:
           show_source: False
           show_root_heading: True
 markdown_extensions:
+- admonition
+- pymdownx.details
+- pymdownx.superfences
 - pymdownx.arithmatex:
     generic: true
 extra_javascript:

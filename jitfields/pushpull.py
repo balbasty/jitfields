@@ -52,13 +52,12 @@ def pull(
 ) -> Tensor:
     """Sample a tensor using spline interpolation
 
-    Notes
-    -----
-    By default, `inp` is assumed to contain the coefficients of a
-    continuous function encoded by regularly spaced cubic splines.
-    Instead, when `prefilter` is `True`, `pull` interpolates the values
-    of `inp`. To this end, `inp` is first converted to spline coefficients
-    (_i.e._, prefiltered).
+    !!! note
+        By default, `inp` is assumed to contain the coefficients of a
+        continuous function encoded by regularly spaced cubic splines.
+        Instead, when `prefilter` is `True`, `pull` interpolates the values
+        of `inp`. To this end, `inp` is first converted to spline coefficients
+        (_i.e._, prefiltered).
 
     Parameters
     ----------
@@ -108,13 +107,12 @@ def grad(
 ) -> Tensor:
     """Sample the spatial gradients of a tensor using spline interpolation
 
-    Notes
-    -----
-    By default, `inp` is assumed to contain the coefficients of a
-    continuous function encoded by regularly spaced cubic splines.
-    Instead, when `prefilter` is `True`, `grad` interpolates the values
-    of `inp`. To this end, `inp` is first converted to spline coefficients
-    (_i.e._, prefiltered).
+    !!! note
+        By default, `inp` is assumed to contain the coefficients of a
+        continuous function encoded by regularly spaced cubic splines.
+        Instead, when `prefilter` is `True`, `grad` interpolates the values
+        of `inp`. To this end, `inp` is first converted to spline coefficients
+        (_i.e._, prefiltered).
 
     Parameters
     ----------
