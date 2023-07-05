@@ -88,6 +88,218 @@ References
     """
 ```
 
+```python
+def spline_distance_table(
+    loc: tensor, 
+    coeff: tensor, 
+    steps: Optional[Union[int, tensor]] = None, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+) -> Tuple[tensor, tensor]: ...
+"""Compute the minimum distance from a set of points to a 1D spline
+
+Parameters
+----------
+loc : `(..., D) tensor`
+    Point set.
+coeff : `(..., N, D) tensor`
+    Spline coefficients encoding the location of the 1D spline.
+steps : `int or (..., K) tensor`
+    Number of time steps to try, or list of time steps to try.
+order : {1..7}
+    Spline order.
+bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    Boundary conditions of the spline.
+square : bool
+    Return the squared Euclidean distance.
+
+Returns
+-------
+dist : `(...) tensor`
+    Distance from each point in the set to its closest point on the spline
+time : `(...) tensor`
+    Time of the closest point on the spline
+"""
+```
+
+```python
+def spline_distance_brent(
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 128, 
+    tol: float = 1e-6, 
+    step_size: float = 0.01, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+    steps: Optional[Union[int, tensor]] = None, 
+) -> Tuple[tensor, tensor]: ...
+"""Compute the minimum distance from a set of points to a 1D spline
+
+Parameters
+----------
+loc : `(..., D) tensor`
+    Point set.
+coeff : `(..., N, D) tensor`
+    Spline coefficients encoding the location of the 1D spline.
+max_iter : int
+    Number of optimization steps.
+tol : float
+    Tolerance for early stopping
+step_size : float
+    Initial search size.
+order : {1..7}
+    Spline order.
+bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    Boundary conditions of the spline.
+square : bool
+    Return the squared Euclidean distance.
+steps : int
+    Number of steps used in the table-based initialisation.
+
+Returns
+-------
+dist : `(...) tensor`
+    Distance from each point in the set to its closest point on the spline
+time : `(...) tensor`
+    Time of the closest point on the spline
+"""
+```
+
+```python
+def spline_distance_gaussnewton(
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 16, 
+    tol: float = 1e-6, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+    steps: Optional[Union[int, tensor]] = None, 
+) -> Tuple[tensor, tensor]: ...
+"""Compute the minimum distance from a set of points to a 1D spline
+
+Parameters
+----------
+loc : `(..., D) tensor`
+    Point set.
+coeff : `(..., N, D) tensor`
+    Spline coefficients encoding the location of the 1D spline.
+max_iter : int
+    Number of optimization steps.
+tol : float
+    Tolerance for early stopping
+order : {1..7}
+    Spline order.
+bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    Boundary conditions of the spline.
+square : bool
+    Return the squared Euclidean distance.
+steps : int
+    Number of steps used in the table-based initialisation.
+
+Returns
+-------
+dist : `(...) tensor`
+    Distance from each point in the set to its closest point on the spline
+time : `(...) tensor`
+    Time of the closest point on the spline
+"""
+```
+
+```python
+
+def spline_distance_brent_(
+    dist: tensor, 
+    time: tensor, 
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 128, 
+    tol: float = 1e-6, 
+    step_size: float = 0.01, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+) -> Tuple[tensor, tensor]: ...
+"""Compute the minimum distance from a set of points to a 1D spline (inplace)
+
+Parameters
+----------
+dist : `(...) tensor`
+    Initial distance from each point in the set to its closest point on the spline
+time : `(...) tensor`
+    Initial time of the closest point on the spline
+loc : `(..., D) tensor`
+    Point set.
+coeff : `(..., N, D) tensor`
+    Spline coefficients encoding the location of the 1D spline.
+max_iter : int
+    Number of optimization steps.
+tol : float
+    Tolerance for early stopping
+step_size : float
+    Initial search size.
+order : {1..7}
+    Spline order.
+bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    Boundary conditions of the spline.
+square : bool
+    Return the squared Euclidean distance.
+
+Returns
+-------
+dist : `(...) tensor`
+    Distance from each point in the set to its closest point on the spline
+time : `(...) tensor`
+    Time of the closest point on the spline
+"""
+```
+
+```python
+
+def spline_distance_gaussnewton_(
+    dist: tensor, 
+    time: tensor, 
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 16, 
+    tol: float = 1e-6, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+) -> Tuple[tensor, tensor]: ...
+"""Compute the minimum distance from a set of points to a 1D spline (inplace)
+
+Parameters
+----------
+dist : `(...) tensor`
+    Initial distance from each point in the set to its closest point on the spline
+time : `(...) tensor`
+    Initial time of the closest point on the spline
+loc : `(..., D) tensor`
+    Point set.
+coeff : `(..., N, D) tensor`
+    Spline coefficients encoding the location of the 1D spline.
+max_iter : int
+    Number of optimization steps.
+tol : float
+    Tolerance for early stopping
+order : {1..7}
+    Spline order.
+bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    Boundary conditions of the spline.
+square : bool
+    Return the squared Euclidean distance.
+
+Returns
+-------
+dist : `(...) tensor`
+    Distance from each point in the set to its closest point on the spline
+time : `(...) tensor`
+    Time of the closest point on the spline
+"""
+```
 
 ### Interpolation/Resampling
 

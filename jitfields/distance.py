@@ -6,9 +6,9 @@ __all__ = [
 
 import torch
 from torch import Tensor as tensor
-from typing import Optional
+from typing import Optional, Union, Tuple
 from .utils import make_vector, try_import
-from .typing import OneOrSeveral
+from .typing import OneOrSeveral, BoundType, OrderType
 
 cuda_dist = try_import('jitfields.bindings.cuda', 'distance')
 cpu_dist = try_import('jitfields.bindings.cpp', 'distance')
@@ -138,7 +138,12 @@ def l1_distance_transform(
     return x
 
 
-def signed_distance_transform(x, ndim=None, vx=1, dtype=None):
+def signed_distance_transform(
+    x: tensor,
+    ndim: Optional[int] = None,
+    vx: OneOrSeveral[float] = 1,
+    dtype: Optional[torch.dtype] = None,
+) -> tensor:
     """Compute the Euclidean distance transform of a binary image
 
     Parameters
@@ -180,3 +185,276 @@ def signed_distance_transform(x, ndim=None, vx=1, dtype=None):
     d = euclidean_distance_transform(x, ndim, vx, dtype)
     d -= euclidean_distance_transform(x.logical_not_(), ndim, vx, dtype)
     return d
+
+
+
+def _dot(x, y):
+    """Dot product along the last dimension"""
+    return x.unsqueeze(-2).matmul(y.unsqueeze(-1)).squeeze(-1).squeeze(-1)
+
+
+def spline_distance_table(
+    loc: tensor, 
+    coeff: tensor, 
+    steps: Optional[Union[int, tensor]] = None, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+) -> Tuple[tensor, tensor]:
+    """Compute the minimum distance from a set of points to a 1D spline
+
+    Parameters
+    ----------
+    loc : `(..., D) tensor`
+        Point set.
+    coeff : `(..., N, D) tensor`
+        Spline coefficients encoding the location of the 1D spline.
+    steps : `int or (..., K) tensor`
+        Number of time steps to try, or list of time steps to try.
+    order : {1..7}
+        Spline order.
+    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+        Boundary conditions of the spline.
+    square : bool
+        Return the squared Euclidean distance.
+
+    Returns
+    -------
+    dist : `(...) tensor`
+        Distance from each point in the set to its closest point on the spline
+    time : `(...) tensor`
+        Time of the closest point on the spline
+    """
+
+    fn = cuda_dist.splinedt_table_ if coeff.is_cuda else cpu_dist.splinedt_table_
+
+    if steps is None:
+        length = coeff[..., 1:, :] - coeff[..., :-1, :]
+        length = _dot(length, length).sqrt_().sum(-1).max()
+        steps = max(3, (length / 2).ceil().int().item())
+    if isinstance(steps, int):
+        steps = torch.linspace(0, coeff.shape[-2] - 1, steps, dtype=coeff.dtype, device=coeff.device)
+    else:
+        steps = torch.as_tensor(steps, dtype=coeff.dtype, device=coeff.device).flatten()
+
+    batch = torch.broadcast_shapes(loc.shape[:-1], coeff.shape[:-2], steps.shape[:-1])
+    loc = loc.expand(torch.Size(batch) + loc.shape[-1:])
+    coeff = coeff.expand(torch.Size(batch) + coeff.shape[-2:])
+    steps = steps.expand(torch.Size(batch) + steps.shape[-1:])
+    time = loc.new_zeros(batch)
+    dist = loc.new_full(batch, float('inf'))
+
+    fn(time, dist, loc, coeff, steps, order, bound)
+    if not square:
+        dist = dist.sqrt_()
+
+    return dist, time
+
+
+def spline_distance_brent_(
+    dist: tensor, 
+    time: tensor, 
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 128, 
+    tol: float = 1e-6, 
+    step_size: float = 0.01, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+) -> Tuple[tensor, tensor]:
+    """Compute the minimum distance from a set of points to a 1D spline (inplace)
+
+    Parameters
+    ----------
+    dist : `(...) tensor`
+        Initial distance from each point in the set to its closest point on the spline
+    time : `(...) tensor`
+        Initial time of the closest point on the spline
+    loc : `(..., D) tensor`
+        Point set.
+    coeff : `(..., N, D) tensor`
+        Spline coefficients encoding the location of the 1D spline.
+    max_iter : int
+        Number of optimization steps.
+    tol : float
+        Tolerance for early stopping
+    step_size : float
+        Initial search size.
+    order : {1..7}
+        Spline order.
+    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+        Boundary conditions of the spline.
+    square : bool
+        Return the squared Euclidean distance.
+
+    Returns
+    -------
+    dist : `(...) tensor`
+        Distance from each point in the set to its closest point on the spline
+    time : `(...) tensor`
+        Time of the closest point on the spline
+    """
+
+    fn = cuda_dist.splinedt_quad_ if coeff.is_cuda else cpu_dist.splinedt_quad_
+
+    batch = torch.broadcast_shapes(dist.shape, time.shape, loc.shape[:-1], coeff.shape[:-2])
+    loc = loc.expand(torch.Size(batch) + loc.shape[-1:])
+    coeff = coeff.expand(torch.Size(batch) + coeff.shape[-2:])
+    time = time.expand(batch)
+    dist = dist.expand(batch)
+
+    dist = dist.square_()
+    fn(time, dist, loc, coeff, order, bound, max_iter, tol, step_size)
+    if not square:
+        dist = dist.sqrt_()
+
+    return dist, time
+
+
+
+def spline_distance_brent(
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 128, 
+    tol: float = 1e-6, 
+    step_size: float = 0.01, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+    steps: Optional[Union[int, tensor]] = None, 
+) -> Tuple[tensor, tensor]:
+    """Compute the minimum distance from a set of points to a 1D spline
+
+    Parameters
+    ----------
+    loc : `(..., D) tensor`
+        Point set.
+    coeff : `(..., N, D) tensor`
+        Spline coefficients encoding the location of the 1D spline.
+    max_iter : int
+        Number of optimization steps.
+    tol : float
+        Tolerance for early stopping
+    step_size : float
+        Initial search size.
+    order : {1..7}
+        Spline order.
+    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+        Boundary conditions of the spline.
+    square : bool
+        Return the squared Euclidean distance.
+    steps : int
+        Number of steps used in the table-based initialisation.
+
+    Returns
+    -------
+    dist : `(...) tensor`
+        Distance from each point in the set to its closest point on the spline
+    time : `(...) tensor`
+        Time of the closest point on the spline
+    """
+
+    dist, time = spline_distance_table(loc, coeff, order=order, bound=bound, steps=steps)
+    return spline_distance_brent_(dist, time, loc, coeff, max_iter, tol, step_size, order, bound, square)
+
+
+def spline_distance_gaussnewton_(
+    dist: tensor, 
+    time: tensor, 
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 16, 
+    tol: float = 1e-6, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+) -> Tuple[tensor, tensor]:
+    """Compute the minimum distance from a set of points to a 1D spline (inplace)
+
+    Parameters
+    ----------
+    dist : `(...) tensor`
+        Initial distance from each point in the set to its closest point on the spline
+    time : `(...) tensor`
+        Initial time of the closest point on the spline
+    loc : `(..., D) tensor`
+        Point set.
+    coeff : `(..., N, D) tensor`
+        Spline coefficients encoding the location of the 1D spline.
+    max_iter : int
+        Number of optimization steps.
+    tol : float
+        Tolerance for early stopping
+    order : {1..7}
+        Spline order.
+    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+        Boundary conditions of the spline.
+    square : bool
+        Return the squared Euclidean distance.
+
+    Returns
+    -------
+    dist : `(...) tensor`
+        Distance from each point in the set to its closest point on the spline
+    time : `(...) tensor`
+        Time of the closest point on the spline
+    """
+
+    fn = cuda_dist.splinedt_gaussnewton_ if coeff.is_cuda else cpu_dist.splinedt_gaussnewton_
+
+    batch = torch.broadcast_shapes(dist.shape, time.shape, loc.shape[:-1], coeff.shape[:-2])
+    loc = loc.expand(torch.Size(batch) + loc.shape[-1:])
+    coeff = coeff.expand(torch.Size(batch) + coeff.shape[-2:])
+    time = time.expand(batch)
+    dist = dist.expand(batch)
+
+    dist = dist.square_()
+    fn(time, dist, loc, coeff, order, bound, max_iter, tol)
+    if not square:
+        dist = dist.sqrt_()
+
+    return dist, time
+
+
+def spline_distance_gaussnewton(
+    loc: tensor, 
+    coeff: tensor, 
+    max_iter: int = 16, 
+    tol: float = 1e-6, 
+    order: OrderType = 3, 
+    bound: BoundType = 'dct2', 
+    square: bool = False,
+    steps: Optional[Union[int, tensor]] = None, 
+) -> Tuple[tensor, tensor]:
+    """Compute the minimum distance from a set of points to a 1D spline
+
+    Parameters
+    ----------
+    loc : `(..., D) tensor`
+        Point set.
+    coeff : `(..., N, D) tensor`
+        Spline coefficients encoding the location of the 1D spline.
+    max_iter : int
+        Number of optimization steps.
+    tol : float
+        Tolerance for early stopping
+    order : {1..7}
+        Spline order.
+    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+        Boundary conditions of the spline.
+    square : bool
+        Return the squared Euclidean distance.
+    steps : int
+        Number of steps used in the table-based initialisation.
+
+    Returns
+    -------
+    dist : `(...) tensor`
+        Distance from each point in the set to its closest point on the spline
+    time : `(...) tensor`
+        Time of the closest point on the spline
+    """
+
+    dist, time = spline_distance_table(loc, coeff, order=order, bound=bound, steps=steps)
+    return spline_distance_gaussnewton_(dist, time, loc, coeff, max_iter, tol, order, bound, square)

@@ -575,9 +575,9 @@ template <bound::type B> struct PushPull<one, C, B> {
               const offset_t stride[1],
               offset_t nc, offset_t osc, offset_t isc)
     {
-        offset_t x0, x1, x2, x3;
-        reduce_t w0, w1, w2, w3;
-        signed char   f0, f1, f2, f3;
+        offset_t     x0, x1, x2, x3;
+        reduce_t     w0, w1, w2, w3;
+        signed char  f0, f1, f2, f3;
         utils::index(loc[0], size[0], x0, x1, x2, x3, w0, w1, w2, w3, f0, f1, f2, f3);
         x0 *= stride[0];
         x1 *= stride[0];
