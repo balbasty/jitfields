@@ -142,6 +142,8 @@ bounds_ok_int = list(map(lambda x: convert_bound[x], bounds_ok))
 
 
 def checkbound(order, bound):
+    order = ensure_list(order)
+    bound = ensure_list(bound)
     if any(o != 1 and b not in bounds_ok_int for o, b in zip(order, bound)):
         bound = tuple(boundnames[b].lower() for b in bound)
         raise ValueError(f'`spline_coeff` only implemented for bounds '
