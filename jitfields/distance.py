@@ -470,7 +470,7 @@ def mesh_distance_signed(
     faces: tensor,
     out: Optional[tensor] = None,
 ) -> tensor:
-    """Compute the *signed* minimum distance from a set of points to a 1D spline
+    """Compute the *signed* minimum distance from a set of points to a triangular mesh
 
     Parameters
     ----------
@@ -531,7 +531,7 @@ def mesh_distance(
     faces: tensor,
     out: Optional[tensor] = None,
 ) -> tensor:
-    """Compute the minimum distance from a set of points to a 1D spline
+    """Compute the minimum distance from a set of points to a triangular mesh
 
     Parameters
     ----------
