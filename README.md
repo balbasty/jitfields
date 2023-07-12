@@ -679,8 +679,6 @@ out : (..., *outshape, channel, ndim) tensor
 
 ### Compact symmetric (or postive-definite) matrices
 
-Currently only implemented on the CPU.
-
 ```python
 def sym_matvec(mat, vec, dtype=None, out=None): ...
 """Matrix-vector product for compact symmetric matrices
