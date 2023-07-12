@@ -30,6 +30,8 @@ pip install git+https://github.com/balbasty/jitfields#egg=jitfields[cuda]
 
 ### Distance transforms
 
+#### Distance to binary masks
+
 ```python
 def euclidean_distance_transform(x, ndim=None, vx=1, dtype=None): ...
 """Compute the Euclidean distance transform of a binary image
@@ -87,6 +89,43 @@ References
       https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
     """
 ```
+
+```python
+def signed_distance_transform(
+    x: tensor,
+    ndim: Optional[int] = None,
+    vx: OneOrSeveral[float] = 1,
+    dtype: Optional[torch.dtype] = None,
+) -> tensor: ...
+"""Compute the signed Euclidean distance transform of a binary image
+
+Parameters
+----------
+x : `(..., *spatial) tensor`
+    Input tensor, with shape `(..., *spatial)`.
+ndim : `int`, default=`x.ndim`
+    Number of spatial dimensions. Default: all.
+vx : `[sequence of] float`, default=1
+    Voxel size.
+dtype : `torch.dtype`, optional
+    Ouptut data type. Default is same as `x` if it has a floating
+    point data type, else `torch.get_default_dtype()`.
+
+Returns
+-------
+d : `(..., *spatial) tensor`
+    Signed distance map, with shape `(..., *spatial)`.
+
+References
+----------
+..[1] "Distance Transforms of Sampled Functions"
+      Pedro F. Felzenszwalb & Daniel P. Huttenlocher
+      Theory of Computing (2012)
+      https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf
+"""
+```
+
+#### Distance to 1D splines
 
 ```python
 def spline_distance_table(
@@ -298,6 +337,8 @@ time : `(...) tensor`
     Time of the closest point on the spline
 """
 ```
+
+#### Distance to triangular meshes
 
 ```python
 def mesh_distance_signed(
