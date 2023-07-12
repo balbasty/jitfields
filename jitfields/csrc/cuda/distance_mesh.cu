@@ -277,7 +277,7 @@ __global__ void dt_naive(
     auto vertices     = VertexList(_vertices, stride_vertices[0], stride_vertices[1]);
 
     offset_t numel = size.prod();
-    for (offset_t i=index; index < numel; index += stride, i=index)
+    for (offset_t i=index; i < numel; i += stride)
     {
         offset_t offset_coord = index2offset<nbatch>(i, size.data, stride_coord.data);
         offset_t offset_dist  = index2offset<nbatch>(i, size.data, stride_dist.data);

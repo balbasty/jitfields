@@ -529,6 +529,7 @@ def mesh_distance(
     loc: tensor, 
     vertices: tensor, 
     faces: tensor,
+    naive: bool = False,
     out: Optional[tensor] = None,
 ) -> tensor:
     """Compute the minimum distance from a set of points to a triangular mesh
@@ -541,6 +542,8 @@ def mesh_distance(
         Mesh vertices
     faces : `(M, D) tensor[integer]`
         Mesh faces
+    naive : bool
+        Usae naive algorithm
 
     Returns
     -------
@@ -549,26 +552,39 @@ def mesh_distance(
         (negative inside, positive outside)
     """
 
-    fn_dt = cuda_dist.mesh_dt if loc.is_cuda else cpu_dist.mesh_dt
-    fn_tree = cpu_dist.mesh_make_tree
+    if not naive:
+        fn_dt = cuda_dist.mesh_dt if loc.is_cuda else cpu_dist.mesh_dt
+        fn_tree = cpu_dist.mesh_make_tree
 
-    # move to CPU (no choice for tree and normals)
-    cpuvertices = vertices.cpu()
-    cpufaces = faces.to('cpu', copy=True)
+        # move to CPU (no choice for tree and normals)
+        cpuvertices = vertices.cpu()
+        cpufaces = faces.to('cpu', copy=True)
 
-    # build binary search tree (modifies faces inplace)
-    tree, cpufaces = fn_tree(cpuvertices, cpufaces)
+        # build binary search tree (modifies faces inplace)
+        tree, cpufaces = fn_tree(cpuvertices, cpufaces)
 
-    # move to loc's device
-    # NOTE that faces were reordered to match tree order, so
-    # we MUST transfer `cpufaces`, even if the input `faces` was
-    # already on the gpu.
-    vertices = vertices.to(loc)
-    faces = cpufaces.to(loc.device)
-    if out is None:
-        out = loc.new_empty(out.shape[:-1])
+        # move to loc's device
+        # NOTE that faces were reordered to match tree order, so
+        # we MUST transfer `cpufaces`, even if the input `faces` was
+        # already on the gpu.
+        vertices = vertices.to(loc)
+        faces = cpufaces.to(loc.device)
+        if out is None:
+            out = loc.new_empty(loc.shape[:-1])
 
-    # compute unsigned distance
-    fn_dt(out, loc, vertices, faces, tree)
+        # compute unsigned distance
+        fn_dt(out, loc, vertices, faces, tree)
+
+    else:
+        fn_dt = cuda_dist.mesh_dt_naive if loc.is_cuda else cpu_dist.mesh_dt_naive
+
+        # move to loc's device
+        vertices = vertices.to(loc)
+        faces = faces.to(loc.device)
+        if out is None:
+            out = loc.new_empty(loc.shape[:-1])
+
+        # compute unsigned distance
+        fn_dt(out, loc, vertices, faces)
 
     return out

@@ -182,7 +182,7 @@ struct MeshDistUtil<3, scalar_t, offset_t> {
                 else
                 {
                     nearest_entity = NearestEntity::E01;
-                    t = -b0 / a00;
+                    s = -b0 / a00;
                     d2 = b0 * s + c;
                 }
             }
@@ -333,8 +333,10 @@ struct MeshDistUtil<3, scalar_t, offset_t> {
             nearest_point[d] = vertices[0][d] + s * edge0[d] + t * edge1[d];
 
         // Account for numerical round-off error.
-        if (d2 < 0)
+        if (d2 < 0) {
+            printf("neg dist: %f true dist: %f entity = %d\n", d2, (nearest_point - point).sqnorm(), nearest_entity);
             d2 = static_cast<scalar_t>(0);
+        }
         return d2;
     }
 
@@ -1108,7 +1110,7 @@ struct MeshDist {
             const Faces    & faces
     )
     {
-        scalar_t nearest_dist = 1e9; // static_cast<scalar_t>(1./0.);
+        scalar_t nearest_dist = static_cast<scalar_t>(1./0.);
         for (offset_t n=0; n<faces.size(); ++n)
         {
             NearestEntity       maybe_entity;
@@ -1121,6 +1123,17 @@ struct MeshDist {
                     facevertices[d].copy_(vertices[face[d]]);
                 
                 maybe_dist = Utils::sqdist_unsigned(maybe_entity, maybe_point, point, facevertices);
+
+                if (maybe_dist == 0)
+                {
+                    printf("zero dist: point = [%f %f %f] nearest = [%f %f %f] vertices = [%f %f %f; %f %f %f; %f %f %f] entity = %d\n",
+                           point[0], point[1], point[2], 
+                           maybe_point[0], maybe_point[1], maybe_point[2],
+                           facevertices[0][0], facevertices[0][1], facevertices[0][2], 
+                           facevertices[1][0], facevertices[1][1], facevertices[1][2], 
+                           facevertices[2][0], facevertices[2][1], facevertices[2][2],
+                           maybe_entity);
+                }
             }
 
             if (maybe_dist < nearest_dist * nearest_dist)
