@@ -46,12 +46,12 @@ def get_cuda_blocks(n, max_threads_per_block=None):
     return (n - 1) // max_threads_per_block + 1
 
 
-def culaunch(kernel, numel, args):
+def culaunch(kernel, numel, args, num_threads=None, num_blocks=None):
     trials = 0
-    num_threads = get_cuda_num_threads()
+    num_threads = num_threads or get_cuda_num_threads()
     e = None
     while trials < 4 and num_threads >= 1:
-        num_blocks = get_cuda_blocks(numel, num_threads)
+        num_blocks = num_blocks or get_cuda_blocks(numel, num_threads)
         try:
             return kernel((num_blocks,), (num_threads,), args)
         except CUDADriverError as e:
@@ -62,6 +62,8 @@ def culaunch(kernel, numel, args):
 def get_offset_type(*shapes):
     can_use_32b = True
     for shape in shapes:
+        if shape is None:
+            continue
         if isinstance(shape, (np.ndarray, cp.ndarray)):
             array = shape
             maxstride = max(sz * st for sz, st in zip(array.shape, array.strides))

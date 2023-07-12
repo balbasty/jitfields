@@ -31,6 +31,46 @@ T square(T a)
     return a*a;
 }
 
+#ifdef __CUDACC__
+
+template <typename T>
+inline __device__
+T sqrt(T a)
+{}
+
+template <>
+inline __device__
+float sqrt(float a)
+{
+    return ::sqrtf(a);
+}
+
+template <>
+inline __device__
+double sqrt(double a)
+{
+    return ::sqrt(a);
+}
+
+template <>
+inline __device__
+half sqrt(half a)
+{
+    return ::hsqrt(a);
+}
+
+#else
+
+template <typename T>
+inline __device__
+T sqrt(T a)
+{
+    return std::sqrt(a);
+}
+
+#endif
+
+
 template <int N, typename T>
 inline __device__
 T pow(T a) {

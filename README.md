@@ -209,7 +209,6 @@ time : `(...) tensor`
 ```
 
 ```python
-
 def spline_distance_brent_(
     dist: tensor, 
     time: tensor, 
@@ -257,7 +256,6 @@ time : `(...) tensor`
 ```
 
 ```python
-
 def spline_distance_gaussnewton_(
     dist: tensor, 
     time: tensor, 
@@ -298,6 +296,58 @@ dist : `(...) tensor`
     Distance from each point in the set to its closest point on the spline
 time : `(...) tensor`
     Time of the closest point on the spline
+"""
+```
+
+```python
+def mesh_distance_signed(
+    loc: tensor, 
+    vertices: tensor, 
+    faces: tensor,
+    out: Optional[tensor] = None,
+) -> tensor: ...
+"""Compute the *signed* minimum distance from a set of points to a triangular mesh
+
+Parameters
+----------
+loc : `(..., D) tensor`
+    Point set.
+vertices : `(N, D) tensor`
+    Mesh vertices
+faces : `(M, D) tensor[integer]`
+    Mesh faces
+
+Returns
+-------
+dist : `(...) tensor`
+    Signed distance from each point in the set to its closest point on the mesh
+    (negative inside, positive outside)
+"""
+```
+
+```python
+def mesh_distance(
+    loc: tensor, 
+    vertices: tensor, 
+    faces: tensor,
+    out: Optional[tensor] = None,
+) -> tensor: ...
+"""Compute the minimum distance from a set of points to a triangular mesh
+
+Parameters
+----------
+loc : `(..., D) tensor`
+    Point set.
+vertices : `(N, D) tensor`
+    Mesh vertices
+faces : `(M, D) tensor[integer]`
+    Mesh faces
+
+Returns
+-------
+dist : `(...) tensor`
+    Signed distance from each point in the set to its closest point on the mesh
+    (negative inside, positive outside)
 """
 ```
 

@@ -1,5 +1,5 @@
-#ifndef JIT_DISTANCE_SPLINEDIST_H
-#define JIT_DISTANCE_SPLINEDIST_H
+#ifndef JF_DISTANCE_SPLINE_H
+#define JF_DISTANCE_SPLINE_H
 #include "../spline.h"
 #include "../bounds.h"
 #include "../pushpull.h"
@@ -418,4 +418,4 @@ public:
 } // namespace distance_spline
 } // namespace jf
 
-#endif // JIT_DISTANCE_SPLINEDIST_H
+#endif // JF_DISTANCE_SPLINE_H
