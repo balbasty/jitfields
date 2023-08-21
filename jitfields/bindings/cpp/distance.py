@@ -2,11 +2,10 @@ import cppyy
 import torch
 import math
 import numpy as np
-from .utils import include, cwrap
+from .utils import include, cwrap, nullptr
 from ..common.utils import ctypename, cinfo, spline_as_cname, bound_as_cname
-from ..cuda.utils import get_offset_type
 
-cppyy.set_debug(True)
+# cppyy.set_debug(True)
 include()
 cppyy.include('distance_l1.hpp')
 cppyy.include('distance_euclidean.hpp')
@@ -172,7 +171,9 @@ def mesh_make_tree(vertices, faces):
     M, K = faces.shape
     if (D != K) or (D not in (2, 3)):
         raise ValueError('Faces must be triangles (in 3D) or segments (in 2D)')
-    nb_levels = int(math.ceil(math.log2(M))) + 2
+    nb_levels = int(math.ceil(math.log2(M))) + 3
+    # I don't understand why I need `+3` and not just `+1`.
+    # It is empirical to avoid segfaults...
     nb_nodes = int(math.ceil(sum(2**(i) for i in range(nb_levels))))
     nb_features = scalar_t.itemsize * 2*(D+1) + index_t.itemsize * 3
 
@@ -208,7 +209,8 @@ def mesh_pseudonormals(vertices, faces):
     npvertices = vertices.numpy()
     npnormfaces = normals_faces.numpy()
     npnormvertices = normal_vertices.numpy()
-    npnormedges = normals_edges.numpy() if normals_edges is not None else None
+    npnormedges = (normals_edges.numpy() if normals_edges is not None else 
+                   nullptr(npnormfaces.dtype))
     scalar_t = np.dtype(npvertices.dtype)
     index_t = np.dtype(npfaces.dtype)
     offset_t = np.dtype(np.int64)
@@ -220,7 +222,7 @@ def mesh_pseudonormals(vertices, faces):
     if normals_edges is not None:
         _, stride_normedges = cinfo(npnormedges, dtype=offset_t)
     else:
-        stride_normedges = None
+        stride_normedges = nullptr(offset_t)
     M = offset_t.type(M)
     N = offset_t.type(N)
 
@@ -235,17 +237,22 @@ def mesh_pseudonormals(vertices, faces):
         return normals_faces, normal_vertices
 
 
-def mesh_sdt(dist, coord, vertices, faces, tree, normals_faces, normal_vertices, normals_edges):
+def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree, normals_faces, normal_vertices, normals_edges):
     """Signed distance transform with binary tree search"""
 
     npdist = dist.numpy()
     npfaces = faces.numpy()
+    npnearest = (nearest_vertex.numpy() if nearest_vertex is not None else 
+                 nullptr(npfaces.dtype))
+    # npentity = (nearest_entity.numpy() if nearest_entity is not None else 
+    #             nullptr(np.uint8))
     npvertices = vertices.numpy()
     nptree = tree.numpy()
     npcoord = coord.numpy()
     npnormfaces = normals_faces.numpy()
     npnormvertices = normal_vertices.numpy()
-    npnormedges = normals_edges.numpy() if normals_edges is not None else None
+    npnormedges = (normals_edges.numpy() if normals_edges is not None else 
+                   nullptr(npdist.dtype))
     scalar_t = np.dtype(npvertices.dtype)
     index_t = np.dtype(npfaces.dtype)
     offset_t = np.dtype(np.int64)
@@ -266,15 +273,23 @@ def mesh_sdt(dist, coord, vertices, faces, tree, normals_faces, normal_vertices,
     if normals_edges is not None:
         _, stride_normedges = cinfo(npnormedges, dtype=offset_t)
     else:
-        stride_normedges = None
+        stride_normedges = nullptr(offset_t)
+    if nearest_vertex is not None:
+        _, stride_nearest = cinfo(npnearest, dtype=offset_t)
+    else:
+        stride_nearest = nullptr(offset_t)
+    # if nearest_entity is not None:
+    #     _, stride_entity = cinfo(npentity, dtype=offset_t)
+    # else:
+    #     stride_entity = nullptr(offset_t)
     M = offset_t.type(M)
     N = offset_t.type(N)
 
     template = f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, {ctypename(index_t)}, {ctypename(offset_t)}'
     func = cwrap(cppyy.gbl.jf.distance_mesh.sdt[template])
-    func(npdist, npcoord, npvertices, npfaces, nptree,
+    func(npdist, npnearest, npcoord, npvertices, npfaces, nptree,
          npnormfaces, npnormvertices, npnormedges,
-         size, stride_dist, stride_coord, stride_vertices, stride_faces, 
+         size, stride_dist, stride_nearest, stride_coord, stride_vertices, stride_faces, 
          stride_normfaces, stride_normvertices, stride_normedges)
 
     return dist
@@ -289,7 +304,7 @@ def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices,
     npcoord = coord.numpy()
     npnormfaces = normals_faces.numpy()
     npnormvertices = normal_vertices.numpy()
-    npnormedges = normals_edges.numpy() if normals_edges is not None else None
+    npnormedges = normals_edges.numpy() if normals_edges is not None else nullptr(npdist.dtype)
     scalar_t = np.dtype(npvertices.dtype)
     index_t = np.dtype(npfaces.dtype)
     offset_t = np.dtype(np.int64)
@@ -310,7 +325,7 @@ def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices,
     if normals_edges is not None:
         _, stride_normedges = cinfo(npnormedges, dtype=offset_t)
     else:
-        stride_normedges = None
+        stride_normedges = nullptr(offset_t)
     M = offset_t.type(M)
     N = offset_t.type(N)
 
@@ -318,7 +333,7 @@ def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices,
     func = cwrap(cppyy.gbl.jf.distance_mesh.sdt_naive[template])
     func(npdist, npcoord, npvertices, npfaces, 
          npnormfaces, npnormvertices, npnormedges,
-         size, M, stride_dist, stride_coord, stride_vertices, stride_faces, 
+         size, M, stride_dist, stride_coord, stride_vertices, stride_faces,
          stride_normfaces, stride_normvertices, stride_normedges)
 
     return dist

@@ -30,11 +30,133 @@ template <int D, typename scalar_t, typename offset_t>
 class MeshDistUtil {};
 
 // -----------------------------------------------------------------------------
+//                              2D IMPLEMENTATION
+// -----------------------------------------------------------------------------
+
+template <typename scalar_t,  typename offset_t>
+struct MeshDistUtil<2, scalar_t, offset_t> {
+    static constexpr int D = 2;
+
+    template <typename Point, typename NearestPoint, typename Normals>
+    __host__ __device__ static inline
+    scalar_t sign(const Point & point, const NearestPoint & nearest_point, 
+                  const Normals & pseudonormals, const NearestEntity & nearest_entity)
+    {
+        int i = 0;
+        switch (nearest_entity)
+        {
+            case NearestEntity::F:
+                i = 0;
+                break;
+            case NearestEntity::V0:
+                i = 1;
+                break;
+            case NearestEntity::V1:
+                i = 2;
+                break;
+            default:
+                break;
+        }
+        auto pseudonormal = pseudonormals[i];
+
+
+        auto u = point - nearest_point;
+        scalar_t s = static_cast<scalar_t>(u.dot(pseudonormal) >= 0 ? 1 : -1);
+        return s;
+    }
+
+    template <typename NearestPoint, typename Point, typename Vertices>
+    __host__ __device__ static inline 
+    scalar_t sqdist_unsigned(NearestEntity & nearest_entity, NearestPoint & nearest_point, 
+                             const Point & point, const Vertices & vertices)
+    {
+        auto edge = vertices[1] - vertices[0];
+
+        auto diff0 = point - vertices[0];
+        auto dot0 = diff0.dot(edge);
+        if (dot0 <= 0)
+        {
+            nearest_entity = NearestEntity::V0;
+            nearest_point.copy_(vertices[0]);
+            return diff0.sqnorm();
+        }
+
+        auto diff1 = point - vertices[1];
+        if (diff1.dot(edge) >= 0)
+        {
+            nearest_entity = NearestEntity::V1;
+            nearest_point.copy_(vertices[1]);
+            return diff1.sqnorm();
+        }
+
+        nearest_entity = NearestEntity::F;
+        auto edgenorm = edge.norm();
+        auto alpha = dot0 / edgenorm;
+        nearest_point.addto_(vertices[0], edge, alpha / edgenorm);
+        return diff0.sqnorm() - alpha * alpha;
+    }
+
+#ifndef __CUDACC__
+    // Returns pseudonormals ordered as: F, V0, V1
+    template <typename Normal, typename Vertices>
+    __host__ __device__ static inline
+    void compute_normal(Normal & normal, const Vertices & vertices)
+    {
+        auto edge = vertices[1] - vertices[0];
+        normal[0] = -edge[1];
+        normal[1] = edge[0];
+        normal.normalize_();
+    }
+
+    template <typename NormFaces, typename NormVertices, typename NormEdges, 
+              typename Faces, typename Vertices>
+    static inline 
+    void build_normals(
+        NormFaces       & normfaces, 
+        NormVertices    & normvertices, 
+        NormEdges       & normedges, 
+        const Faces     & faces,
+        const Vertices  & vertices)
+    {
+        auto get_edge_id = [&](offset_t i, offset_t j) {
+            return min(i, j) * vertices.size() + max(i, j);
+        };
+
+        for (offset_t n=0; n<faces.size(); ++n)
+        {
+            auto face = faces[n];
+
+            // compute normals
+            auto normal       = StaticPoint<D, scalar_t>();
+            auto facevertices = StaticPointList<D, D, scalar_t>();
+            auto vertex_id    = StaticPoint<D, offset_t>();
+            for (offset_t d=0; d<D; ++d)
+            {
+                vertex_id[d] = static_cast<offset_t>(face[d]);
+                facevertices[d].copy_(vertices[vertex_id[d]]);
+            }
+            compute_normal(normal, facevertices);
+
+            // accumulate normals
+            normfaces[n].copy_(normal);
+            for (offset_t d=0; d<D; ++d)
+                normvertices[vertex_id[d]].add_(normal);
+        }
+
+        // normalize
+        for (offset_t n=0; n<vertices.size(); ++n)
+            normvertices[n].normalize_();
+    }
+#endif // __CUDACC__
+};
+
+// -----------------------------------------------------------------------------
 //                              3D IMPLEMENTATION
 // -----------------------------------------------------------------------------
 
 template <typename scalar_t,  typename offset_t>
 struct MeshDistUtil<3, scalar_t, offset_t> {
+    static constexpr int D = 3;
 
     template <typename Point, typename NearestPoint, typename Normals>
     __host__ __device__ static inline
@@ -338,6 +460,7 @@ struct MeshDistUtil<3, scalar_t, offset_t> {
         return d2;
     }
 
+#ifndef __CUDACC__
     // Returns pseudonormals ordered as: F, V0, V1, V2
     template <typename Normals, typename Triangle>
     __host__ __device__ static inline
@@ -372,6 +495,82 @@ struct MeshDistUtil<3, scalar_t, offset_t> {
         }
     }
 
+    template <typename NormFaces, typename NormVertices, typename NormEdges, 
+              typename Faces, typename Vertices>
+    static inline 
+    void build_normals(
+        NormFaces       & normfaces, 
+        NormVertices    & normvertices, 
+        NormEdges       & normedges, 
+        const Faces     & faces,
+        const Vertices  & vertices)
+    {
+        std::unordered_map<offset_t, StaticPoint<D, scalar_t> > normedges_dict;
+
+        auto get_edge_id = [&](offset_t i, offset_t j) {
+            return min(i, j) * vertices.size() + max(i, j);
+        };
+
+        for (offset_t n=0; n<faces.size(); ++n)
+        {
+            auto face = faces[n];
+
+            // compute normals
+            auto normals      = StaticPointList<D+1, D, scalar_t>();
+            auto facevertices = StaticPointList<D, D, scalar_t>();
+            auto vertex_id    = StaticPoint<D, offset_t>();
+            for (offset_t d=0; d<D; ++d)
+            {
+                vertex_id[d]    = static_cast<offset_t>(face[d]);
+                facevertices[d].copy_(vertices[vertex_id[d]]);
+            }
+            compute_pseudonormals(normals, facevertices);
+
+            // accumulate normals
+            normfaces[n].copy_(normals[0]);
+            for (offset_t d=0; d<D; ++d)
+            {
+                normvertices[vertex_id[d]].add_(normals[d+1]);
+                auto edge_id = (d == 0 ? get_edge_id(vertex_id[0], vertex_id[1]): 
+                                d == 1 ? get_edge_id(vertex_id[1], vertex_id[2]): 
+                                         get_edge_id(vertex_id[0], vertex_id[2]));
+                if (normedges_dict.find(edge_id) == normedges_dict.end())
+                {
+                    normedges_dict[edge_id] = StaticPoint<D, scalar_t>(normals[0]);
+                }
+                else
+                {
+                    normedges_dict[edge_id].add_(normals[0]);
+                }
+            }
+        }
+
+        // normalize
+        for (offset_t n=0; n<vertices.size(); ++n)
+            normvertices[n].normalize_();
+
+        // build final edge map
+        for (auto edge = normedges_dict.begin(); edge != normedges_dict.end(); ++edge)
+            edge->second.normalize_();
+        for (offset_t n=0; n<faces.size(); ++n)
+        {
+            auto face = faces[n];
+            auto vertex_id = StaticPoint<D, offset_t>();
+            for (offset_t d=0; d<D; ++d)
+            {
+                vertex_id[d] = static_cast<offset_t>(face[d]);
+            }
+
+            for (offset_t d=0; d<D; ++d)
+            {
+                auto edge_id = (d == 0 ? get_edge_id(vertex_id[0], vertex_id[1]): 
+                                d == 1 ? get_edge_id(vertex_id[1], vertex_id[2]): 
+                                         get_edge_id(vertex_id[0], vertex_id[2]));
+                normedges[n][d].copy_(normedges_dict[edge_id]);
+            }
+        }
+    }
+#endif // __CUDACC__
 };
 
 // =============================================================================
@@ -488,8 +687,7 @@ struct MeshDist {
             ptr(other.ptr.face.data, other.ptr.face.stride), stride(other.stride) {}
         
         this_type & operator= (const this_type & other) 
-            { ptr.change_(other.ptr); stride = other.stride; 
-              return *this; }
+            { ptr.change_(other.ptr); stride = other.stride; return *this; }
 
         value_type & operator* () { return ptr.load_(); }
         value_type operator* () const { return ptr.load(); } 
@@ -578,7 +776,7 @@ struct MeshDist {
             if (D == 3)
                 split_dim = top[0] > top[1] ? (top[0] > top[2] ? 0 : 2) : (top[1] > top[2] ? 1 : 2);
             else // D == 2
-                split_dim = top[0] > top[1] ? 0 : 1;
+            split_dim = top[0] > top[1] ? 0 : 1;
 
             scalar_t radius_sq = 0;
             for (index_t i=begin; i < end; ++i)
@@ -618,91 +816,11 @@ struct MeshDist {
             return sphere;
         }
     }
-
-    template <typename NormFaces, typename NormVertices, typename NormEdges, 
-              typename Faces, typename Vertices>
-    static inline 
-    void build_normals(
-        NormFaces       & normfaces, 
-        NormVertices    & normvertices, 
-        NormEdges       & normedges, 
-        const Faces     & faces,
-        const Vertices  & vertices)
-    {
-        std::unordered_map<offset_t, StaticPointScalar> normedges_dict;
-
-        auto get_edge_id = [&](offset_t i, offset_t j) {
-            return min(i, j) * vertices.size() + max(i, j);
-        };
-
-        for (offset_t n=0; n<faces.size(); ++n)
-        {
-            auto face = faces[n];
-
-            // compute normals
-            auto normals      = StaticPointList<D+1, D, scalar_t>();
-            auto facevertices = StaticPointList<D, D, scalar_t>();
-            auto vertex_id    = StaticPoint<D, offset_t>();
-            for (offset_t d=0; d<D; ++d)
-            {
-                vertex_id[d]    = static_cast<offset_t>(face[d]);
-                facevertices[d].copy_(vertices[vertex_id[d]]);
-            }
-            Utils::compute_pseudonormals(normals, facevertices);
-
-            // accumulate normals
-            normfaces[n].copy_(normals[0]);
-            for (offset_t d=0; d<D; ++d)
-            {
-                normvertices[vertex_id[d]].add_(normals[d+1]);
-                if (D == 3)
-                {
-                    index_t edge_id = (d == 0 ? get_edge_id(vertex_id[0], vertex_id[1]): 
-                                       d == 1 ? get_edge_id(vertex_id[1], vertex_id[2]): 
-                                                get_edge_id(vertex_id[0], vertex_id[2]));
-                    if (normedges_dict.find(edge_id) == normedges_dict.end())
-                    {
-                        normedges_dict[edge_id] = StaticPointScalar(normals[0]);
-                    }
-                    else
-                    {
-                        normedges_dict[edge_id].add_(normals[0]);
-                    }
-                }
-            }
-        }
-
-        // normalize
-        for (offset_t n=0; n<vertices.size(); ++n)
-            normvertices[n].normalize_();
-
-        // build final edge map
-        if (D  == 3) 
-        {
-            for (auto edge = normedges_dict.begin(); edge != normedges_dict.end(); ++edge)
-                edge->second.normalize_();
-            for (offset_t n=0; n<faces.size(); ++n)
-            {
-                auto face = faces[n];
-                auto vertex_id = StaticPoint<D, offset_t>();
-                for (offset_t d=0; d<D; ++d)
-                {
-                    vertex_id[d] = static_cast<offset_t>(face[d]);
-                }
-
-                for (offset_t d=0; d<D; ++d)
-                {
-                    index_t edge_id = (d == 0 ? get_edge_id(vertex_id[0], vertex_id[1]): 
-                                       d == 1 ? get_edge_id(vertex_id[1], vertex_id[2]): 
-                                                get_edge_id(vertex_id[0], vertex_id[2]));
-                    normedges[n][d].copy_(normedges_dict[edge_id]);
-                }
-            }
-        }
-    }
-
 #endif
 
+    // On the cpu, we can recursively traverse the tree.
+    // The point of the tree search is that we can cut long branches that 
+    // we know are already too far.
     template <typename NearestPoint, typename Point, typename Vertices, typename Faces> 
     __host__ __device__ static inline
     void query_dist_recurse(
@@ -771,6 +889,8 @@ struct MeshDist {
         }
     }
 
+    // we can't use recursions in cuda (because stack size must be known at compile time)
+    // so we must unroll the recursion, which is a pain. This works though!
     template <typename NearestPoint, typename Point, typename Vertices, typename Faces, typename Trace> 
     __host__ __device__ static inline
     void query_dist_loop(
@@ -960,6 +1080,28 @@ struct MeshDist {
 #endif
 
 
+    template <typename Point, typename Vertices, typename Face>
+    __host__ __device__ static inline
+    index_t get_nearest_vertex(
+        const Face & nearest_face,
+        const Point & point, 
+        const Vertices & vertices)
+    {
+        scalar_t best_dist = static_cast<scalar_t>(1./0.);
+        index_t best_vertex = 0;
+        for (offset_t d=0; d<D; ++d)
+        {
+            auto vertex_id = nearest_face[d];
+            auto dist = (vertices[vertex_id]-point).norm();
+            if (dist < best_dist)
+            {
+                best_dist = dist;
+                best_vertex = vertex_id;
+            }
+        }
+        return best_vertex;
+    }
+
     template <typename NearestPoint, typename Point, typename Vertices, typename Faces
 #ifdef DIST_USE_LOOP
     ,typename Trace
@@ -1013,10 +1155,11 @@ struct MeshDist {
             const Point    & point, 
             const Vertices & vertices, 
             const Faces    & faces, 
-            const Node     * tree
+            const Node     * tree,
 #ifdef DIST_USE_LOOP
-            , Trace        & treetrace
+            Trace        & treetrace,
 #endif
+            index_t * nearest_vertex = nullptr
     )
     {
         index_t             nearest_face;
@@ -1035,6 +1178,10 @@ struct MeshDist {
             ,treetrace
 #endif
         );
+
+        // get index of vertex nearest to the projection
+        if (nearest_vertex)
+            *nearest_vertex = get_nearest_vertex(faces[nearest_face], nearest_point, vertices);
     }
 
     template <typename Point, typename Vertices, typename Faces, 
@@ -1054,7 +1201,10 @@ struct MeshDist {
 #endif
             const NormFaces    & normfaces, 
             const NormEdges    & normedges, 
-            const NormVertices & normvertices
+            const NormVertices & normvertices,
+            index_t * nearest_vertex = nullptr,
+            index_t * _nearest_face = nullptr,
+            NearestEntity * _nearest_entity = nullptr
     )
     {
         index_t             nearest_face;
@@ -1074,16 +1224,30 @@ struct MeshDist {
             ,treetrace
 #endif
         );
+        if (_nearest_face)   *_nearest_face   = nearest_face;
+        if (_nearest_entity) *_nearest_entity = nearest_entity;
+
+        // get index of vertex nearest to the projection
+        if (nearest_vertex)
+            *nearest_vertex = get_nearest_vertex(faces[nearest_face], nearest_point, vertices);
 
         // load normals into a compact array
-        auto normals     = StaticPointList<D+1+(D == 3 ? D : 0), D, scalar_t>();
         auto face        = faces[nearest_face];
-        auto normedge    = normedges[nearest_face];
+        auto normals     = StaticPointList<D+1+(D == 3 ? D : 0), D, scalar_t>();
         normals[0].copy_(normfaces[nearest_face]);
-        for (offset_t d=0; d<D; ++d)
+        if (D == 3)
         {
-            normals[1+d].copy_(normvertices[face[d]]);
-            if (D == 3) { normals[1+D+d].copy_(normedge[d]); }
+            auto normedge = normedges[nearest_face];
+            for (offset_t d=0; d<D; ++d)
+            {
+                normals[1+d].copy_(normvertices[face[d]]);
+                normals[1+D+d].copy_(normedge[d]);
+            }
+        }
+        else
+        {
+            for (offset_t d=0; d<D; ++d)
+                normals[1+d].copy_(normvertices[face[d]]);
         }
 
         // compute sign from dot product <ray, normal>
@@ -1140,7 +1304,8 @@ struct MeshDist {
     scalar_t unsigned_dist_naive(
             const Point    & point, 
             const Vertices & vertices, 
-            const Faces    & faces
+            const Faces    & faces,
+            index_t * nearest_vertex = nullptr
     )
     {
         index_t             nearest_face;
@@ -1155,6 +1320,10 @@ struct MeshDist {
             vertices, 
             faces
         );
+
+        // get index of vertex nearest to the projection
+        if (nearest_vertex)
+            *nearest_vertex = get_nearest_vertex(faces[nearest_face], nearest_point, vertices);
     }
 
     template <typename Point, typename Vertices, typename Faces, 
@@ -1166,7 +1335,8 @@ struct MeshDist {
             const Faces        & faces, 
             const NormFaces    & normfaces, 
             const NormEdges    & normedges, 
-            const NormVertices & normvertices
+            const NormVertices & normvertices,
+            index_t * nearest_vertex = nullptr
     )
     {
         index_t             nearest_face;
@@ -1183,15 +1353,27 @@ struct MeshDist {
             faces
         );
 
+        // get index of vertex nearest to the projection
+        if (nearest_vertex)
+            *nearest_vertex = get_nearest_vertex(faces[nearest_face], nearest_point, vertices);
+
         // load normals into a compact array
         auto normals     = StaticPointList<D+1+(D == 3 ? D : 0), D, scalar_t>();
         auto face        = faces[nearest_face];
-        auto normedge    = normedges[nearest_face];
         normals[0].copy_(normfaces[nearest_face]);
-        for (offset_t d=0; d<D; ++d)
+        if (D == 3)
         {
-            normals[1+d].copy_(normvertices[face[d]]);
-            if (D == 3) normals[1+D+d].copy_(normedge[d]);
+            auto normedge = normedges[nearest_face];
+            for (offset_t d=0; d<D; ++d)
+            {
+                normals[1+d].copy_(normvertices[face[d]]);
+                normals[1+D+d].copy_(normedge[d]);
+            }
+        }
+        else
+        {
+            for (offset_t d=0; d<D; ++d)
+                normals[1+d].copy_(normvertices[face[d]]);
         }
 
         // compute sign from dot product <ray, normal>

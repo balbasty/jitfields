@@ -1,6 +1,9 @@
 import os
 import torch
-from torch.utils.dlpack import to_dlpack as torch_to_dlpack
+from torch.utils.dlpack import (
+    to_dlpack as torch_to_dlpack, 
+    from_dlpack as torch_from_dlpack,
+)
 import numpy as np
 from ...utils import prod
 from ..common.utils import ctypename
@@ -9,9 +12,15 @@ import cupy as cp
 from cupy_backends.cuda.api.driver import CUDADriverError
 
 try:
-    from cupy import from_dlpack as cupy_from_dlpack
+    from cupy import (
+        from_dlpack as cupy_from_dlpack, 
+        to_dlpack as cupy_to_dlpack,
+    )
 except ImportError:
+    import cupy
     from cupy import fromDlpack as cupy_from_dlpack
+    cupy_to_dlpack = cupy.ndarray.toDlpack
+
 
 _cuda_num_threads = os.environ.get('CUDA_NUM_THREADS', 1024)
 _num_threads = torch.get_num_threads()
@@ -150,3 +159,8 @@ class CachedKernel:
 def to_cupy(x):
     """Convert a torch tensor to cupy without copy"""
     return cupy_from_dlpack(torch_to_dlpack(x))
+
+
+def from_cupy(x):
+    """Convert a cupy tensor to torch without copy"""
+    return torch_from_dlpack(cupy_to_dlpack(x))

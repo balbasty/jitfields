@@ -993,6 +993,10 @@ struct StridedPointArray<D, scalar_t, offset_t, N1, N...> {
     StridedPointArray(scalar_t * data, const Stride & stride): 
         data(data), stride(stride) {}
 
+    __host__ __device__ 
+    StridedPointArray(scalar_t * data = nullptr): 
+        data(data), stride() { stride.copy_(1); }
+
     template <typename... T>
     __host__ __device__  inline 
     typename returned<_Count<T...>::value>::type at(int n0, T... n) 
@@ -1090,6 +1094,10 @@ struct ConstStridedPointArray<D, scalar_t, offset_t, N1, N...> {
     ConstStridedPointArray(const scalar_t * data, const Stride & stride): 
         data(data), stride(stride) {}
 
+    __host__ __device__ 
+    ConstStridedPointArray(scalar_t * data = nullptr): 
+        data(data), stride() { stride.copy_(1); }
+
     template <typename... T>
     __host__ __device__  inline 
     const typename returned<_Count<T...>::value>::type at(int n0, T... n) const
@@ -1122,6 +1130,11 @@ struct ConstStridedPointArray<D, scalar_t, offset_t> {
     __host__ __device__ 
     ConstStridedPointArray(const scalar_t * data, const Stride & stride): 
         data(data), stride(stride) {}
+
+    __host__ __device__ 
+    ConstStridedPointArray(scalar_t * data = nullptr): 
+        data(data), stride() { stride.copy_(1); }
+
 
     __host__ __device__  inline ConstPointType at(int n) const
     { 

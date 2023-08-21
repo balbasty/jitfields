@@ -36,6 +36,10 @@ def as_ctype(x):
     return x
 
 
+def nullptr(dtype):
+    return ctypes.POINTER(ctype(dtype))()
+
+
 def cwrap(func):
     """Decorator to automatically cast inputs to a cppyy function"""
     def call(*args):

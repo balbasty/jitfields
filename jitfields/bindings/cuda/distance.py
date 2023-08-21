@@ -169,10 +169,11 @@ def splinedt_gaussnewton_(time, dist, loc, coeff, order, bound, max_iter, tol):
 
 
 
-def mesh_sdt(dist, coord, vertices, faces, tree, normals_faces, normal_vertices, normals_edges):
+def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree, normals_faces, normal_vertices, normals_edges):
     """Signed distance transform with binary tree search"""
 
     npdist = to_cupy(dist)
+    npnearest = to_cupy(nearest_vertex) if nearest_vertex is not None else None
     npfaces = to_cupy(faces)
     npvertices = to_cupy(vertices)
     nptree = to_cupy(tree)
@@ -209,24 +210,29 @@ def mesh_sdt(dist, coord, vertices, faces, tree, normals_faces, normal_vertices,
         _, stride_normedges = cinfo(npnormedges, dtype=offset_t, backend=cp)
     else:
         stride_normedges = None
+    if nearest_vertex is not None:
+        _, stride_nearest = cinfo(npnearest, dtype=offset_t, backend=cp)
+    else:
+        stride_nearest = None
     M = offset_t.type(M)
     N = offset_t.type(N)
     nb_levels = offset_t.type(nb_levels)
 
     kernel = kernels_mesh.get('sdt', nbatch, D, scalar_t, index_t, offset_t)
     culaunch(kernel, dist.numel(),
-             (npdist, npcoord, npvertices, npfaces, nptree, nptree_trace, nb_levels,
+             (npdist, npnearest, npcoord, npvertices, npfaces, nptree, nptree_trace, nb_levels,
               npnormfaces, npnormvertices, npnormedges,
-              size, stride_dist, stride_coord, stride_vertices, stride_faces, 
+              size, stride_dist, stride_nearest, stride_coord, stride_vertices, stride_faces, 
               stride_normfaces, stride_normvertices, stride_normedges))
 
     return dist
 
 
-def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices, normals_edges):
+def mesh_sdt_naive(dist, nearest_vertex, coord, vertices, faces, normals_faces, normal_vertices, normals_edges):
     """Naive signed distance transform (exhaustive search)"""
 
     npdist = to_cupy(dist)
+    npnearest = to_cupy(nearest_vertex) if nearest_vertex is not None else None
     npfaces = to_cupy(faces)
     npvertices = to_cupy(vertices)
     npcoord = to_cupy(coord)
@@ -257,14 +263,18 @@ def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices,
         _, stride_normedges = cinfo(npnormedges, dtype=offset_t, backend=cp)
     else:
         stride_normedges = None
+    if nearest_vertex is not None:
+        _, stride_nearest = cinfo(npnearest, dtype=offset_t, backend=cp)
+    else:
+        stride_nearest = None
     M = offset_t.type(M)
     N = offset_t.type(N)
 
     kernel = kernels_mesh.get('sdt_naive', nbatch, D, scalar_t, index_t, offset_t)
     culaunch(kernel, dist.numel(),
-             (npdist, npcoord, npvertices, npfaces, 
+             (npdist, npnearest, npcoord, npvertices, npfaces, 
               npnormfaces, npnormvertices, npnormedges,
-              size, M, stride_dist, stride_coord, stride_vertices, stride_faces, 
+              size, M, stride_dist, stride_nearest, stride_coord, stride_vertices, stride_faces, 
               stride_normfaces, stride_normvertices, stride_normedges))
 
     return dist

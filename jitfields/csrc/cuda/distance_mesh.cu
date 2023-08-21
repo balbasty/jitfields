@@ -16,6 +16,7 @@ template <
 >
 __global__ void sdt(
     scalar_t * dist,                    // (*batch) tensor -> Output placeholder for distance
+    index_t  * nearest_vertex,          // (*batch) tensor -> Output placeholder for index of nearest vertex
     const scalar_t * coord,             // (*batch, D) tensor -> Coordinates at which to evaluate distance
     const scalar_t * _vertices,         // (N, D) tensor -> All vertices
     const index_t  * _faces,            // (M, D) tensor -> All faces (face = D vertex indices)
@@ -27,6 +28,7 @@ __global__ void sdt(
     const scalar_t * _normedges,        // (M, D, D) tensor
     const offset_t * _size,             // [*batch] list -> Size of `dist`
     const offset_t * _stride_dist,          // [*batch] list -> Strides of `dist`
+    const offset_t * _stride_nearest,       // [*batch] list -> Strides of `nearest_vertex`
     const offset_t * _stride_coord,         // [*batch, D] list -> Strides of `coord`
     const offset_t * stride_vertices,       // [N, D] list -> Strides of `vertices`
     const offset_t * stride_faces,          // [M, D] list -> Strides of `faces`
@@ -54,6 +56,8 @@ __global__ void sdt(
     size.copy_(ConstRefPoint<nbatch, offset_t>(_size));
     StaticPoint<nbatch, offset_t> stride_dist;
     stride_dist.copy_(ConstRefPoint<nbatch, offset_t>(_stride_dist));
+    StaticPoint<nbatch, offset_t> stride_nearest;
+    stride_nearest.copy_(ConstRefPoint<nbatch, offset_t>(_stride_nearest));
     StaticPoint<nbatch+1, offset_t> stride_coord;
     stride_coord.copy_(ConstRefPoint<nbatch+1, offset_t>(_stride_coord));
 
@@ -79,6 +83,9 @@ __global__ void sdt(
 
         offset_t offset_coord = index2offset<nbatch>(i, size.data, stride_coord.data);
         offset_t offset_dist  = index2offset<nbatch>(i, size.data, stride_dist.data);
+        offset_t offset_nearest = 0;
+        if (nearest_vertex)
+            offset_nearest  = index2offset<nbatch>(i, size.data, stride_nearest.data);
 
         ClonedPoint point;
         point.copy_(RefPoint(coord + offset_coord, stride_coord[nbatch]));
@@ -91,7 +98,8 @@ __global__ void sdt(
             treetrace,
             normfaces,
             normedges,
-            normvertices
+            normvertices,
+            nearest_vertex + offset_nearest
         );
     }
 }

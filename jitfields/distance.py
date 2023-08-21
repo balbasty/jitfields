@@ -1,17 +1,17 @@
 __all__ = [
-    'euclidean_distance_transform',
-    'l1_distance_transform',
-    'signed_distance_transform',
+    'euclidean_distance_transform', 'edt',
+    'l1_distance_transform', 'l1dt',
+    'signed_distance_transform', 'sdt'
     'spline_distance_table',
     'spline_distance_brent', 'spline_distance_brent_',
-    'spline_distance_gaussnewton', 'spline_distance_gaussnewton_',
-    'mesh_distance', 'mesh_distance_signed',
+    'spline_distance_gaussnewton', 'spline_distance_gaussnewton_', 'spline_dt', 'spline_dt_',
+    'mesh_distance', 'mesh_distance_signed', 'mesh_dt', 'mesh_sdt', 'mesh_sdt_extra', 
 ]
 
 import torch
 from torch import Tensor as tensor
 from typing import Optional, Union, Tuple
-from .utils import make_vector, try_import
+from .utils import make_vector, try_import, ensure_list
 from .typing import OneOrSeveral, BoundType, OrderType
 
 cuda_dist = try_import('jitfields.bindings.cuda', 'distance')
@@ -190,6 +190,11 @@ def signed_distance_transform(
     d -= euclidean_distance_transform(x.logical_not_(), ndim, vx, dtype)
     return d
 
+
+# aliases
+edt = euclidean_distance_transform
+l1dt = l1_distance_transform
+sdt = signed_distance_transform
 
 
 def _dot(x, y):
@@ -463,6 +468,13 @@ def spline_distance_gaussnewton(
     dist, time = spline_distance_table(loc, coeff, order=order, bound=bound, steps=steps)
     return spline_distance_gaussnewton_(dist, time, loc, coeff, max_iter, tol, order, bound, square)
 
+# aliases
+spline_dt_table = spline_distance_table
+spline_dt_brent = spline_distance_brent
+spline_dt_brent_ = spline_distance_brent_
+spline_dt = spline_dt_gaussnewton = spline_distance_gaussnewton
+spline_dt_ = spline_dt_gaussnewton_ = spline_distance_gaussnewton_
+
 
 def mesh_distance_signed(
     loc: tensor, 
@@ -513,16 +525,86 @@ def mesh_distance_signed(
     vertices = vertices.to(loc)
     normf = normf.to(loc)
     normv = normv.to(loc)
-    norme = norme.to(loc)
+    if norme is not None:
+        norme = norme.to(loc)
     faces = cpufaces.to(loc.device)
     tree = tree.to(loc.device)
     if out is None:
         out = loc.new_empty(loc.shape[:-1])
 
     # compute signed distance
-    fn_sdt(out, loc, vertices, faces, tree, normf, normv, norme)
+    fn_sdt(out, None, loc, vertices, faces, tree, normf, normv, norme)
 
     return out
+
+
+def mesh_sdt_extra(
+    loc: tensor, 
+    vertices: tensor, 
+    faces: tensor,
+    out: Optional[Tuple[tensor, tensor]] = None,
+) -> tensor:
+    """Compute the *signed* minimum distance from a set of points to a triangular mesh.
+
+    Also return the vertex nearest (in geodesic distance) to each point.
+
+    Parameters
+    ----------
+    loc : `(..., D) tensor`
+        Point set.
+    vertices : `(N, D) tensor`
+        Mesh vertices
+    faces : `(M, D) tensor[integer]`
+        Mesh faces
+
+    Returns
+    -------
+    dist : `(...) tensor`
+        Signed distance from each point in the set to its closest point on the mesh
+        (negative inside, positive outside)
+    nearest_vertex : `(...) tensor[integer]`
+        Index of the nearest vertex to each point.
+    """
+
+    fn_sdt = cuda_dist.mesh_sdt if loc.is_cuda else cpu_dist.mesh_sdt
+    fn_tree = cpu_dist.mesh_make_tree
+    fn_norm = cpu_dist.mesh_pseudonormals
+
+    # move to CPU (no choice for tree and normals)
+    cpuvertices = vertices.cpu()
+    cpufaces = faces.to('cpu', copy=True)
+
+    # build binary search tree (modifies faces inplace)
+    tree, cpufaces = fn_tree(cpuvertices, cpufaces)
+
+    # compute pseudonormals
+    if loc.shape[-1] == 3:
+        normf, normv, norme = fn_norm(cpuvertices, cpufaces)
+    else:
+        normf, normv = fn_norm(cpuvertices, cpufaces)
+        norme = None
+
+    # move to loc's device
+    # NOTE that faces were reordered to match tree order, so
+    # we MUST transfer `cpufaces`, even if the input `faces` was
+    # already on the gpu.
+    vertices = vertices.to(loc)
+    normf = normf.to(loc)
+    normv = normv.to(loc)
+    norme = norme.to(loc)
+    faces = cpufaces.to(loc.device)
+    tree = tree.to(loc.device)
+    out = ensure_list(out, 2, default=None)
+    if out[0] is None:
+        out[0] = loc.new_empty(loc.shape[:-1])
+    if out[1] is None:
+        out[1] = loc.new_empty(loc.shape[:-1], dtype=faces.dtype)
+    # entity = loc.new_empty(loc.shape[:-1], dtype=torch.uint8)
+
+    # compute signed distance
+    fn_sdt(*out, loc, vertices, faces, tree, normf, normv, norme)
+
+    return tuple(out)
 
 
 def mesh_distance(
@@ -588,3 +670,8 @@ def mesh_distance(
         fn_dt(out, loc, vertices, faces)
 
     return out
+
+
+# aliases
+mesh_dt = mesh_distance
+mesh_sdt = mesh_distance_signed
