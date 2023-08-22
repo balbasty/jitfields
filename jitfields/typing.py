@@ -20,7 +20,7 @@ BoundType = (
 OrderType = Literal[0, 1, 2, 3, 4, 5, 6, 7] if Literal else int
 """Interpolation orders are integers in the range `{0..7}`"""
 
-ExtrapolateType = Union[bool, Literal['center', 'edge']]
+ExtrapolateType = Union[bool, Literal['center', 'edge'] if Literal else str]
 """Extrapolation can be a boolean or one of `{'center', 'edge'}`
 
 - `True`: use bound to extrapolate out-of-bound value
