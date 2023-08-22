@@ -1,5 +1,7 @@
 import cppyy
 cppyy.set_debug(True)
+from jitfields import get_parallel_backend
+print(get_parallel_backend())
 
 from jitfields.distance import (
     l1_distance_transform,
