@@ -1,8 +1,8 @@
 import torch
 from torch.autograd import gradcheck
-from jitfields.pushpull import pull, push, count, grad
+from jitfields.pushpull import pull
 from jitfields.utils import identity_grid
-from .utils import test_devices, init_device
+from .utils import get_test_devices, init_device
 import inspect
 import pytest
 import os
@@ -16,7 +16,7 @@ extrapolate = True
 # parameters
 bounds = ['dct1', 'dct2', 'dft']
 orders = list(range(8))
-devices = test_devices()
+devices = get_test_devices()
 dims = [1, 2, 3]
 
 

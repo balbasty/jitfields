@@ -2,7 +2,7 @@ import torch
 from torch.autograd import gradcheck
 from jitfields.resize import resize, restrict
 from jitfields.bindings.common.bounds import cnames as boundnames
-from .utils import test_devices, init_device
+from .utils import get_test_devices, init_device
 import inspect
 import pytest
 import os
@@ -19,7 +19,7 @@ bounds = [boundnames[i].lower() for i in range(7)][3:4]
 orders = list(range(8))[:4]
 anchors = ['center', 'edge', 'first'][:1]
 factors = [2, 3]
-devices = test_devices()
+devices = get_test_devices()
 dims = [1, 2, 3]
 
 
@@ -49,7 +49,8 @@ def make_data(shape, device, dtype):
 @pytest.mark.parametrize("factor", factors)
 @pytest.mark.parametrize("anchor", anchors)
 def test_gradcheck_resize(device, dim, bound, interpolation, factor, anchor):
-    print(f'resize_{dim}d({factor}, {interpolation}, {bound}, {anchor}) on {device}')
+    print(f'resize_{dim}d({factor}, {interpolation}, {bound}, {anchor}) '
+          f'on {device}')
     device = init_device(device)
     shape = (shape1,) * dim
     vol = make_data(shape, device, dtype)
@@ -65,17 +66,23 @@ def test_gradcheck_resize(device, dim, bound, interpolation, factor, anchor):
 @pytest.mark.parametrize("factor", factors)
 @pytest.mark.parametrize("anchor", anchors)
 def test_adjoint_resize(device, dim, bound, interpolation, factor, anchor):
-    print(f'resize_{dim}d({factor}, {interpolation}, {bound}, {anchor}) on {device}')
+    print(f'resize_{dim}d({factor}, {interpolation}, {bound}, {anchor}) '
+          f'on {device}')
     device = init_device(device)
     torch.random.manual_seed(0)
     shapeinp = (16,) * dim
     shapeout = (16*factor,) * dim
     u = torch.randn(shapeinp, device=device, dtype=dtype)
-    Au = resize(u, None, shapeout, dim, anchor, interpolation, bound, prefilter)
+    Au = resize(
+        u, None, shapeout, dim, anchor, interpolation, bound, prefilter
+    )
     v = torch.randn_like(Au)
-    Atv = restrict(v, None, shapeinp, dim, anchor, interpolation, bound, True)
+    Atv = restrict(
+        v, None, shapeinp, dim, anchor, interpolation, bound, True
+    )
 
     vAu = v.flatten().dot(Au.flatten())
     uAtv = u.flatten().dot(Atv.flatten())
     print(f"<v, Au> = {vAu.item()}, <u, A'v> = {uAtv.item()}")
-    assert torch.allclose(vAu, uAtv), f"<v, Au> = {vAu.item()}, <u, A'v> = {uAtv.item()}"
+    assert torch.allclose(vAu, uAtv), \
+           f"<v, Au> = {vAu.item()}, <u, A'v> = {uAtv.item()}"

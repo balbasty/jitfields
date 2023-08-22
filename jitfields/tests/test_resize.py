@@ -1,13 +1,13 @@
 from jitfields.resize import resize
 from jitfields.utils import identity_grid
-from .utils import test_devices, init_device
+from .utils import get_test_devices, init_device
 import torch
 import pytest
 
 bounds = ['dct1', 'dct2', 'dft']
 orders = list(range(2, 8))
 anchors = ['center', 'edge', 'first']
-devices = test_devices()
+devices = get_test_devices()
 dims = [1, 2, 3]
 shape1 = 32
 dtype = torch.float64

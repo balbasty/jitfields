@@ -2,7 +2,7 @@ import torch
 from jitfields import set_num_threads
 
 
-def test_devices():
+def get_test_devices():
     devices = [('cpu', 1), ('cpu', 4)]
     if torch.cuda.is_available():
         print('cuda backend available')

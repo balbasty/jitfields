@@ -2,11 +2,11 @@ from jitfields.distance import (
     l1_distance_transform,
     euclidean_distance_transform
 )
-from .utils import test_devices, init_device
+from .utils import get_test_devices, init_device
 import torch
 import pytest
 
-devices = test_devices()
+devices = get_test_devices()
 
 
 @pytest.mark.parametrize("device", devices)

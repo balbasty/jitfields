@@ -3,7 +3,7 @@ from torch.autograd import gradcheck
 from jitfields.pushpull import pull, push, count, grad
 from jitfields.utils import add_identity_grid_
 from jitfields.bindings.common.bounds import cnames as boundnames
-from .utils import test_devices, init_device
+from .utils import get_test_devices, init_device
 import inspect
 import pytest
 import os
@@ -17,7 +17,7 @@ extrapolate = True
 # parameters
 bounds = [boundnames[i].lower() for i in range(7)]
 orders = list(range(8))[:3]
-devices = test_devices()
+devices = get_test_devices()
 dims = [1, 2, 3]
 
 
@@ -53,8 +53,8 @@ def test_gradcheck_grad(device, dim, bound, interpolation):
     vol, grid = make_data(shape, device, dtype)
     vol.requires_grad = True
     grid.requires_grad = True
-    assert gradcheck(grad, (vol, grid, interpolation, bound, extrapolate),
-                     **kwargs)
+    assert gradcheck(
+        grad, (vol, grid, interpolation, bound, extrapolate), **kwargs)
 
 
 @pytest.mark.parametrize("device", devices)
@@ -68,8 +68,8 @@ def test_gradcheck_pull(device, dim, bound, interpolation):
     vol, grid = make_data(shape, device, dtype)
     vol.requires_grad = True
     grid.requires_grad = True
-    assert gradcheck(pull, (vol, grid, interpolation, bound, extrapolate),
-                     **kwargs)
+    assert gradcheck(
+        pull, (vol, grid, interpolation, bound, extrapolate), **kwargs)
 
 
 @pytest.mark.parametrize("device", devices)
@@ -83,8 +83,8 @@ def test_gradcheck_push(device, dim, bound, interpolation):
     vol, grid = make_data(shape, device, dtype)
     vol.requires_grad = True
     grid.requires_grad = True
-    assert gradcheck(push, (vol, grid, shape, interpolation, bound, extrapolate),
-                     **kwargs)
+    assert gradcheck(
+        push, (vol, grid, shape, interpolation, bound, extrapolate), **kwargs)
 
 
 @pytest.mark.parametrize("device", devices)
@@ -97,5 +97,5 @@ def test_gradcheck_count(device, dim, bound, interpolation):
     shape = (shape1,) * dim
     _, grid = make_data(shape, device, dtype)
     grid.requires_grad = True
-    assert gradcheck(count, (grid, shape, interpolation, bound, extrapolate),
-                     **kwargs)
+    assert gradcheck(
+        count, (grid, shape, interpolation, bound, extrapolate), **kwargs)

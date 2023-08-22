@@ -1,11 +1,11 @@
 from jitfields.regularisers import flow_kernel, flow_matvec
 from .ref_kernels import kernels1, kernels2, kernels3
-from .utils import test_devices, init_device
+from .utils import get_test_devices, init_device
 import torch
 import pytest
 
 
-devices = test_devices()
+devices = get_test_devices()
 dims = [1, 2, 3]
 
 
@@ -30,22 +30,28 @@ def test_kernel(device, dim):
 
     pred_absolute = flow_kernel([3]*dim, absolute=1, **backend)[..., 0]
     kernel_absolute = torch.as_tensor(kernel_absolute, **backend)
-    assert torch.allclose(pred_absolute, kernel_absolute), f"{pred_absolute}\n{kernel_absolute}"
+    assert torch.allclose(pred_absolute, kernel_absolute), \
+           f"{pred_absolute}\n{kernel_absolute}"
 
     pred_membrane = flow_kernel([3]*dim, membrane=1, **backend)[..., 0]
     kernel_membrane = torch.as_tensor(kernels.membrane, **backend)
-    assert torch.allclose(pred_membrane, kernel_membrane), f"{pred_membrane}\n{kernel_membrane}"
+    assert torch.allclose(pred_membrane, kernel_membrane), \
+           f"{pred_membrane}\n{kernel_membrane}"
 
     pred_bending = flow_kernel([5]*dim, bending=1, **backend)[..., 0]
     kernel_bending = torch.as_tensor(kernels.bending, **backend)
-    assert torch.allclose(pred_bending, kernel_bending), f"{pred_bending}\n{kernel_bending}"
+    assert torch.allclose(pred_bending, kernel_bending), \
+           f"{pred_bending}\n{kernel_bending}"
 
     pred_shears = flow_kernel([3]*dim, shears=1, **backend)
-    kernel_shears = torch.as_tensor(kernels.shears, **backend).movedim(0, -1).movedim(0, -1)
-    assert torch.allclose(pred_shears, kernel_shears), f"{pred_shears}\n{kernel_shears}"
+    kernel_shears = torch.as_tensor(kernels.shears, **backend)
+    kernel_shears = kernel_shears.movedim(0, -1).movedim(0, -1)
+    assert torch.allclose(pred_shears, kernel_shears), \
+           f"{pred_shears}\n{kernel_shears}"
 
     pred_div = flow_kernel([3]*dim, div=1, **backend)
-    kernel_div = torch.as_tensor(kernels.div, **backend).movedim(0, -1).movedim(0, -1)
+    kernel_div = torch.as_tensor(kernels.div, **backend)
+    kernel_div = kernel_div.movedim(0, -1).movedim(0, -1)
     assert torch.allclose(pred_div, kernel_div), f"{pred_div}\n{kernel_div}"
 
 
