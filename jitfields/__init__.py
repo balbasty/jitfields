@@ -11,3 +11,6 @@ except (ImportError, ModuleNotFoundError):
 
     def get_parallel_backend(*args, **kwargs):
         warn('Could not import C++ bindings', ImportWarning)
+
+from . import _version
+__version__ = _version.get_versions()['version']
