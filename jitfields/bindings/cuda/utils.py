@@ -1,7 +1,7 @@
 import os
 import torch
 from torch.utils.dlpack import (
-    to_dlpack as torch_to_dlpack, 
+    to_dlpack as torch_to_dlpack,
     from_dlpack as torch_from_dlpack,
 )
 import numpy as np
@@ -12,13 +12,13 @@ import cupy as cp
 from cupy_backends.cuda.api.driver import CUDADriverError
 
 try:
-    from cupy import (
-        from_dlpack as cupy_from_dlpack, 
-        to_dlpack as cupy_to_dlpack,
-    )
+    from cupy import from_dlpack as cupy_from_dlpack
+except ImportError:
+    from cupy import fromDlpack as cupy_from_dlpack
+try:
+    from cupy import to_dlpack as cupy_to_dlpack
 except ImportError:
     import cupy
-    from cupy import fromDlpack as cupy_from_dlpack
     cupy_to_dlpack = cupy.ndarray.toDlpack
 
 
@@ -35,7 +35,8 @@ def set_cuda_num_threads(n):
 
 
 def get_cuda_num_threads():
-    return globals()['_cuda_num_threads'] or os.environ.get('CUDA_NUM_THREADS', 1024)
+    return (globals()['_cuda_num_threads'] or
+            os.environ.get('CUDA_NUM_THREADS', 1024))
 
 
 def init_num_threads():
@@ -63,7 +64,7 @@ def culaunch(kernel, numel, args, num_threads=None, num_blocks=None):
         num_blocks = num_blocks or get_cuda_blocks(numel, num_threads)
         try:
             return kernel((num_blocks,), (num_threads,), args)
-        except CUDADriverError as e:
+        except CUDADriverError:
             num_threads = num_threads // 2
     raise e
 
@@ -75,7 +76,9 @@ def get_offset_type(*shapes):
             continue
         if isinstance(shape, (np.ndarray, cp.ndarray)):
             array = shape
-            maxstride = max(sz * st for sz, st in zip(array.shape, array.strides))
+            maxstride = max(
+                sz * st for sz, st in zip(array.shape, array.strides)
+            )
         else:
             maxstride = prod(shape)
         if maxstride >= np.iinfo('int32').max:

@@ -475,7 +475,8 @@ struct PushPull<two, L, BX, L, BY> {
         utils_x::index(loc[0], size[0], ix0, ix1, wx0, wx1, fx0, fx1);
         utils_y::index(loc[1], size[1], iy0, iy1, wy0, wy1, fy0, fy1);
         offset_t osx = stride_out[0], osy = stride_out[1];
-        offset_t isx = stride_inp[0], isy = stride_inp[1];
+        ix0 *= stride_out[0]; ix1 *= stride_out[0];
+        iy0 *= stride_out[1]; iy1 *= stride_out[1];
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
@@ -484,16 +485,16 @@ struct PushPull<two, L, BX, L, BY> {
             reduce_t gvaly = static_cast<reduce_t>(ginp[isg]);
 
             oval = - gvalx * wy0 - gvaly * wx0;
-            bound::add(out, ix0 * osx + iy0 * osy, oval, fx0 * fy0);
+            bound::add(out, ix0 + iy0, oval, fx0 * fy0);
 
             oval = - gvalx * wy1 + gvaly * wx0;
-            bound::add(out, ix0 * osx + iy1 * osy, oval, fx0 * fy1);
+            bound::add(out, ix0 + iy1, oval, fx0 * fy1);
 
             oval = + gvalx * wy0 - gvaly * wx1;
-            bound::add(out, ix1 * osx + iy0 * osy, oval, fx1 * fy0);
+            bound::add(out, ix1 + iy0, oval, fx1 * fy0);
 
             oval = + gvalx * wy1 + gvaly * wx1;
-            bound::add(out, ix1 * osx + iy1 * osy, oval, fx1 * fy1);
+            bound::add(out, ix1 + iy1, oval, fx1 * fy1);
         }
 
         gout[0]   = static_cast<scalar_t>(0);

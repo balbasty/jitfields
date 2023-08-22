@@ -434,7 +434,6 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
             i110 = ix1 + i10;
             i111 = ix1 + i11;
         }
-        reduce_t w000, w001, w010, w011, w100, w101, w110, w111;
         reduce_t wx00 = wy0 * wz0;
         reduce_t wx01 = wy0 * wz1;
         reduce_t wx10 = wy1 * wz0;
@@ -447,14 +446,6 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
         reduce_t wz01 = wx0 * wy1;
         reduce_t wz10 = wx1 * wy0;
         reduce_t wz11 = wx1 * wy1;
-        w000 = wx0 * wx00;
-        w001 = wx0 * wx01;
-        w010 = wx0 * wx10;
-        w011 = wx0 * wx11;
-        w100 = wx1 * wx00;
-        w101 = wx1 * wx01;
-        w110 = wx1 * wx10;
-        w111 = wx1 * wx11;
         signed char f000, f001, f010, f011, f100, f101, f110, f111;
         {
             reduce_t f00 = fy0 * fz0;
@@ -471,7 +462,8 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
             f111 = fx1 * f11;
         }
 
-        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc) {
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+        {
             reduce_t v000 = bound::cget<reduce_t>(inp, i000, f000);
             reduce_t v001 = bound::cget<reduce_t>(inp, i001, f001);
             reduce_t v010 = bound::cget<reduce_t>(inp, i010, f010);
@@ -485,7 +477,7 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
                     + v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11);
             out[osg] = static_cast<scalar_t>(
                     - v000 * wy00 - v001 * wy01 + v010 * wy00 + v011 * wy01
-                    - v100 * wy10 - v101 * wy11 + v110 * wy10 + v111* wy11);
+                    - v100 * wy10 - v101 * wy11 + v110 * wy10 + v111 * wy11);
             out[osg * 2] = static_cast<scalar_t>(
                     - v000 * wz00 + v001 * wz00 - v010 * wz01 + v011 * wz01
                     - v100 * wz10 + v101 * wz10 - v110 * wz11 + v111 * wz11);
@@ -827,7 +819,7 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
                        const reduce_t loc[3],
                        const offset_t size[3],
                        const offset_t stride_out[3],
-                       const offset_t stride_inp[3],
+                       const offset_t stride_inp[3] /* unused */,
                        offset_t nc, offset_t osc, offset_t isc, offset_t gsc,
                        offset_t osg, offset_t isg)
     {
@@ -837,8 +829,9 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
         utils_x::index(loc[0], size[0], ix0, ix1, wx0, wx1, fx0, fx1);
         utils_y::index(loc[1], size[1], iy0, iy1, wy0, wy1, fy0, fy1);
         utils_y::index(loc[2], size[2], iz0, iz1, wz0, wz1, fz0, fz1);
-        offset_t osx = stride_out[0], osy = stride_out[1], osz = stride_out[2];
-        offset_t isx = stride_inp[0], isy = stride_inp[1], isz = stride_inp[2];
+        ix0 *= stride_out[0]; ix1 *= stride_out[0];
+        iy0 *= stride_out[1]; iy1 *= stride_out[1];
+        iz0 *= stride_out[2]; iz1 *= stride_out[2];
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc, ginp += gsc)
         {
@@ -847,29 +840,30 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
             reduce_t gvaly = static_cast<reduce_t>(ginp[isg]);
             reduce_t gvalz = static_cast<reduce_t>(ginp[isg*2]);
 
+            // 000
             oval = - gvalx * (wy0 * wz0) - gvaly * (wx0 * wz0) - gvalz * (wx0 * wy0);
-            bound::add(out, ix0 * osx + iy0 * osy + iz0 * osz, oval, fx0 * fy0 * fz0);
-
+            bound::add(out, ix0 + iy0 + iz0, oval, fx0 * fy0 * fz0);
+            // 001
             oval = - gvalx * (wy0 * wz1) - gvaly * (wx0 * wz1) + gvalz * (wx0 * wy0);
-            bound::add(out, ix0 * osx + iy0 * osy + iz1 * osz, oval, fx0 * fy0 * fz1);
-
+            bound::add(out, ix0 + iy0 + iz1, oval, fx0 * fy0 * fz1);
+            // 010
             oval = - gvalx * (wy1 * wz0) + gvaly * (wx0 * wz0) - gvalz * (wx0 * wy1);
-            bound::add(out, ix0 * osx + iy1 * osy + iz0 * osz, oval, fx0 * fy1 * fz0);
-
+            bound::add(out, ix0 + iy1 + iz0, oval, fx0 * fy1 * fz0);
+            // 011
             oval = - gvalx * (wy1 * wz1) + gvaly * (wx0 * wz1) + gvalz * (wx0 * wy1);
-            bound::add(out, ix0 * osx + iy1 * osy + iz1 * osz, oval, fx0 * fy1 * fz1);
-
-            oval = + gvalx * (wy0 * wz0) - gvaly * (wx0 * wz0) - gvalz * (wx0 * wy0);
-            bound::add(out, ix1 * osx + iy0 * osy + iz0 * osz, oval, fx1 * fy0 * fz0);
-
-            oval = + gvalx * (wy0 * wz1) - gvaly * (wx0 * wz1) - gvalz * (wx0 * wy0);
-            bound::add(out, ix1 * osx + iy0 * osy + iz1 * osz, oval, fx1 * fy0 * fz1);
-
-            oval = + gvalx * (wy1 * wz0) - gvaly * (wx0 * wz0) - gvalz * (wx0 * wy1);
-            bound::add(out, ix1 * osx + iy1 * osy + iz0 * osz, oval, fx1 * fy1 * fz0);
-
-            oval = + gvalx * (wy1 * wz1) - gvaly * (wx0 * wz1) - gvalz * (wx0 * wy1);
-            bound::add(out, ix1 * osx + iy1 * osy + iz1 * osz, oval, fx1 * fy1 * fz1);
+            bound::add(out, ix0 + iy1 + iz1, oval, fx0 * fy1 * fz1);
+            // 100
+            oval = + gvalx * (wy0 * wz0) - gvaly * (wx1 * wz0) - gvalz * (wx1 * wy0);
+            bound::add(out, ix1 + iy0 + iz0, oval, fx1 * fy0 * fz0);
+            // 101
+            oval = + gvalx * (wy0 * wz1) - gvaly * (wx1 * wz1) + gvalz * (wx1 * wy0);
+            bound::add(out, ix1 + iy0 + iz1, oval, fx1 * fy0 * fz1);
+            // 110
+            oval = + gvalx * (wy1 * wz0) + gvaly * (wx1 * wz0) - gvalz * (wx1 * wy1);
+            bound::add(out, ix1 + iy1 + iz0 , oval, fx1 * fy1 * fz0);
+            // 111
+            oval = + gvalx * (wy1 * wz1) + gvaly * (wx1 * wz1) + gvalz * (wx1 * wy1);
+            bound::add(out, ix1 + iy1 + iz1 , oval, fx1 * fy1 * fz1);
         }
 
         gout[0]       = static_cast<scalar_t>(0);
