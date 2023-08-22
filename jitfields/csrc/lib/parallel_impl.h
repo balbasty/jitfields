@@ -41,7 +41,7 @@
 #include "threadpool.h"
 namespace jf {
 inline size_t get_parallel_threads() { return get_num_threads(); }
-inline size_t set_parallel_threads(int nthreads) { return set_num_threads(); }
+inline size_t set_parallel_threads(int nthreads) { return set_num_threads(nthreads); }
 inline std::string get_parallel_backend() { return "native"; }
 }
 #elif JF_CAN_USE_OPENMP
