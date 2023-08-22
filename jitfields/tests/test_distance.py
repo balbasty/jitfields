@@ -1,3 +1,6 @@
+import cppyy
+cppyy.set_debug(True)
+
 from jitfields.distance import (
     l1_distance_transform,
     euclidean_distance_transform
