@@ -1,14 +1,23 @@
-from typing import TypeVar, Union, Sequence, Literal
+from typing import TypeVar, Union, Sequence, Optional
+
+try:
+    from typing import Literal
+except ImportError:
+    Literal = None
+
 
 T = TypeVar('T')
 
 OneOrSeveral = Union[T, Sequence[T]]
 """A single scalar value or a sequence (list, tuple, ...) of scalar values"""
 
-BoundType = Literal['zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft']
-"""A Bound can be one of `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`"""
+BoundType = (
+    Literal['zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft']
+    if Literal else str)
+"""A Bound can be one of
+`{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`"""
 
-OrderType = Literal[0, 1, 2, 3, 4, 5, 6, 7]
+OrderType = Literal[0, 1, 2, 3, 4, 5, 6, 7] if Literal else int
 """Interpolation orders are integers in the range `{0..7}`"""
 
 ExtrapolateType = Union[bool, Literal['center', 'edge']]
@@ -21,7 +30,7 @@ of the centers of the first and last voxels.
 of the edges of the first and last voxels.
 """
 
-AnchorType = Literal['center', 'edge', None]
+AnchorType = Literal['center', 'edge', None] if Literal else Optional[str]
 """
 What feature should be aligned across the input and output tensors.
 
