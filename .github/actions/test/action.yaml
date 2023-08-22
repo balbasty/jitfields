@@ -30,5 +30,5 @@ runs:
         pip install "torch==${PYTORCH_VERSION}" pytest
         [ "${PYTORCH_VERSION}" == "1.4" ] && pip install numpy
         pip install .
-        pytest pytest --pyargs jitfields
+        pytest pytest --pyargs jitfields --maxfail=1
       shell: bash
