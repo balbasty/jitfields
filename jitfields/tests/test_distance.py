@@ -1,7 +1,6 @@
 import cppyy
 cppyy.set_debug(True)
 from jitfields import get_parallel_backend
-print(get_parallel_backend())
 
 from jitfields.distance import (
     l1_distance_transform,
@@ -17,6 +16,7 @@ devices = get_test_devices()
 @pytest.mark.parametrize("device", devices)
 def test_l1(device):
     device = init_device(device)
+    print(get_parallel_backend())
 
     mask = [[1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1],
@@ -41,6 +41,7 @@ def test_l1(device):
 @pytest.mark.parametrize("device", devices)
 def test_l2(device):
     device = init_device(device)
+    print(get_parallel_backend())
 
     mask = [[1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1],
