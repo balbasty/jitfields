@@ -26,9 +26,10 @@ namespace internal {
 
     size_t default_num_threads() {
         size_t nthreads = get_env_num_threads("JF_NUM_THREADS", 0);
-        nthreads = get_env_num_threads("OMP_NUM_THREADS", nthreads);
-        nthreads = get_env_num_threads("MKL_NUM_THREADS", nthreads);
+        if (nthreads == 0) nthreads = get_env_num_threads("OMP_NUM_THREADS", nthreads);
+        if (nthreads == 0) nthreads = get_env_num_threads("MKL_NUM_THREADS", nthreads);
         if (nthreads == 0) nthreads = default_num_threads_from_hardware();
+        if (nthreads == 0) nthreads = 1;
         return nthreads;
     }
 
@@ -37,8 +38,9 @@ namespace internal {
 } // namespace internal
 
 size_t set_num_threads(size_t nthreads) {
+    if (nthreads == 0) nthreads = 1; 
     size_t old_num_threads = internal::num_threads;
-    if (nthreads) internal::num_threads = nthreads;
+    internal::num_threads = nthreads;
     if (old_num_threads != internal::num_threads)
         internal::global_pool.reset(new ThreadPool(internal::num_threads));
     return internal::num_threads;
