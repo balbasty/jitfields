@@ -5,7 +5,7 @@ inputs:
     description: 'Commit / Branch / Tag / SHA to checkout'
     required: false
     default: ''
-  dry_run:
+  dry-run:
     description: 'Dry run'
     required: false
     default: false
@@ -22,11 +22,24 @@ runs:
     with:
       fetch-depth: 0
       ref: ${{ inputs.tag }}
-  - name: publish-to-conda
-    uses: MichaelsJP/conda-package-publish-action@v1.0.0
+  - uses: conda-incubator/setup-miniconda@v2
     with:
-      subDir: '.conda'
-      AnacondaToken: ${{ inputs.password }}
-      platforms: 'all'
-      override: ${{ inputs.override }}
-      dry_run: ${{ inputs.dry_run }}
+      auto-activate-base: true
+      activate-environment: ""
+  - name: Install conda-build
+    shell: bash -el {0}
+    run: |
+      conda install -n base conda-build anaconda-client
+  - name: Build
+    shell: bash -el {0}
+    run: |
+      cd .conda
+      conda build -c conda-forge -c pytorch --output-folder . .
+  - name: Publish
+    if: (!inputs.dry-run)
+    shell: bash -el {0}
+    env: 
+      OVERRIDE: ${{ inputs.override }}
+    run: |
+      [[ "${OVERRIDE}" == "true" ]] && FORCE="--force" || FORCE=""
+      anaconda upload ${FORCE} jitfields 
