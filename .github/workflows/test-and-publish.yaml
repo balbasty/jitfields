@@ -64,14 +64,14 @@ jobs:
           python-version: ${{ inputs.python-version }}
           publish: ${{ inputs.publish }}
           tag: ${{ inputs.tag }}
-          pypi-password: ${{ secret.PYPI_TOKEN }}
-          test-password: ${{ secret.TEST_PYPI_TOKEN }}
+          pypi-password: ${{ secrets.PYPI_TOKEN }}
+          test-password: ${{ secrets.TEST_PYPI_TOKEN }}
       - uses: ./.github/actions/conda
         if: ${{ contains(inputs.publish, 'conda') }}
         with:
           tag: ${{ inputs.tag }}
           dry_run: contains(inputs.publish, 'dry')
-          password: ${{ secret.ANACONDA_TOKEN }}
+          password: ${{ secrets.ANACONDA_TOKEN }}
 
   publish-only:
     if: (!inputs.test) && inputs.publish != 'none'
@@ -86,11 +86,11 @@ jobs:
           python-version: ${{ inputs.python-version }}
           publish: ${{ inputs.publish }}
           tag: ${{ inputs.tag }}
-          pypi-password: ${{ secret.PYPI_TOKEN }}
-          test-password: ${{ secret.TEST_PYPI_TOKEN }}
+          pypi-password: ${{ secrets.PYPI_TOKEN }}
+          test-password: ${{ secrets.TEST_PYPI_TOKEN }}
       - uses: ./.github/actions/conda
         if: ${{ contains(inputs.publish, 'conda') }}
         with:
           tag: ${{ inputs.tag }}
           dry_run: contains(inputs.publish, 'dry')
-          password: ${{ secret.ANACONDA_TOKEN }}
+          password: ${{ secrets.ANACONDA_TOKEN }}
