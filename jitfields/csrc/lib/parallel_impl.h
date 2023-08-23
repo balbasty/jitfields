@@ -23,18 +23,31 @@
  * the thread id in our loops (no use for get_thread_num).
  */
 
-#define JF_CAN_USE_FUTURE 1
-#if __clang__
-#if __clang_major__ < 13
-#undef  JF_CAN_USE_FUTURE
-#define JF_CAN_USE_FUTURE 0
-#endif
-#endif
-
-#ifdef _OPENMP
-#define JF_CAN_USE_OPENMP 1
+#ifdef JF_USE_SEQ
+#   define JF_CAN_USE_FUTURE 0
+#   define JF_CAN_USE_OPENMP 0
 #else
-#define JF_CAN_USE_OPENMP 0
+#ifdef JF_USE_FUTURE
+#   define JF_CAN_USE_FUTURE 1
+#   define JF_CAN_USE_OPENMP 0
+#else
+#ifdef JF_USE_OPENMP
+#   define JF_CAN_USE_FUTURE 0
+#   define JF_CAN_USE_OPENMP 1
+#else
+#   define JF_CAN_USE_FUTURE 1
+#   if __clang__
+#   if __clang_major__ < 13
+#   undef  JF_CAN_USE_FUTURE
+#   define JF_CAN_USE_FUTURE 0
+#   endif
+#   endif
+
+#   ifdef _OPENMP
+#   define JF_CAN_USE_OPENMP 1
+#   else
+#   define JF_CAN_USE_OPENMP 0
+#   endif
 #endif
 
 #if JF_CAN_USE_FUTURE
