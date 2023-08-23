@@ -16,12 +16,12 @@ build:
 
 requirements:
   build:
-    - python >= 3.6
+    - python >=3.6
     - pip
     - setuptools
   run:
-    - python >= 3.6
-    - pytorch >= 1.8
+    - python >=3.6
+    - pytorch >=1.8
     - cppyy
     - numpy
     - cupy [not osx]
