@@ -13,6 +13,8 @@ inputs:
     description: 'Override'
     required: false
     default: true
+  password: 
+    required: true
 runs:
   using: "composite"
   steps:
@@ -24,7 +26,7 @@ runs:
     uses: MichaelsJP/conda-package-publish-action@v1.0.0
     with:
       subDir: '.conda'
-      AnacondaToken: ${{ secrets.ANACONDA_TOKEN }}
+      AnacondaToken: ${{ inputs.password }}
       platforms: 'all'
       override: ${{ inputs.override }}
       dry_run: ${{ inputs.dry_run }}

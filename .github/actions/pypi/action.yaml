@@ -14,6 +14,10 @@ inputs:
     required: false
     default: 'test+pypi'
     # {pypi, test, test+pypi}
+  pypi-password:
+    required: true
+  test-password: 
+    required: true
 runs:
   using: "composite"
   steps:
@@ -35,14 +39,14 @@ runs:
         python setup.py sdist bdist_wheel
       shell: bash
     - name: Publish distribution 📦 to Test PyPI
-      if: contains(inputs.publish, 'test')
+      if: ${{ contains(inputs.publish, 'test') }}
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        password: ${{ secrets.TEST_PYPI_TOKEN }}
+        password: ${{ inputs.test-password }}
         repository_url: https://test.pypi.org/legacy/
     - name: Publish distribution 📦 to PyPI
-      if: contains(inputs.publish, 'pypi')
+      if: ${{ contains(inputs.publish, 'pypi') }}
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        password: ${{ secrets.PYPI_TOKEN }}
+        password: ${{ inputs.pypi-password }}
         repository_url: https://upload.pypi.org/legacy/
