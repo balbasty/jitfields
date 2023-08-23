@@ -1,0 +1,37 @@
+{% set name = "jitfields" %}
+{% set version = "0.1.0" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: e64dff191875469b4236c84d45d0971cff6eab6f37fd78e444d01732775f699a
+
+build:
+  number: 0
+  script: {{ PYTHON }} -m pip install . -vv
+  noarch: python
+
+requirements:
+  build:
+    - python >= 3.6
+    - pip
+    - setuptools
+  run:
+    - python >= 3.6
+    - pytorch >= 1.8
+    - cppyy
+    - numpy
+    - cupy [not osx]
+
+test:
+  imports:
+    - jitfields
+
+about:
+  home: https://github.com/balbasty/jitfields
+  license: MIT
+  summary: Fast functions for dense scalar and vector fields
+  dev_url: https://github.com/balbasty/jitfields

@@ -1,0 +1,30 @@
+name: conda
+description: Publish to Anaconda
+inputs:
+  tag:
+    description: 'Commit / Branch / Tag / SHA to checkout'
+    required: false
+    default: ''
+  dry_run:
+    description: 'Dry run'
+    required: false
+    default: false
+  override:
+    description: 'Override'
+    required: false
+    default: true
+runs:
+  using: "composite"
+  steps:
+  - uses: actions/checkout@v3
+    with:
+      fetch-depth: 0
+      ref: ${{ inputs.tag }}
+  - name: publish-to-conda
+    uses: MichaelsJP/conda-package-publish-action@v1.0.0
+    with:
+      subDir: '.conda'
+      AnacondaToken: ${{ secrets.ANACONDA_TOKEN }}
+      platforms: 'all'
+      override: ${{ inputs.override }}
+      dry_run: ${{ inputs.dry_run }}

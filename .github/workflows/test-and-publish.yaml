@@ -8,36 +8,32 @@ on:
         required: false
         default: ''
       publish:
-        description: 'Publish'
+        description: 'Publish on PyPi'
         required: false
-        default: 'auto'
+        default: 'none'
         type: choice
         options:
-          - 'auto'
           - 'none'
           - 'pypi'
           - 'test'
+          - 'conda'
+          - 'dryconda'
           - 'test+pypi'
+          - 'pypi+conda'
+          - 'test+pypi+conda'
       test:
         description: 'Run tests'
         required: false
-        default: 'needs'
-        type: choice
-        options:
-          - 'yes'
-          - 'no'
-          - 'needs'
+        default: true
+        type: boolean
       python-version:
         description: 'Python version'
         required: false
         default: '3.7'
-#  push:
-#    branches: [ main ]
-#  release
 
 jobs:
   test:
-    if: inputs.test != 'no'
+    if: inputs.test
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -55,36 +51,36 @@ jobs:
           tag: ${{ inputs.tag }}
 
   publish:
-    if: |
-      inputs.test == 'needs' && 
-      inputs.publish != 'none' && 
-      (inputs.publish != 'auto' || 
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')))
+    if: inputs.test && inputs.publish != 'none'
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/publish
+      - uses: ./.github/actions/pypi
+        if: |
+          contains(inputs.publish, 'pypi') || contains(inputs.publish, 'test')
         with:
           python-version: ${{ inputs.python-version }}
           publish: ${{ inputs.publish }}
-          password-pypi: ${{ secrets.pypi_token }}
-          password-test: ${{ secrets.test_pypi_token }}
           tag: ${{ inputs.tag }}
+      - uses: ./.github/actions/conda
+        if: contains(inputs.publish, 'conda')
+        with:
+          tag: ${{ inputs.tag }}
+          dry_run: contains(inputs.publish, 'dry')
 
   publish-only:
-    if: |
-      inputs.test != 'needs'  && 
-      inputs.publish != 'none' &&
-      (inputs.publish != 'auto' || 
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags')))
+    if: (!inputs.test) && inputs.publish != 'none'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/publish
+      - uses: ./.github/actions/pypi
         with:
           python-version: ${{ inputs.python-version }}
           publish: ${{ inputs.publish }}
-          password-pypi: ${{ secrets.pypi_token }}
-          password-test: ${{ secrets.test_pypi_token }}
           tag: ${{ inputs.tag }}
+      - uses: ./.github/actions/conda
+        if: contains(inputs.publish, 'conda')
+        with:
+          tag: ${{ inputs.tag }}
+          dry_run: contains(inputs.publish, 'dry')
