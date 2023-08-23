@@ -25,6 +25,10 @@ runs:
         python-version: ${{ inputs.python-version }}
         channels: conda-forge,pytorch,defaults
         activate-environment: test-env
+    - name: Install libomp
+      shell: bash -el {0}
+      run: |
+        sudo apt update && sudo apt upgrade && sudo apt install libomp-dev
     - name: Install dependencies
       shell: bash -el {0}
       env: 

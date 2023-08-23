@@ -24,15 +24,19 @@
  */
 
 #ifdef JF_USE_SEQ
+#   undef  JF_CAN_USE_FUTURE
 #   define JF_CAN_USE_FUTURE 0
+#   undef  JF_CAN_USE_OPENMP
 #   define JF_CAN_USE_OPENMP 0
-#else
-#ifdef JF_USE_FUTURE
+#elif defined(JF_USE_FUTURE)
+#   undef  JF_CAN_USE_FUTURE
 #   define JF_CAN_USE_FUTURE 1
+#   undef  JF_CAN_USE_OPENMP
 #   define JF_CAN_USE_OPENMP 0
-#else
-#ifdef JF_USE_OPENMP
+#elif defined(JF_USE_OPENMP)
+#   undef  JF_CAN_USE_FUTURE
 #   define JF_CAN_USE_FUTURE 0
+#   undef  JF_CAN_USE_OPENMP
 #   define JF_CAN_USE_OPENMP 1
 #else
 #   define JF_CAN_USE_FUTURE 1
