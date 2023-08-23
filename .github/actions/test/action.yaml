@@ -37,8 +37,8 @@ runs:
         mamba install pytorch=${PYTORCH_VERSION} cppyy numpy pytest
     - name: Test with pytest
       shell: bash -el {0}
-      env: 
-        EXTRA_CLING_ARGS: -DJF_USE_SEQ
+      # env: 
+      #   EXTRA_CLING_ARGS: -DJF_USE_SEQ
       run: |
         pip install .
         pytest pytest --pyargs jitfields --maxfail=1
