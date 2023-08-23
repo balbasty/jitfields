@@ -23,21 +23,45 @@
  * the thread id in our loops (no use for get_thread_num).
  */
 
-#define JF_CAN_USE_FUTURE 1
-#if __clang__
-#if __clang_major__ < 13
-#undef  JF_CAN_USE_FUTURE
-#define JF_CAN_USE_FUTURE 0
-#endif
-#endif
-
-#ifdef _OPENMP
-#define JF_CAN_USE_OPENMP 1
+#ifdef JF_USE_SEQ
+#   undef  JF_CAN_USE_FUTURE
+#   define JF_CAN_USE_FUTURE 0
+#   undef  JF_CAN_USE_OPENMP
+#   define JF_CAN_USE_OPENMP 0
+#elif defined(JF_USE_FUTURE)
+#   undef  JF_CAN_USE_FUTURE
+#   define JF_CAN_USE_FUTURE 1
+#   undef  JF_CAN_USE_OPENMP
+#   define JF_CAN_USE_OPENMP 0
+#elif defined(JF_USE_OPENMP)
+#   undef  JF_CAN_USE_FUTURE
+#   define JF_CAN_USE_FUTURE 0
+#   undef  JF_CAN_USE_OPENMP
+#   define JF_CAN_USE_OPENMP 1
 #else
-#define JF_CAN_USE_OPENMP 0
+#   define JF_CAN_USE_FUTURE 1
+#   if __clang__
+#   if __clang_major__ < 13
+#   undef  JF_CAN_USE_FUTURE
+#   define JF_CAN_USE_FUTURE 0
+#   endif
+#   endif
+
+#   ifdef _OPENMP
+#   define JF_CAN_USE_OPENMP 1
+#   else
+#   define JF_CAN_USE_OPENMP 0
+#   endif
 #endif
 
-#if JF_CAN_USE_OPENMP
+#if JF_CAN_USE_FUTURE
+#include "threadpool.h"
+namespace jf {
+inline size_t get_parallel_threads() { return get_num_threads(); }
+inline size_t set_parallel_threads(int nthreads) { return set_num_threads(nthreads); }
+inline std::string get_parallel_backend() { return "native"; }
+}
+#elif JF_CAN_USE_OPENMP
 #pragma cling load("libomp").
 #include <omp.h>
 namespace jf {
@@ -49,14 +73,6 @@ inline size_t set_parallel_threads(int nthreads)
 }
 inline std::string get_parallel_backend() { return "omp"; }
 }
-#elif JF_CAN_USE_FUTURE
-#include "threadpool.h"
-namespace jf {
-inline size_t get_parallel_threads() { return get_num_threads(); }
-inline size_t set_parallel_threads(int nthreads) { return set_num_threads(nthreads); }
-inline std::string get_parallel_backend() { return "native"; }
-}
-
 #else
 namespace jf {
 inline size_t get_parallel_threads() { return 1; }

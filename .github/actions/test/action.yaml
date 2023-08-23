@@ -19,16 +19,22 @@ runs:
     - uses: actions/checkout@v3
       with:
         ref: ${{ inputs.tag }}
-    - name: Setup Python ${{ inputs.python-version }}
-      uses: actions/setup-python@v4
+    - uses: conda-incubator/setup-miniconda@v2
       with:
+        mamba-version: "*"
         python-version: ${{ inputs.python-version }}
-    - name: Test with pytest
-      env:
+        channels: conda-forge,pytorch,defaults
+        activate-environment: test-env
+    - name: Install dependencies
+      shell: bash -el {0}
+      env: 
         PYTORCH_VERSION: ${{ inputs.pytorch-version }}
       run: |
-        pip install "torch==${PYTORCH_VERSION}" pytest
-        [ "${PYTORCH_VERSION}" == "1.4" ] && pip install numpy
+        mamba install pytorch=${PYTORCH_VERSION} cppyy numpy pytest
+    - name: Test with pytest
+      shell: bash -el {0}
+      env: 
+        EXTRA_CLING_ARGS: -DJF_USE_SEQ
+      run: |
         pip install .
-        pytest pytest --pyargs jitfields
-      shell: bash
+        pytest pytest --pyargs jitfields --maxfail=1
