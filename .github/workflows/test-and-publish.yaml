@@ -70,7 +70,7 @@ jobs:
         if: ${{ contains(inputs.publish, 'conda') }}
         with:
           tag: ${{ inputs.tag }}
-          dry_run: contains(inputs.publish, 'dry')
+          dry_run: ${{ contains(inputs.publish, 'dry') }}
           password: ${{ secrets.ANACONDA_TOKEN }}
 
   publish-only:
@@ -92,5 +92,5 @@ jobs:
         if: ${{ contains(inputs.publish, 'conda') }}
         with:
           tag: ${{ inputs.tag }}
-          dry-run: contains(inputs.publish, 'dry')
+          dry-run: ${{ contains(inputs.publish, 'dry') }}
           password: ${{ secrets.ANACONDA_TOKEN }}
