@@ -76,7 +76,9 @@ runs:
     env: 
       OVERRIDE: ${{ inputs.override }}
       PLATFORMS: ${{ inputs.platforms }}
+      ANACONDA_API_TOKEN: ${{ inputs.password }}
     run: |
+      export ANACONDA_API_TOKEN
       [[ "${OVERRIDE}" == "true" ]] && FORCE="--force" || FORCE=""
 
       for PLATFORM in noarch osx-64 osx-arm64 linux-32 linux-64 linux-ppc64 linux-s390x linux-armv6l linux-armv7l linux-aarch64 win-32 win-64
