@@ -31,7 +31,7 @@ runs:
       TAG: ${{ inputs.tag }}
       PLATFORMS: ${{ inputs.platforms }}
       DRYRUN: ${{ inputs.dry-run }}
-      OVERRIDE: ${{ override }}
+      OVERRIDE: ${{ inputs.override }}
     run: echo "$TAG // $PLATFORMS // $DRYRUN // $OVERRIDE"
   # - uses: actions/checkout@v3
   #   with:
