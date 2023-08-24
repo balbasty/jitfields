@@ -48,11 +48,11 @@ runs:
       PY=($PY)
       OPT=""
       for V in "${PY[@]}"; do
-      OPT+=" --py ${V}"
+      OPT+=",${V}"
       done
-      OPT=($OPT)
+      OPT="{python: [${OPT:1}]}"
       cd .conda
-      conda mambabuild $OPT -c pytorch --croot . .
+      conda mambabuild --variants "$OPT" -c pytorch --croot . .
   - name: Convert
     shell: bash -el {0}
     env:
