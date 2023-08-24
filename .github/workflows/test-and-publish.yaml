@@ -79,7 +79,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/pypi
         if: |
-          ${{ contains(inputs.publish, 'pypi') || contains(inputs.publish, 'test') }}
+          contains(inputs.publish, 'pypi') || contains(inputs.publish, 'test')
         with:
           python-version: ${{ inputs.python-version }}
           publish: ${{ inputs.publish }}
@@ -87,8 +87,8 @@ jobs:
           pypi-password: ${{ secrets.PYPI_TOKEN }}
           test-password: ${{ secrets.TEST_PYPI_TOKEN }}
       - uses: ./.github/actions/conda
-        if: ${{ contains(inputs.publish, 'conda') }}
+        if: contains(inputs.publish, 'conda')
         with:
           tag: ${{ inputs.tag }}
-          dry-run: ${{ contains(inputs.publish, 'dry') }}
+          dry-run: contains(inputs.publish, 'dry')
           password: ${{ secrets.ANACONDA_TOKEN }}
