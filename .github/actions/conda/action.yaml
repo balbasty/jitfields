@@ -51,8 +51,7 @@ runs:
       OPT+=",${V}"
       done
       OPT="{python: [${OPT:1}]}"
-      cd .conda
-      conda mambabuild --variants "$OPT" -c pytorch --croot . .
+      conda mambabuild --variants "$OPT" -c pytorch --croot . .conda
   - name: Convert
     shell: bash -el {0}
     env:
