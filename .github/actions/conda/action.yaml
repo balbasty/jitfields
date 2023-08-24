@@ -26,6 +26,7 @@ inputs:
 runs:
   using: "composite"
   steps:
+  - name: "tag: ${{ inputs.tag }}, platforms: ${{ inputs.platforms }}, python: ${{ inputs.python-version }}, dry run: ${{ inputs.dry-run }}, overrride: ${{ inputs.override }}"
   - uses: actions/checkout@v3
     with:
       fetch-depth: 0
@@ -63,7 +64,7 @@ runs:
           conda convert -p $PLATFORM linux-64/*.tar.bz2
         fi
       done
-  - name: Publish
+  - name: "Publish (dry run: ${{ inputs.dry-run }})"
     if: ${{ !(inputs.dry-run) }}
     shell: bash -el {0}
     env: 
