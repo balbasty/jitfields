@@ -27,6 +27,8 @@ runs:
   using: "composite"
   steps:
   - name: "tag: ${{ inputs.tag }}, platforms: ${{ inputs.platforms }}, python: ${{ inputs.python-version }}, dry run: ${{ inputs.dry-run }}, overrride: ${{ inputs.override }}"
+    shell: bash
+    run: echo ""
   - uses: actions/checkout@v3
     with:
       fetch-depth: 0
