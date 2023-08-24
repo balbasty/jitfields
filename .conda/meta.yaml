@@ -15,16 +15,15 @@ build:
   noarch: python
 
 requirements:
-  build:
+  host:
     - python >=3.6
     - pip
-    - setuptools
   run:
     - python >=3.6
     - pytorch >=1.8
     - cppyy
     - numpy
-    - cupy [not osx]
+    - cupy # [not osx]
 
 test:
   imports:
