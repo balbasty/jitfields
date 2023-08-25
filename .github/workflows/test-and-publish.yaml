@@ -30,6 +30,10 @@ on:
         description: 'Python version'
         required: false
         default: '3.7'
+      conda-platforms:
+        description: 'Target platforms'
+        required: false
+        default: 'noarch osx-64 osx-arm64'
 
 jobs:
   test:
@@ -69,6 +73,7 @@ jobs:
         if: contains(inputs.publish, 'conda')
         with:
           tag: ${{ inputs.tag }}
+          platforms: ${{ inputs.conda-platforms }}
           dry_run: ${{ contains(inputs.publish, 'dry') }}
           password: ${{ secrets.ANACONDA_TOKEN }}
 
@@ -90,5 +95,6 @@ jobs:
         if: contains(inputs.publish, 'conda')
         with:
           tag: ${{ inputs.tag }}
+          platforms: ${{ inputs.conda-platforms }}
           dry-run: ${{ contains(inputs.publish, 'dry') }}
           password: ${{ secrets.ANACONDA_TOKEN }}
