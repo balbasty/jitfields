@@ -26,7 +26,13 @@ inputs:
 runs:
   using: "composite"
   steps:
-  - name: "tag: ${{ inputs.tag }}, platforms: ${{ inputs.platforms }}, python: ${{ inputs.python-version }}, dry run: ${{ inputs.dry-run }}, overrride: ${{ inputs.override }}"
+  - shell: bash
+    env:
+      TAG: ${{ inputs.tag }}
+      PLATFORMS: ${{ inputs.platforms }}
+      DRYRUN: ${{ inputs.dry-run }}
+      OVERRIDE: ${{ inputs.override }}
+    run: echo "$TAG // $PLATFORMS // $DRYRUN // $OVERRIDE"
   - uses: actions/checkout@v3
     with:
       fetch-depth: 0
@@ -65,12 +71,14 @@ runs:
         fi
       done
   - name: "Publish (dry run: ${{ inputs.dry-run }})"
-    if: ${{ !(inputs.dry-run) }}
+    if: inputs.dry-run == 'false'
     shell: bash -el {0}
     env: 
       OVERRIDE: ${{ inputs.override }}
       PLATFORMS: ${{ inputs.platforms }}
+      ANACONDA_API_TOKEN: ${{ inputs.password }}
     run: |
+      export ANACONDA_API_TOKEN
       [[ "${OVERRIDE}" == "true" ]] && FORCE="--force" || FORCE=""
 
       for PLATFORM in noarch osx-64 osx-arm64 linux-32 linux-64 linux-ppc64 linux-s390x linux-armv6l linux-armv7l linux-aarch64 win-32 win-64
