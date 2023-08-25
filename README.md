@@ -8,25 +8,55 @@ Fast functions for dense scalar and vector fields, implemented using just-in-tim
 
 ## Installation
 
-Installation through pip should work, although I don't know how robust the cupy/pytorch 
-interaction is in term of cuda version.
+### Dependencies
+
+- `pytorch >= 1.8`
+- `numpy`
+- `cppyy`
+- `cupy` (if CUDA support required)
+
+### Conda
+
+PyTorch, cppyy and cupy all heavily depend on system libraries, and easily find themselves 
+in situation of incompatibility. The preferred installation method therefore relies on 
+conda, which minimizes such issues.
 ```sh
-pip install git+https://github.com/balbasty/jitfields
+conda install jitfields -c balbasty -c pytorch -c conda-forge 
+```
+
+Note that in this case PyTorch without GPU support will get installed (unless PyTorch 
+was already installed using conda, in which case the installed version will be preserved).
+To ensure that the GPU version of PyTorch gets installed (and ensure compatibility with cupy), 
+you should instead do:
+```sh
+# for pytorch >= 1.13
+conda install jitfields pytorch==$TORCH_VERSION pytorch-cuda=$CUDA_VERSION -c balbasty -c pytorch -c nvidia -c conda-forge 
+# for pytorch < 1.13
+conda install jitfields pytorch==$TORCH_VERSION cudatoolkit=$CUDA_VERSION -c balbasty -c pytorch -c conda-forge 
+```
+
+In our experience this is enough to ensure compatibility across all dependencies. 
+If for some reason it is not, it may be necessary to use cupy's specific `cuda-version` package. See:
+- https://docs.cupy.dev/en/stable/install.html
+- https://pytorch.org/get-started/previous-versions/
+
+### Pip
+
+Installation through pip should work, as `jitfields` is a pure python package. As stated above,
+there may be inconsistencies across `pytorch`, `cppyy` and `cupy`. It may therefore be preferable 
+to pre-install these dependencies yourself, rather than relying on pip's dependency solver.
+
+```sh
+pip install jitfields
 ```
 
 If you intend to run code on the GPU, specify the [cuda] extra tag, which
 ensures that cupy gets installed.
 ```sh
-pip install git+https://github.com/balbasty/jitfields#egg=jitfields[cuda]
+pip install jitfields[cuda]
 ```
 
-Pre-installing dependencies from conda may be more robust:
-```sh
-conda install -c python>=3.6 conda-forge numpy cupy ccpyy pytorch>=1.8 cudatoolkit=10.2
-pip install git+https://github.com/balbasty/jitfields#egg=jitfields[cuda]
-```
-
-## Implemented so far
+## API
 
 ### Distance transforms
 
