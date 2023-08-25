@@ -33,7 +33,7 @@ on:
       conda-platforms:
         description: 'Target platforms'
         required: false
-        default: 'noarch osx-64 osx-arm64'
+        default: 'noarch'
 
 jobs:
   test:
