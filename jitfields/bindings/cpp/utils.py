@@ -47,3 +47,15 @@ def cwrap(func):
         out = func(*args)
         return out
     return call
+
+
+def to_numpy(x, dtype=None):
+    """
+    Convert tensor to numpy (and to dtype). If None, return `nullptr(dtype)`
+    """
+    if x is None:
+        return nullptr(dtype)
+    x = x.numpy()
+    if dtype and (x.dtype != dtype):
+        raise ValueError('Wrong data type')
+    return x

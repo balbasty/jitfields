@@ -85,12 +85,14 @@ def pull(
     out : `(..., *outshape, channel) tensor`
         Pulled tensor, with shape `(..., *outshape, channel)`.
 
-    """
+    """  # noqa: E501
     ndim = grid.shape[-1]
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
-        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = spline_coeff_nd(
+            inp.movedim(-1, 0), order, bound, ndim
+        ).movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     return Pull.apply(inp, grid, order, bound, extrapolate, out)
@@ -140,12 +142,14 @@ def grad(
     out : `(..., *outshape, channel, ndim) tensor`
         Pulled gradients, with shape `(..., *outshape, channel, ndim)`.
 
-    """
+    """  # noqa: E501
     ndim = grid.shape[-1]
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
-        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = spline_coeff_nd(
+            inp.movedim(-1, 0), order, bound, ndim
+        ).movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     return Grad.apply(inp, grid, order, bound, extrapolate, out)
@@ -191,7 +195,7 @@ def push(
     out : `(..., *shape, channel) tensor`
         Pushed tensor, with shape `(..., *shape, channel)`.
 
-    """
+    """  # noqa: E501
     ndim = grid.shape[-1]
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
@@ -200,7 +204,9 @@ def push(
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     inp = Push.apply(inp, grid, shape, order, bound, extrapolate, out)
     if prefilter:
-        inp = spline_coeff_nd_(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = spline_coeff_nd_(
+            inp.movedim(-1, 0), order, bound, ndim
+        ).movedim(0, -1)
     return inp
 
 
@@ -236,7 +242,7 @@ def count(
     out : `(..., *shape) tensor`
         Pushed ones, with shape `(..., *shape)`.
 
-    """
+    """  # noqa: E501
     ndim = grid.shape[-1]
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
@@ -275,7 +281,8 @@ class Push(torch.autograd.Function):
         ctx.opt = (order, bound, extrapolate)
         ctx.save_for_backward(inp, grid)
         ndim = grid.shape[-1]
-        fullshape = list(grid.shape[:-ndim-1]) + list(shape) + list(inp.shape[-1:])
+        fullshape = \
+            list(grid.shape[:-ndim-1]) + list(shape) + list(inp.shape[-1:])
         out = inp.new_zeros(fullshape) if out is None else out.view(fullshape)
         out = fwd(out, inp, grid, order, bound, extrapolate)
         return out

@@ -46,7 +46,7 @@ struct AtomicAdd {
     }
 
     template <typename scalar_t>
-    static inline scalar_t atomicAddNoReturn(scalar_t * address, scalar_t val) {
+    static inline void atomicAddNoReturn(scalar_t * address, scalar_t val) {
         *address += val;
     }
 };
@@ -57,7 +57,7 @@ struct AtomicAdd<true> {
     // Implemented in c++ 20+ for floating types
 
     template <typename scalar_t>
-    static inline void atomicAdd(scalar_t * address, scalar_t val) {
+    static inline scalar_t atomicAdd(scalar_t * address, scalar_t val) {
         std::atomic<scalar_t> *aptr;
         aptr->store(address);
         return aptr->fetch_add(val);
@@ -68,7 +68,6 @@ struct AtomicAdd<true> {
         std::atomic<scalar_t> *aptr;
         aptr->store(address);
         aptr->fetch_add(val);
-        return;
     }
 };
 
@@ -79,7 +78,7 @@ static inline T anyAtomicAdd(T *address, T val) {
 
 template <typename T>
 static inline void anyAtomicAddNoReturn(T *address, T val) {
-    return AtomicAdd<has_atomic_add<T>::value>::atomicAddNoReturn(address, val);
+    AtomicAdd<has_atomic_add<T>::value>::atomicAddNoReturn(address, val);
 }
 
 } // namespace jf

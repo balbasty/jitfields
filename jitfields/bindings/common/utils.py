@@ -1,11 +1,19 @@
 import numpy as np
 import torch
+import ctypes
 from .bounds import convert_bound, cnames as cnames_bound
 from .spline import convert_order, cnames as cnames_spline
+from ..cpp.utils import nullptr
 
 
 def cinfo(array, dtype=None, backend=np):
     """Return shape and strides as numpy arrays"""
+    if isinstance(array, ctypes._Pointer) or array is None:
+        if backend is np:
+            dtype = dtype or np.int64
+            return nullptr(dtype), nullptr(dtype)
+        else:
+            return None, None
     shape = backend.asarray(array.shape, dtype=dtype)
     stride = backend.asarray(strides_np2c(array), dtype=dtype)
     return shape, stride

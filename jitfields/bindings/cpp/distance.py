@@ -2,10 +2,10 @@ import cppyy
 import torch
 import math
 import numpy as np
-from .utils import include, cwrap, nullptr
+from .utils import include, cwrap, nullptr, to_numpy
 from ..common.utils import ctypename, cinfo, spline_as_cname, bound_as_cname
 
-# cppyy.set_debug(True)
+cppyy.set_debug(True)
 include()
 cppyy.include('distance_l1.hpp')
 cppyy.include('distance_euclidean.hpp')
@@ -62,7 +62,6 @@ def edt_1d(f, dim=-1, w=1):
     return edt_1d_(f, dim, w)
 
 
-
 def splinedt_table_(time, dist, loc, coeff, timetable, order, bound):
     """in-place distance to 1D spline"""
     ndim = coeff.shape[-1]
@@ -86,9 +85,10 @@ def splinedt_table_(time, dist, loc, coeff, timetable, order, bound):
     order = spline_as_cname(order)
     bound = bound_as_cname(bound)
 
-    template = f'{nbatch}, {ndim}, {order}, {bound}, {ctypename(scalar_t)}, {ctypename(offset_t)}'
+    template = (f'{nbatch}, {ndim}, {order}, {bound}, '
+                f'{ctypename(scalar_t)}, {ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_spline.mindist_table[template])
-    func(nptime, npdist, nploc, npcoeff, nptimetable, int(ntimes), shape, 
+    func(nptime, npdist, nploc, npcoeff, nptimetable, int(ntimes), shape,
          stride_time, stride_dist, stride_loc, stride_coeff, stride_timetable)
 
     return time, dist
@@ -117,10 +117,12 @@ def splinedt_quad_(time, dist, loc, coeff, order, bound, max_iter, tol, step):
     tol = float(tol)
     step = float(step)
 
-    template = f'{nbatch}, {ndim}, {order}, {bound}, {ctypename(scalar_t)}, {ctypename(offset_t)}'
+    template = (f'{nbatch}, {ndim}, {order}, {bound}, '
+                f'{ctypename(scalar_t)}, {ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_spline.mindist_brent[template])
-    func(nptime, npdist, nploc, npcoeff, shape, 
-         stride_time, stride_dist, stride_loc, stride_coeff, max_iter, tol, step)
+    func(nptime, npdist, nploc, npcoeff, shape,
+         stride_time, stride_dist, stride_loc, stride_coeff,
+         max_iter, tol, step)
     return time, dist
 
 
@@ -146,9 +148,10 @@ def splinedt_gaussnewton_(time, dist, loc, coeff, order, bound, max_iter, tol):
     max_iter = int(max_iter)
     tol = float(tol)
 
-    template = f'{nbatch}, {ndim}, {order}, {bound}, {ctypename(scalar_t)}, {ctypename(offset_t)}'
+    template = (f'{nbatch}, {ndim}, {order}, {bound}, '
+                f'{ctypename(scalar_t)}, {ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_spline.mindist_gaussnewton[template])
-    func(nptime, npdist, nploc, npcoeff, shape, 
+    func(nptime, npdist, nploc, npcoeff, shape,
          stride_time, stride_dist, stride_loc, stride_coeff, max_iter, tol)
     return time, dist
 
@@ -160,7 +163,7 @@ def mesh_make_tree(vertices, faces):
     faces : (M, K) tensor[int|long]
     tree : (log2(M) * F) tensor[uint8]
     """
-    
+
     npfaces = faces.numpy()
     npvertices = vertices.numpy()
     scalar_t = np.dtype(npvertices.dtype)
@@ -185,7 +188,8 @@ def mesh_make_tree(vertices, faces):
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    template = f'{D}, {ctypename(scalar_t)}, {ctypename(index_t)}, {ctypename(offset_t)}'
+    template = (f'{D}, {ctypename(scalar_t)}, {ctypename(index_t)}, '
+                f'{ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_mesh.build_tree[template])
     func(nptree, npfaces, npvertices, M, N, stride_faces, stride_vertices)
 
@@ -203,13 +207,14 @@ def mesh_pseudonormals(vertices, faces):
         normals_edges = vertices.new_empty([M, D, D])
     else:
         normals_edges = None
-    normal_vertices = vertices.new_zeros([N, D]) # needs zero init to accumulate
+    normal_vertices = vertices.new_zeros([N, D])
+    # ^ needs zero init to accumulate
 
     npfaces = faces.numpy()
     npvertices = vertices.numpy()
     npnormfaces = normals_faces.numpy()
     npnormvertices = normal_vertices.numpy()
-    npnormedges = (normals_edges.numpy() if normals_edges is not None else 
+    npnormedges = (normals_edges.numpy() if normals_edges is not None else
                    nullptr(npnormfaces.dtype))
     scalar_t = np.dtype(npvertices.dtype)
     index_t = np.dtype(npfaces.dtype)
@@ -226,10 +231,12 @@ def mesh_pseudonormals(vertices, faces):
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    template = f'{D}, {ctypename(scalar_t)}, {ctypename(index_t)}, {ctypename(offset_t)}'
+    template = (f'{D}, {ctypename(scalar_t)}, {ctypename(index_t)}, '
+                f'{ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_mesh.build_normals[template])
-    func(npnormfaces, npnormvertices, npnormedges, npfaces, npvertices, M, N, 
-         stride_normfaces, stride_normvertices, stride_normedges, stride_faces, stride_vertices)
+    func(npnormfaces, npnormvertices, npnormedges, npfaces, npvertices, M, N,
+         stride_normfaces, stride_normvertices, stride_normedges,
+         stride_faces, stride_vertices)
 
     if D == 3:
         return normals_faces, normal_vertices, normals_edges
@@ -237,21 +244,20 @@ def mesh_pseudonormals(vertices, faces):
         return normals_faces, normal_vertices
 
 
-def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree, normals_faces, normal_vertices, normals_edges):
+def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree,
+             normals_faces, normal_vertices, normals_edges):
     """Signed distance transform with binary tree search"""
 
     npdist = dist.numpy()
     npfaces = faces.numpy()
-    npnearest = (nearest_vertex.numpy() if nearest_vertex is not None else 
+    npnearest = (nearest_vertex.numpy() if nearest_vertex is not None else
                  nullptr(npfaces.dtype))
-    # npentity = (nearest_entity.numpy() if nearest_entity is not None else 
-    #             nullptr(np.uint8))
     npvertices = vertices.numpy()
     nptree = tree.numpy()
     npcoord = coord.numpy()
     npnormfaces = normals_faces.numpy()
     npnormvertices = normal_vertices.numpy()
-    npnormedges = (normals_edges.numpy() if normals_edges is not None else 
+    npnormedges = (normals_edges.numpy() if normals_edges is not None else
                    nullptr(npdist.dtype))
     scalar_t = np.dtype(npvertices.dtype)
     index_t = np.dtype(npfaces.dtype)
@@ -278,24 +284,75 @@ def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree, normals_faces, 
         _, stride_nearest = cinfo(npnearest, dtype=offset_t)
     else:
         stride_nearest = nullptr(offset_t)
-    # if nearest_entity is not None:
-    #     _, stride_entity = cinfo(npentity, dtype=offset_t)
-    # else:
-    #     stride_entity = nullptr(offset_t)
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    template = f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, {ctypename(index_t)}, {ctypename(offset_t)}'
+    template = (f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, '
+                f'{ctypename(index_t)}, {ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_mesh.sdt[template])
     func(npdist, npnearest, npcoord, npvertices, npfaces, nptree,
-         npnormfaces, npnormvertices, npnormedges,
-         size, stride_dist, stride_nearest, stride_coord, stride_vertices, stride_faces, 
+         npnormfaces, npnormvertices, npnormedges, size,
+         stride_dist, stride_nearest, stride_coord,
+         stride_vertices, stride_faces,
          stride_normfaces, stride_normvertices, stride_normedges)
 
     return dist
 
 
-def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices, normals_edges):
+def mesh_sdt_backward(gradcoord, gradvert, grad, coord, vertices, faces, tree,
+                      normals_faces, normal_vertices, normals_edges):
+    """Signed distance transform with binary tree search"""
+
+    npfaces = to_numpy(faces)
+    npvertices = to_numpy(vertices)
+    npgradcoord = to_numpy(gradcoord, npvertices.dtype)
+    npgradvert = to_numpy(gradvert, npvertices.dtype)
+    npgrad = to_numpy(grad)
+    nptree = to_numpy(tree)
+    npcoord = to_numpy(coord)
+    npnormfaces = to_numpy(normals_faces)
+    npnormvertices = to_numpy(normal_vertices)
+    npnormedges = to_numpy(normals_edges, npvertices.dtype)
+    scalar_t = np.dtype(npvertices.dtype)
+    index_t = np.dtype(npfaces.dtype)
+    offset_t = np.dtype(np.int64)
+
+    N, D = vertices.shape
+    M, K = faces.shape
+    if (D != K) or (D not in (2, 3)):
+        raise ValueError('Faces must be triangles (in 3D) or segments (in 2D)')
+    if (coord.shape[-1] != D):
+        raise ValueError('Number of spatial dimensions not consistent.')
+
+    size, stride_coord = cinfo(npcoord, dtype=offset_t)
+    _, stride_gradcoord = cinfo(npgradcoord, dtype=offset_t)
+    _, stride_gradvert = cinfo(npgradvert, dtype=offset_t)
+    _, stride_grad = cinfo(npgrad, dtype=offset_t)
+    _, stride_faces = cinfo(npfaces, dtype=offset_t)
+    _, stride_vertices = cinfo(npvertices, dtype=offset_t)
+    _, stride_normfaces = cinfo(npnormfaces, dtype=offset_t)
+    _, stride_normvertices = cinfo(npnormvertices, dtype=offset_t)
+    if normals_edges is not None:
+        _, stride_normedges = cinfo(npnormedges, dtype=offset_t)
+    else:
+        stride_normedges = nullptr(offset_t)
+    M = offset_t.type(M)
+    N = offset_t.type(N)
+
+    template = (f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, '
+                f'{ctypename(index_t)}, {ctypename(offset_t)}')
+    func = cwrap(cppyy.gbl.jf.distance_mesh.sdt_backward[template])
+    func(npgradcoord, npgradvert, npgrad, npcoord, npvertices, npfaces,
+         nptree, npnormfaces, npnormvertices, npnormedges, size,
+         stride_gradcoord, stride_gradvert, stride_grad, stride_coord,
+         stride_vertices, stride_faces,
+         stride_normfaces, stride_normvertices, stride_normedges)
+
+    return gradcoord, gradvert
+
+
+def mesh_sdt_naive(dist, coord, vertices, faces,
+                   normals_faces, normal_vertices, normals_edges):
     """Naive signed distance transform (exhaustive search)"""
 
     npdist = dist.numpy()
@@ -304,7 +361,8 @@ def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices,
     npcoord = coord.numpy()
     npnormfaces = normals_faces.numpy()
     npnormvertices = normal_vertices.numpy()
-    npnormedges = normals_edges.numpy() if normals_edges is not None else nullptr(npdist.dtype)
+    npnormedges = (normals_edges.numpy() if normals_edges is not None else
+                   nullptr(npdist.dtype))
     scalar_t = np.dtype(npvertices.dtype)
     index_t = np.dtype(npfaces.dtype)
     offset_t = np.dtype(np.int64)
@@ -329,14 +387,16 @@ def mesh_sdt_naive(dist, coord, vertices, faces, normals_faces, normal_vertices,
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    template = f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, {ctypename(index_t)}, {ctypename(offset_t)}'
+    template = (f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, '
+                f'{ctypename(index_t)}, {ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_mesh.sdt_naive[template])
-    func(npdist, npcoord, npvertices, npfaces, 
+    func(npdist, npcoord, npvertices, npfaces,
          npnormfaces, npnormvertices, npnormedges,
          size, M, stride_dist, stride_coord, stride_vertices, stride_faces,
          stride_normfaces, stride_normvertices, stride_normedges)
 
     return dist
+
 
 def mesh_dt(dist, coord, vertices, faces, tree):
     """Unsigned distance transform with binary tree search"""
@@ -364,12 +424,54 @@ def mesh_dt(dist, coord, vertices, faces, tree):
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    template = f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, {ctypename(index_t)}, {ctypename(offset_t)}'
+    template = (f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, '
+                f'{ctypename(index_t)}, {ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_mesh.dt[template])
-    func(npdist, npcoord, npvertices, npfaces, nptree, 
+    func(npdist, npcoord, npvertices, npfaces, nptree,
          size, stride_dist, stride_coord, stride_vertices, stride_faces)
 
     return dist
+
+
+def mesh_dt_backward(gradcoord, gradvert, grad, coord, vertices, faces, tree):
+    """Signed distance transform with binary tree search"""
+
+    npfaces = to_numpy(faces)
+    npvertices = to_numpy(vertices)
+    npgradcoord = to_numpy(gradcoord, npvertices.dtype)
+    npgradvert = to_numpy(gradvert, npvertices.dtype)
+    npgrad = to_numpy(grad)
+    nptree = to_numpy(tree)
+    npcoord = to_numpy(coord)
+    scalar_t = np.dtype(npvertices.dtype)
+    index_t = np.dtype(npfaces.dtype)
+    offset_t = np.dtype(np.int64)
+
+    N, D = vertices.shape
+    M, K = faces.shape
+    if (D != K) or (D not in (2, 3)):
+        raise ValueError('Faces must be triangles (in 3D) or segments (in 2D)')
+    if (coord.shape[-1] != D):
+        raise ValueError('Number of spatial dimensions not consistent.')
+
+    size, stride_coord = cinfo(npcoord, dtype=offset_t)
+    _, stride_grad = cinfo(npgrad, dtype=offset_t)
+    _, stride_faces = cinfo(npfaces, dtype=offset_t)
+    _, stride_vertices = cinfo(npvertices, dtype=offset_t)
+    _, stride_gradcoord = cinfo(npgradcoord, dtype=offset_t)
+    _, stride_gradvert = cinfo(npgradvert, dtype=offset_t)
+    M = offset_t.type(M)
+    N = offset_t.type(N)
+
+    template = (f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, '
+                f'{ctypename(index_t)}, {ctypename(offset_t)}')
+    func = cwrap(cppyy.gbl.jf.distance_mesh.dt_backward[template])
+    func(npgradcoord, npgradvert, npgrad, npcoord, npvertices, npfaces,
+         nptree, size,
+         stride_gradcoord, stride_gradvert, stride_grad, stride_coord,
+         stride_vertices, stride_faces)
+
+    return gradcoord, gradvert
 
 
 def mesh_dt_naive(dist, coord, vertices, faces):
@@ -397,9 +499,10 @@ def mesh_dt_naive(dist, coord, vertices, faces):
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    template = f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, {ctypename(index_t)}, {ctypename(offset_t)}'
+    template = (f'{npcoord.ndim-1}, {D}, {ctypename(scalar_t)}, '
+                f'{ctypename(index_t)}, {ctypename(offset_t)}')
     func = cwrap(cppyy.gbl.jf.distance_mesh.dt_naive[template])
-    func(npdist, npcoord, npvertices, npfaces, 
+    func(npdist, npcoord, npvertices, npfaces,
          size, M, stride_dist, stride_coord, stride_vertices, stride_faces)
 
     return dist

@@ -161,9 +161,13 @@ class CachedKernel:
 
 def to_cupy(x):
     """Convert a torch tensor to cupy without copy"""
+    if x is None:
+        return None
     return cupy_from_dlpack(torch_to_dlpack(x))
 
 
 def from_cupy(x):
     """Convert a cupy tensor to torch without copy"""
+    if x is None:
+        return None
     return torch_from_dlpack(cupy_to_dlpack(x))

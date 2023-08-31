@@ -78,7 +78,6 @@ def edt_1d(f, dim=-1, w=1):
     return edt_1d_(f, dim, w)
 
 
-
 def splinedt_table_(time, dist, loc, coeff, timetable, order, bound):
     """in-place distance to 1D spline"""
     ndim = coeff.shape[-1]
@@ -102,10 +101,13 @@ def splinedt_table_(time, dist, loc, coeff, timetable, order, bound):
     order = spline_as_cname(order)
     bound = bound_as_cname(bound)
 
-    kernel = kernels_spline.get('mindist_table', nbatch, ndim, order, bound, scalar_t, offset_t)
-    culaunch(kernel, batch.numel(), 
-             (cutime, cudist, culoc, cucoeff, cutimetable, offset_t(ntimes), shape, 
-              stride_time, stride_dist, stride_loc, stride_coeff, stride_timetable))
+    kernel = kernels_spline.get(
+        'mindist_table', nbatch, ndim, order, bound, scalar_t, offset_t
+    )
+    culaunch(kernel, batch.numel(),
+             (cutime, cudist, culoc, cucoeff, cutimetable,
+              offset_t(ntimes), shape, stride_time, stride_dist,
+              stride_loc, stride_coeff, stride_timetable))
     return time, dist
 
 
@@ -132,10 +134,13 @@ def splinedt_quad_(time, dist, loc, coeff, order, bound, max_iter, tol, step):
     tol = scalar_t(tol)
     step = scalar_t(step)
 
-    kernel = kernels_spline.get('mindist_brent', nbatch, ndim, order, bound, scalar_t, offset_t)
-    culaunch(kernel, batch.numel(), 
-             (cutime, cudist, culoc, cucoeff, shape, 
-              stride_time, stride_dist, stride_loc, stride_coeff, max_iter, tol, step))
+    kernel = kernels_spline.get(
+        'mindist_brent', nbatch, ndim, order, bound, scalar_t, offset_t
+    )
+    culaunch(kernel, batch.numel(),
+             (cutime, cudist, culoc, cucoeff, shape,
+              stride_time, stride_dist, stride_loc, stride_coeff,
+              max_iter, tol, step))
     return time, dist
 
 
@@ -161,30 +166,34 @@ def splinedt_gaussnewton_(time, dist, loc, coeff, order, bound, max_iter, tol):
     max_iter = offset_t(max_iter)
     tol = scalar_t(tol)
 
-    kernel = kernels_spline.get('mindist_gaussnewton', nbatch, ndim, order, bound, scalar_t, offset_t)
-    culaunch(kernel, batch.numel(), 
-             (cutime, cudist, culoc, cucoeff, shape, 
-              stride_time, stride_dist, stride_loc, stride_coeff, max_iter, tol))
+    kernel = kernels_spline.get(
+        'mindist_gaussnewton', nbatch, ndim, order, bound, scalar_t, offset_t
+    )
+    culaunch(kernel, batch.numel(),
+             (cutime, cudist, culoc, cucoeff, shape,
+              stride_time, stride_dist, stride_loc, stride_coeff,
+              max_iter, tol))
     return time, dist
 
 
-
-def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree, normals_faces, normal_vertices, normals_edges):
+def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree,
+             normals_faces, normal_vertices, normals_edges):
     """Signed distance transform with binary tree search"""
 
     npdist = to_cupy(dist)
-    npnearest = to_cupy(nearest_vertex) if nearest_vertex is not None else None
+    npnearest = to_cupy(nearest_vertex)
     npfaces = to_cupy(faces)
     npvertices = to_cupy(vertices)
     nptree = to_cupy(tree)
     npcoord = to_cupy(coord)
     npnormfaces = to_cupy(normals_faces)
     npnormvertices = to_cupy(normal_vertices)
-    npnormedges = to_cupy(normals_edges) if normals_edges is not None else None
+    npnormedges = to_cupy(normals_edges)
     scalar_t = cp.dtype(npvertices.dtype)
     index_t = cp.dtype(npfaces.dtype)
     offset_t = cp.dtype(get_offset_type(
-        npdist, npfaces, npvertices, npcoord, npnormfaces, npnormvertices, npnormedges,
+        npdist, npfaces, npvertices, npcoord,
+        npnormfaces, npnormvertices, npnormedges,
     ))
 
     nbatch = npdist.ndim
@@ -195,10 +204,10 @@ def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree, normals_faces, 
     if (coord.shape[-1] != D):
         raise ValueError('Number of spatial dimensions not consistent.')
 
-    nb_levels = int(math.ceil(math.log2(M))) + 2
+    nb_levels = int(math.ceil(math.log2(M))) + 3
     nb_threads = get_cuda_num_threads()
-    nb_blocks =  get_cuda_blocks(dist.numel(), nb_threads)
-    nptree_trace = cp.zeros([nb_levels * nb_threads * nb_blocks], dtype='uint8')
+    nb_blocks = get_cuda_blocks(dist.numel(), nb_threads)
+    nptrace = cp.zeros([nb_levels * nb_threads * nb_blocks], dtype='uint8')
 
     size, stride_dist = cinfo(npdist, dtype=offset_t, backend=cp)
     _, stride_coord = cinfo(npcoord, dtype=offset_t, backend=cp)
@@ -206,43 +215,38 @@ def mesh_sdt(dist, nearest_vertex, coord, vertices, faces, tree, normals_faces, 
     _, stride_vertices = cinfo(npvertices, dtype=offset_t, backend=cp)
     _, stride_normfaces = cinfo(npnormfaces, dtype=offset_t, backend=cp)
     _, stride_normvertices = cinfo(npnormvertices, dtype=offset_t, backend=cp)
-    if normals_edges is not None:
-        _, stride_normedges = cinfo(npnormedges, dtype=offset_t, backend=cp)
-    else:
-        stride_normedges = None
-    if nearest_vertex is not None:
-        _, stride_nearest = cinfo(npnearest, dtype=offset_t, backend=cp)
-    else:
-        stride_nearest = None
-    M = offset_t.type(M)
-    N = offset_t.type(N)
+    _, stride_normedges = cinfo(npnormedges, dtype=offset_t, backend=cp)
+    _, stride_nearest = cinfo(npnearest, dtype=offset_t, backend=cp)
     nb_levels = offset_t.type(nb_levels)
 
     kernel = kernels_mesh.get('sdt', nbatch, D, scalar_t, index_t, offset_t)
-    culaunch(kernel, dist.numel(),
-             (npdist, npnearest, npcoord, npvertices, npfaces, nptree, nptree_trace, nb_levels,
-              npnormfaces, npnormvertices, npnormedges,
-              size, stride_dist, stride_nearest, stride_coord, stride_vertices, stride_faces, 
-              stride_normfaces, stride_normvertices, stride_normedges))
+    culaunch(
+        kernel, dist.numel(),
+        (npdist, npnearest, npcoord, npvertices, npfaces, nptree,
+         nptrace, nb_levels, npnormfaces, npnormvertices, npnormedges,
+         size, stride_dist, stride_nearest, stride_coord, stride_vertices,
+         stride_faces, stride_normfaces, stride_normvertices, stride_normedges)
+    )
 
     return dist
 
 
-def mesh_sdt_naive(dist, nearest_vertex, coord, vertices, faces, normals_faces, normal_vertices, normals_edges):
+def mesh_sdt_naive(dist, coord, vertices, faces,
+                   normals_faces, normal_vertices, normals_edges):
     """Naive signed distance transform (exhaustive search)"""
 
     npdist = to_cupy(dist)
-    npnearest = to_cupy(nearest_vertex) if nearest_vertex is not None else None
     npfaces = to_cupy(faces)
     npvertices = to_cupy(vertices)
     npcoord = to_cupy(coord)
     npnormfaces = to_cupy(normals_faces)
     npnormvertices = to_cupy(normal_vertices)
-    npnormedges = to_cupy(normals_edges) if normals_edges is not None else None
+    npnormedges = to_cupy(normals_edges)
     scalar_t = cp.dtype(npvertices.dtype)
     index_t = cp.dtype(npfaces.dtype)
     offset_t = cp.dtype(get_offset_type(
-        npdist, npfaces, npvertices, npcoord, npnormfaces, npnormvertices, npnormedges,
+        npdist, npfaces, npvertices, npcoord,
+        npnormfaces, npnormvertices, npnormedges,
     ))
 
     nbatch = npdist.ndim
@@ -259,25 +263,22 @@ def mesh_sdt_naive(dist, nearest_vertex, coord, vertices, faces, normals_faces, 
     _, stride_vertices = cinfo(npvertices, dtype=offset_t, backend=cp)
     _, stride_normfaces = cinfo(npnormfaces, dtype=offset_t, backend=cp)
     _, stride_normvertices = cinfo(npnormvertices, dtype=offset_t, backend=cp)
-    if normals_edges is not None:
-        _, stride_normedges = cinfo(npnormedges, dtype=offset_t, backend=cp)
-    else:
-        stride_normedges = None
-    if nearest_vertex is not None:
-        _, stride_nearest = cinfo(npnearest, dtype=offset_t, backend=cp)
-    else:
-        stride_nearest = None
+    _, stride_normedges = cinfo(npnormedges, dtype=offset_t, backend=cp)
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    kernel = kernels_mesh.get('sdt_naive', nbatch, D, scalar_t, index_t, offset_t)
+    kernel = kernels_mesh.get(
+        'sdt_naive', nbatch, D, scalar_t, index_t, offset_t
+    )
     culaunch(kernel, dist.numel(),
-             (npdist, npnearest, npcoord, npvertices, npfaces, 
+             (npdist, npcoord, npvertices, npfaces,
               npnormfaces, npnormvertices, npnormedges,
-              size, M, stride_dist, stride_nearest, stride_coord, stride_vertices, stride_faces, 
+              size, M, stride_dist, stride_coord,
+              stride_vertices, stride_faces,
               stride_normfaces, stride_normvertices, stride_normedges))
 
     return dist
+
 
 def mesh_dt(dist, coord, vertices, faces, tree):
     """Unsigned distance transform with binary tree search"""
@@ -310,10 +311,54 @@ def mesh_dt(dist, coord, vertices, faces, tree):
 
     kernel = kernels_mesh.get('dt', nbatch, D, scalar_t, index_t, offset_t)
     culaunch(kernel, dist.numel(),
-             (npdist, npcoord, npvertices, npfaces, nptree, 
+             (npdist, npcoord, npvertices, npfaces, nptree,
               size, stride_dist, stride_coord, stride_vertices, stride_faces))
 
     return dist
+
+
+def mesh_dt_backward(gradcoord, gradvert, grad, coord, vertices, faces, tree):
+    """Unsigned distance transform with binary tree search"""
+
+    npgradcoord = to_cupy(gradcoord)
+    npgradvert = to_cupy(gradvert)
+    npgrad = to_cupy(grad)
+    npfaces = to_cupy(faces)
+    npvertices = to_cupy(vertices)
+    nptree = to_cupy(tree)
+    npcoord = to_cupy(coord)
+    scalar_t = cp.dtype(npvertices.dtype)
+    index_t = cp.dtype(npfaces.dtype)
+    offset_t = cp.dtype(get_offset_type(
+        npgradcoord, npgradvert, npgrad, npfaces, npvertices, npcoord,
+    ))
+
+    nbatch = npgrad.ndim
+    N, D = vertices.shape
+    M, K = faces.shape
+    if (D != K) or (D not in (2, 3)):
+        raise ValueError('Faces must be triangles (in 3D) or segments (in 2D)')
+    if (coord.shape[-1] != D):
+        raise ValueError('Number of spatial dimensions not consistent.')
+
+    size, stride_coord = cinfo(npcoord, dtype=offset_t, backend=cp)
+    _, stride_gradcoord = cinfo(npgradcoord, dtype=offset_t, backend=cp)
+    _, stride_gradvert = cinfo(npgradvert, dtype=offset_t, backend=cp)
+    _, stride_grad = cinfo(npgrad, dtype=offset_t, backend=cp)
+    _, stride_faces = cinfo(npfaces, dtype=offset_t, backend=cp)
+    _, stride_vertices = cinfo(npvertices, dtype=offset_t, backend=cp)
+    M = offset_t.type(M)
+    N = offset_t.type(N)
+
+    kernel = kernels_mesh.get(
+        'dt_backward', nbatch, D, scalar_t, index_t, offset_t
+    )
+    culaunch(kernel, grad.numel(),
+             (npgradcoord, npgradvert, npgrad, npcoord, npvertices, npfaces,
+              nptree, size, stride_gradcoord, stride_gradvert, stride_grad,
+              stride_coord, stride_vertices, stride_faces))
+
+    return gradcoord, gradvert
 
 
 def mesh_dt_naive(dist, coord, vertices, faces):
@@ -344,9 +389,13 @@ def mesh_dt_naive(dist, coord, vertices, faces):
     M = offset_t.type(M)
     N = offset_t.type(N)
 
-    kernel = kernels_mesh.get('dt_naive', nbatch, D, scalar_t, index_t, offset_t)
-    culaunch(kernel, dist.numel(),
-             (npdist, npcoord, npvertices, npfaces, 
-              size, M, stride_dist, stride_coord, stride_vertices, stride_faces))
+    kernel = kernels_mesh.get(
+        'dt_naive', nbatch, D, scalar_t, index_t, offset_t
+    )
+    culaunch(
+        kernel, dist.numel(),
+        (npdist, npcoord, npvertices, npfaces,
+         size, M, stride_dist, stride_coord, stride_vertices, stride_faces)
+    )
 
     return dist
