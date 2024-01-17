@@ -36,7 +36,7 @@ In practice, $\boldsymbol{f}$ is a dense discrete field, _i.e._, $\mathbf{f} \in
 are then quadratic forms in $\mathbf{f}$: $\mathcal{L} = \frac{1}{2}\mathbf{f}^{T}\mathbf{Lf}$.
 The penalties are implemented using finite difference and, in the absence of
 local weighting, $\mathbf{L}$ takes the form of a convolution with a small kernel.
-"""
+"""  # noqa: E501
 
 __all__ = [
     'flow_matvec',
@@ -101,7 +101,7 @@ def flow_matvec(
         Penalty on local shears.
     div : `float`
         Penalty on local volume changes.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundLike`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -154,7 +154,7 @@ def flow_matvec_add(
     _sub: bool = False,
 ) -> Tensor:
     """
-    Add the output of [`flow_matvec`](index.html#jitfields.regularisers.flow_matvec)
+    Add the output of [`flow_matvec`][jitfields.regularisers.flow_matvec]
     to `inp`.
     """
     impl = cuda_impl if flow.is_cuda else cpu_impl
@@ -202,7 +202,7 @@ def flow_matvec_add_(
     _sub: bool = False,
 ) -> Tensor:
     """
-    Add the output of [`flow_matvec`](index.html#jitfields.regularisers.flow_matvec)
+    Add the output of [`flow_matvec`][jitfields.regularisers.flow_matvec]
     to `inp` (inplace).
     """
     impl = cuda_impl if flow.is_cuda else cpu_impl
@@ -244,12 +244,12 @@ def flow_matvec_sub(
     out: Optional[Tensor] = None,
 ) -> Tensor:
     """
-    Subtract the output of [`flow_matvec`](index.html#jitfields.regularisers.flow_matvec)
+    Subtract the output of [`flow_matvec`][jitfields.regularisers.flow_matvec]
     from `inp`.
     """
     return flow_matvec_add(inp, flow, weight,
-                            absolute, membrane, bending, shears, div,
-                            bound, voxel_size, out, True)
+                           absolute, membrane, bending, shears, div,
+                           bound, voxel_size, out, True)
 
 
 def flow_matvec_sub_(
@@ -265,12 +265,12 @@ def flow_matvec_sub_(
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """
-    Subtract the output of [`flow_matvec`](index.html#jitfields.regularisers.flow_matvec)
+    Subtract the output of [`flow_matvec`][jitfields.regularisers.flow_matvec]
     from `inp` (inplace).
     """
     return flow_matvec_add_(inp, flow, weight,
-                             absolute, membrane, bending, shears, div,
-                             bound, voxel_size, True)
+                            absolute, membrane, bending, shears, div,
+                            bound, voxel_size, True)
 
 
 def flow_kernel(
@@ -301,7 +301,7 @@ def flow_kernel(
         Penalty on local shears. Linear elastic energy's `mu`.
     div : float
         Penalty on local volume changes. Linear elastic energy's `lambda`.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundLike`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -362,7 +362,7 @@ def flow_kernel_add(
     _sub: bool = False,
 ) -> Tensor:
     """
-    Add the output of [`flow_kernel`](index.html#jitfields.regularisers.flow_kernel)
+    Add the output of [`flow_kernel`][jitfields.regularisers.flow_kernel]
     to `inp`.
     """
     # allocate output
@@ -395,7 +395,7 @@ def flow_kernel_add_(
     _sub: bool = False,
 ) -> Tensor:
     """
-    Add the output of [`flow_kernel`](index.html#jitfields.regularisers.flow_kernel)
+    Add the output of [`flow_kernel`][jitfields.regularisers.flow_kernel]
     to `inp` (inplace).
     """
     bound = ensure_list(bound, inp.shape[-1])
@@ -421,7 +421,7 @@ def flow_kernel_sub(
     out: Optional[Tensor] = None,
 ) -> Tensor:
     """
-    Subtract the output of [`flow_kernel`](index.html#jitfields.regularisers.flow_kernel)
+    Subtract the output of [`flow_kernel`][jitfields.regularisers.flow_kernel]
     from `inp`.
     """
     return flow_kernel_add(inp, absolute, membrane, bending, shears, div,
@@ -439,7 +439,7 @@ def flow_kernel_sub_(
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """
-    Subtract the output of [`flow_kernel`](index.html#jitfields.regularisers.flow_kernel)
+    Subtract the output of [`flow_kernel`][jitfields.regularisers.flow_kernel]
     from `inp` (inplace).
     """
     return flow_kernel_add_(inp, absolute, membrane, bending, shears, div,
@@ -478,7 +478,7 @@ def flow_diag(
         Penalty on local shears.
     div : `float`
         Penalty on local volume changes.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundLike`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -532,7 +532,7 @@ def flow_diag_add(
     _sub: bool = False,
 ) -> Tensor:
     """
-    Add the output of [`flow_diag`](index.html#jitfields.regularisers.flow_diag)
+    Add the output of [`flow_diag`][jitfields.regularisers.flow_diag]
     to `inp`.
     """
     impl = cuda_impl if inp.is_cuda else cpu_impl
@@ -576,7 +576,7 @@ def flow_diag_add_(
     _sub: bool = False,
 ) -> Tensor:
     """
-    Add the output of [`flow_diag`](index.html#jitfields.regularisers.flow_diag)
+    Add the output of [`flow_diag`][jitfields.regularisers.flow_diag]
     to `inp` (inplace).
     """
     impl = cuda_impl if inp.is_cuda else cpu_impl
@@ -614,7 +614,7 @@ def flow_diag_sub(
     out: Optional[Tensor] = None,
 ) -> Tensor:
     """
-    Subtract the output of [`flow_diag`](index.html#jitfields.regularisers.flow_diag)
+    Subtract the output of [`flow_diag`][jitfields.regularisers.flow_diag]
     from `inp`.
     """
     return flow_diag_add(inp, weight,
@@ -634,7 +634,7 @@ def flow_diag_sub_(
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """
-    Subtract the output of [`flow_diag`](index.html#jitfields.regularisers.flow_diag)
+    Subtract the output of [`flow_diag`][jitfields.regularisers.flow_diag]
     from `inp` (inplace).
     """
     return flow_diag_add_(inp, weight,
@@ -677,7 +677,7 @@ def flow_precond(
         Penalty on local shears.
     div : `float`
         Penalty on local volume changes.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundLike`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -757,7 +757,7 @@ def flow_forward(
         Penalty on local shears.
     div : `float`
         Penalty on local volume changes.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundLike`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -816,7 +816,7 @@ def flow_relax_(
         Penalty on local shears.
     div : `float`
         Penalty on local volume changes.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundLike`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.

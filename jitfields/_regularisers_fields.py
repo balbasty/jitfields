@@ -27,7 +27,7 @@ In practice, $\boldsymbol{f}$ is a dense discrete field, _i.e._, $\mathbf{f} \in
 are then quadratic forms in $\mathbf{f}$: $\mathcal{L} = \frac{1}{2}\mathbf{f}^{T}\mathbf{Lf}$.
 The penalties are implemented using finite difference and, in the absence of
 local weighting, $\mathbf{L}$ takes the form of a convolution with a small kernel.
-"""
+"""  # noqa: E501
 
 __all__ = [
     'field_matvec',
@@ -61,7 +61,7 @@ def field_matvec(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -87,7 +87,7 @@ def field_matvec(
         Penalty on first derivatives (per channel).
     bending : `[sequence of] float`
         Penalty on second derivatives (per channel).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundType`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -135,7 +135,7 @@ def field_matvec_add(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     _sub: bool = False,
@@ -183,7 +183,7 @@ def field_matvec_add_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     _sub: bool = False,
 ) -> Tensor:
@@ -224,14 +224,14 @@ def field_matvec_sub(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
     """See `field_matvec`"""
     return field_matvec_add(ndim, inp, vec, weight,
-                             absolute, membrane, bending,
-                             bound, voxel_size, out, True)
+                            absolute, membrane, bending,
+                            bound, voxel_size, out, True)
 
 
 def field_matvec_sub_(
@@ -242,13 +242,13 @@ def field_matvec_sub_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_matvec`"""
     return field_matvec_add_(ndim, inp, vec, weight,
-                              absolute, membrane, bending,
-                              bound, voxel_size, True)
+                             absolute, membrane, bending,
+                             bound, voxel_size, True)
 
 
 def field_kernel(
@@ -256,7 +256,7 @@ def field_kernel(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     **backend,
@@ -273,7 +273,7 @@ def field_kernel(
         Penalty on first derivatives (per channel).
     bending : `[sequence of] float`
         Penalty on second derivatives (per channel).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundType`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -331,7 +331,7 @@ def field_kernel_add(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     _sub: bool = False,
@@ -365,7 +365,7 @@ def field_kernel_add_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     _sub: bool = False,
 ) -> Tensor:
@@ -391,7 +391,7 @@ def field_kernel_sub(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -406,7 +406,7 @@ def field_kernel_sub_(
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_kernel`"""
@@ -416,11 +416,11 @@ def field_kernel_sub_(
 
 def field_diag(
     shape: OneOrSeveral[int],
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     **backend,
@@ -440,7 +440,7 @@ def field_diag(
         Penalty on first derivatives (per channel).
     bending : `[sequence of] float`
         Penalty on second derivatives (per channel).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundType`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -492,11 +492,11 @@ def field_diag(
 def field_diag_add(
     ndim: int,
     inp: Tensor,
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
     _sub: bool = False,
@@ -536,11 +536,11 @@ def field_diag_add(
 def field_diag_add_(
     ndim: int,
     inp: Tensor,
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     _sub: bool = False,
 ) -> Tensor:
@@ -573,11 +573,11 @@ def field_diag_add_(
 def field_diag_sub(
     ndim: int,
     inp: Tensor,
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -590,11 +590,11 @@ def field_diag_sub(
 def field_diag_sub_(
     ndim: int,
     inp: Tensor,
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_diag`"""
@@ -607,11 +607,11 @@ def field_precond(
     ndim: int,
     mat: Tensor,
     vec: Tensor,
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
 ) -> Tensor:
@@ -623,7 +623,8 @@ def field_precond(
     ndim : `int`
         Number of spatial dimensions
     mat : `(*batch, *spatial, CC) tensor`
-        Preconditioning matrix $\mathbf{H}$ with shape `(*batch, *spatial, CC)`,
+        Preconditioning matrix $\mathbf{H}$
+        with shape `(*batch, *spatial, CC)`,
         where `CC` is one of `{1, C, C*(C+1)//2, C*C}`.
     vec : `(*batch, *spatial, C) tensor`
         Point $\mathbf{f}$ at which to solve the system,
@@ -636,7 +637,7 @@ def field_precond(
         Penalty on first derivatives.
     bending : `float`
         Penalty on second derivatives.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundType`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -660,11 +661,11 @@ def field_precond_(
     ndim: int,
     mat: Tensor,
     vec: Tensor,
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
 ) -> Tensor:
     """See `field_precond`"""
@@ -679,14 +680,14 @@ def field_forward(
     ndim: int,
     mat: Tensor,
     vec: Tensor,
-    weight: Optional[Tensor],
+    weight: Optional[Tensor] = None,
     absolute: OneOrSeveral[float] = 0,
     membrane: OneOrSeveral[float] = 0,
     bending: OneOrSeveral[float] = 0,
-    bound: OneOrSeveral[BoundType]= 'dct2',
+    bound: OneOrSeveral[BoundType] = 'dct2',
     voxel_size: OneOrSeveral[float] = 1,
     out: Optional[Tensor] = None,
-    ) -> Tensor:
+) -> Tensor:
     r"""Apply the forward matrix-vector product
     $(\mathbf{H} + \mathbf{L}) \times \mathbf{f}$.
 
@@ -707,7 +708,7 @@ def field_forward(
         Penalty on first derivatives.
     bending : `float`
         Penalty on second derivatives.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundType`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
@@ -763,7 +764,7 @@ def field_relax_(
         Penalty on first derivatives.
     bending : `[sequence of] float`
         Penalty on second derivatives.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dft'
+    bound : `[sequence of] BoundType`, default='dft'
         Boundary conditions.
     voxel_size : `[sequence of] float`
         Voxel size.
