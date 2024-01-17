@@ -1,3 +1,42 @@
+"""
+This module implements functions that compute distances to raster masks,
+2D polygons, 3D triangular meshes, and spline-encoded curves.
+
+Functions
+---------
+euclidean_distance_transform
+    Compute the Euclidean distance transform of a binary image.
+    Alias: `edt`.
+l1_distance_transform
+    Compute the L1 distance transform of a binary image.
+    Alias: `l1dt`.
+signed_distance_transform
+    Compute the signed Euclidean distance transform of a binary image.
+    Alias: `sdt`.
+spline_distance_table
+    Compute the minimum distance from a set of points to a 1D spline
+    (dicitonary search).
+spline_distance_brent
+    Compute the minimum distance from a set of points to a 1D spline
+    (derivative-free optimization).
+    In-place: `spline_distance_brent_`.
+spline_distance_gaussnewton
+    Compute the minimum distance from a set of points to a 1D spline
+    (second order optimization).
+    In-place: `spline_distance_gaussnewton`.
+    Aliases: `spline_dt`, `spline_dt_`.
+mesh_distance
+    Compute the minimum distance from a set of points to a triangular mesh.
+    Alias: `mesh_dt`.
+mesh_distance_signed
+    Compute the *signed* minimum distance from a set of points to a
+    triangular mesh.
+    Alias: `mesh_sdt`.
+mesh_sdt_extra
+    `mesh_distance_signed` + also return the vertex nearest
+    (in geodesic distance) to each point.
+
+"""
 __all__ = [
     'euclidean_distance_transform', 'edt',
     'l1_distance_transform', 'l1dt',
@@ -154,7 +193,7 @@ def signed_distance_transform(
     vx: OneOrSeveral[float] = 1,
     dtype: Optional[torch.dtype] = None,
 ) -> tensor:
-    """Compute the Euclidean distance transform of a binary image
+    """Compute the signed Euclidean distance transform of a binary image
 
     Parameters
     ----------

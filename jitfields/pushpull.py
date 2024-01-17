@@ -1,5 +1,4 @@
 """
-## Overview
 This module contains a function (`pull`) for sampling values at arbitrary
 coordinates into a continuous function encoded by regularly spaced splines.
 
@@ -26,6 +25,16 @@ Furthermore, indices are expressed in voxels, and are therefore expected
 in the range `(0, N-1)`. Indices outside of this range are dealt with using
 one of the boundary conditions that are implemented. This again differs
 form PyTorch, where indices are in the normalized range `(-1, 1)`.
+
+## Functions
+pull
+    Sample a tensor using spline interpolation
+grad
+    Sample the spatial gradients of a tensor using spline interpolation
+push
+    Splat a tensor using spline interpolation
+count
+    Splat ones using spline interpolation
 """
 __all__ = ['pull', 'push', 'count', 'grad']
 
