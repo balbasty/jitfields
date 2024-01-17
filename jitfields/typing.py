@@ -46,7 +46,7 @@ discouraged
 | Fourier       | SciPy            | Other                                  | Description               |
 | ------------- | ---------------- | -------------------------------------- | ------------------------- |
 |               | `"border"`       | `"nearest"`, `"replicate"`, `"repeat"` | ` a  a | a b c d |  d  d` |
-|               | ~~`"constant"`~~ | `"zero"`, `"zeros"`                    | ` 0  0 | a b c d |  0  0` |
+|               | <del>`"constant"`</del> | `"zero"`, `"zeros"`             | ` 0  0 | a b c d |  0  0` |
 | `"dct2"`      | `"reflect"`      |                                        | ` b  a | a b c d |  d  c` |
 | `"dct1"`      | `"mirror"`       |                                        | ` c  b | a b c d |  c  b` |
 | `"dft"`       | `"wrap"`         | `"circular"`, `"circulant"`            | ` c  d | a b c d |  a  b` |
