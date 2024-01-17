@@ -67,7 +67,7 @@ def pull(
         Tensor of coordinates into `inp`, with shape `(..., *outshape, ndim)`.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value
@@ -90,7 +90,9 @@ def pull(
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
-        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = inp.movedim(-1, 0)
+        inp = spline_coeff_nd(inp, order, bound, ndim)
+        inp = inp.movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     return Pull.apply(inp, grid, order, bound, extrapolate, out)
@@ -122,7 +124,7 @@ def grad(
         Tensor of coordinates into `inp`, with shape `(..., *outshape, ndim)`.
     order : [sequence of] {0..7}, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value
@@ -145,7 +147,9 @@ def grad(
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
-        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = inp.movedim(-1, 0)
+        inp = spline_coeff_nd(inp, order, bound, ndim)
+        inp = inp.movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     return Grad.apply(inp, grid, order, bound, extrapolate, out)
@@ -173,7 +177,7 @@ def push(
         Output spatial shape. Default is `inshape`.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value
@@ -200,7 +204,9 @@ def push(
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
     inp = Push.apply(inp, grid, shape, order, bound, extrapolate, out)
     if prefilter:
-        inp = spline_coeff_nd_(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = inp.movedim(-1, 0)
+        inp = spline_coeff_nd_(inp, order, bound, ndim)
+        inp = inp.movedim(0, -1)
     return inp
 
 
@@ -222,7 +228,7 @@ def count(
         Output spatial shape. Default is `inshape`.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value
@@ -275,7 +281,7 @@ class Push(torch.autograd.Function):
         ctx.opt = (order, bound, extrapolate)
         ctx.save_for_backward(inp, grid)
         ndim = grid.shape[-1]
-        fullshape = list(grid.shape[:-ndim-1]) + list(shape) + list(inp.shape[-1:])
+        fullshape = grid.shape[:-ndim-1] + tuple(shape) + inp.shape[-1:]
         out = inp.new_zeros(fullshape) if out is None else out.view(fullshape)
         out = fwd(out, inp, grid, order, bound, extrapolate)
         return out

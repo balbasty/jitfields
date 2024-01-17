@@ -1,11 +1,13 @@
 __all__ = [
     'euclidean_distance_transform', 'edt',
     'l1_distance_transform', 'l1dt',
-    'signed_distance_transform', 'sdt'
+    'signed_distance_transform', 'sdt',
     'spline_distance_table',
     'spline_distance_brent', 'spline_distance_brent_',
-    'spline_distance_gaussnewton', 'spline_distance_gaussnewton_', 'spline_dt', 'spline_dt_',
-    'mesh_distance', 'mesh_distance_signed', 'mesh_dt', 'mesh_sdt', 'mesh_sdt_extra', 
+    'spline_distance_gaussnewton', 'spline_distance_gaussnewton_',
+    'spline_dt', 'spline_dt_',
+    'mesh_distance', 'mesh_dt',
+    'mesh_distance_signed', 'mesh_sdt', 'mesh_sdt_extra',
 ]
 
 import torch
@@ -45,21 +47,23 @@ def euclidean_distance_transform(
 
     References
     ----------
-    1. Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
-    [*Distance transforms of sampled functions.*](https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
-    _Theory of computing_, 8(1), pp.415-428.
-
-            @article{felzenszwalb2012distance,
-              title={Distance transforms of sampled functions},
-              author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
-              journal={Theory of computing},
-              volume={8},
-              number={1},
-              pages={415--428},
-              year={2012},
-              publisher={Theory of Computing Exchange},
-              url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
-            }
+    1.  Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
+        [*Distance transforms of sampled functions.*](
+            https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
+        _Theory of computing_, 8(1), pp.415-428.
+        ```bib
+        @article{felzenszwalb2012distance,
+            title={Distance transforms of sampled functions},
+            author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
+            journal={Theory of computing},
+            volume={8},
+            number={1},
+            pages={415--428},
+            year={2012},
+            publisher={Theory of Computing Exchange},
+            url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
+        }
+        ```
     """
     if x.is_cuda:
         edt_1d_ = cuda_dist.edt_1d_
@@ -110,21 +114,23 @@ def l1_distance_transform(
 
     References
     ----------
-    1. Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
-    [*Distance transforms of sampled functions.*](https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
-    _Theory of computing_, 8(1), pp.415-428.
-
-            @article{felzenszwalb2012distance,
-              title={Distance transforms of sampled functions},
-              author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
-              journal={Theory of computing},
-              volume={8},
-              number={1},
-              pages={415--428},
-              year={2012},
-              publisher={Theory of Computing Exchange},
-              url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
-            }
+    1.  Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
+        [*Distance transforms of sampled functions.*](
+            https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
+        _Theory of computing_, 8(1), pp.415-428.
+        ```bib
+        @article{felzenszwalb2012distance,
+            title={Distance transforms of sampled functions},
+            author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
+            journal={Theory of computing},
+            volume={8},
+            number={1},
+            pages={415--428},
+            year={2012},
+            publisher={Theory of Computing Exchange},
+            url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
+        }
+        ```
     """
     if x.is_cuda:
         l1dt_1d_ = cuda_dist.l1dt_1d_
@@ -169,21 +175,23 @@ def signed_distance_transform(
 
     References
     ----------
-    1. Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
-    [*Distance transforms of sampled functions.*](https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
-    _Theory of computing_, 8(1), pp.415-428.
-
-            @article{felzenszwalb2012distance,
-              title={Distance transforms of sampled functions},
-              author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
-              journal={Theory of computing},
-              volume={8},
-              number={1},
-              pages={415--428},
-              year={2012},
-              publisher={Theory of Computing Exchange},
-              url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
-            }
+    1.  Felzenszwalb, P.F. and Huttenlocher, D.P., 2012.
+        [*Distance transforms of sampled functions.*](
+            https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf)
+        _Theory of computing_, 8(1), pp.415-428.
+        ```bib
+        @article{felzenszwalb2012distance,
+            title={Distance transforms of sampled functions},
+            author={Felzenszwalb, Pedro F and Huttenlocher, Daniel P},
+            journal={Theory of computing},
+            volume={8},
+            number={1},
+            pages={415--428},
+            year={2012},
+            publisher={Theory of Computing Exchange},
+            url={https://www.theoryofcomputing.org/articles/v008a019/v008a019.pdf}
+        }
+        ```
     """
     x = x > 0
     d = euclidean_distance_transform(x, ndim, vx, dtype)
@@ -203,11 +211,11 @@ def _dot(x, y):
 
 
 def spline_distance_table(
-    loc: tensor, 
-    coeff: tensor, 
-    steps: Optional[Union[int, tensor]] = None, 
-    order: OrderType = 3, 
-    bound: BoundType = 'dct2', 
+    loc: tensor,
+    coeff: tensor,
+    steps: Optional[Union[int, tensor]] = None,
+    order: OrderType = 3,
+    bound: BoundType = 'dct2',
     square: bool = False,
 ) -> Tuple[tensor, tensor]:
     """Compute the minimum distance from a set of points to a 1D spline
@@ -222,7 +230,7 @@ def spline_distance_table(
         Number of time steps to try, or list of time steps to try.
     order : {1..7}
         Spline order.
-    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    bound : BoundType
         Boundary conditions of the spline.
     square : bool
         Return the squared Euclidean distance.
@@ -235,18 +243,22 @@ def spline_distance_table(
         Time of the closest point on the spline
     """
 
-    fn = cuda_dist.splinedt_table_ if coeff.is_cuda else cpu_dist.splinedt_table_
+    fn = (cuda_dist.splinedt_table_ if coeff.is_cuda else
+          cpu_dist.splinedt_table_)
 
     if steps is None:
         length = coeff[..., 1:, :] - coeff[..., :-1, :]
         length = _dot(length, length).sqrt_().sum(-1).max()
         steps = max(3, (length / 2).ceil().int().item())
     if isinstance(steps, int):
-        steps = torch.linspace(0, coeff.shape[-2] - 1, steps, dtype=coeff.dtype, device=coeff.device)
+        steps = torch.linspace(0, coeff.shape[-2] - 1, steps,
+                               dtype=coeff.dtype, device=coeff.device)
     else:
-        steps = torch.as_tensor(steps, dtype=coeff.dtype, device=coeff.device).flatten()
+        steps = torch.as_tensor(steps, dtype=coeff.dtype, device=coeff.device)
+        steps = steps.flatten()
 
-    batch = torch.broadcast_shapes(loc.shape[:-1], coeff.shape[:-2], steps.shape[:-1])
+    batch = torch.broadcast_shapes(
+        loc.shape[:-1], coeff.shape[:-2], steps.shape[:-1])
     loc = loc.expand(torch.Size(batch) + loc.shape[-1:])
     coeff = coeff.expand(torch.Size(batch) + coeff.shape[-2:])
     steps = steps.expand(torch.Size(batch) + steps.shape[-1:])
@@ -261,23 +273,25 @@ def spline_distance_table(
 
 
 def spline_distance_brent_(
-    dist: tensor, 
-    time: tensor, 
-    loc: tensor, 
-    coeff: tensor, 
-    max_iter: int = 128, 
-    tol: float = 1e-6, 
-    step_size: float = 0.01, 
-    order: OrderType = 3, 
-    bound: BoundType = 'dct2', 
+    dist: tensor,
+    time: tensor,
+    loc: tensor,
+    coeff: tensor,
+    max_iter: int = 128,
+    tol: float = 1e-6,
+    step_size: float = 0.01,
+    order: OrderType = 3,
+    bound: BoundType = 'dct2',
     square: bool = False,
 ) -> Tuple[tensor, tensor]:
-    """Compute the minimum distance from a set of points to a 1D spline (inplace)
+    """
+    Compute the minimum distance from a set of points to a 1D spline (inplace)
 
     Parameters
     ----------
     dist : `(...) tensor`
-        Initial distance from each point in the set to its closest point on the spline
+        Initial distance from each point in the set to its closest point
+        on the spline
     time : `(...) tensor`
         Initial time of the closest point on the spline
     loc : `(..., D) tensor`
@@ -292,7 +306,7 @@ def spline_distance_brent_(
         Initial search size.
     order : {1..7}
         Spline order.
-    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    bound : BounLike
         Boundary conditions of the spline.
     square : bool
         Return the squared Euclidean distance.
@@ -307,7 +321,8 @@ def spline_distance_brent_(
 
     fn = cuda_dist.splinedt_quad_ if coeff.is_cuda else cpu_dist.splinedt_quad_
 
-    batch = torch.broadcast_shapes(dist.shape, time.shape, loc.shape[:-1], coeff.shape[:-2])
+    batch = torch.broadcast_shapes(
+        dist.shape, time.shape, loc.shape[:-1], coeff.shape[:-2])
     loc = loc.expand(torch.Size(batch) + loc.shape[-1:])
     coeff = coeff.expand(torch.Size(batch) + coeff.shape[-2:])
     time = time.expand(batch)
@@ -321,17 +336,16 @@ def spline_distance_brent_(
     return dist, time
 
 
-
 def spline_distance_brent(
-    loc: tensor, 
-    coeff: tensor, 
-    max_iter: int = 128, 
-    tol: float = 1e-6, 
-    step_size: float = 0.01, 
-    order: OrderType = 3, 
-    bound: BoundType = 'dct2', 
+    loc: tensor,
+    coeff: tensor,
+    max_iter: int = 128,
+    tol: float = 1e-6,
+    step_size: float = 0.01,
+    order: OrderType = 3,
+    bound: BoundType = 'dct2',
     square: bool = False,
-    steps: Optional[Union[int, tensor]] = None, 
+    steps: Optional[Union[int, tensor]] = None,
 ) -> Tuple[tensor, tensor]:
     """Compute the minimum distance from a set of points to a 1D spline
 
@@ -349,7 +363,7 @@ def spline_distance_brent(
         Initial search size.
     order : {1..7}
         Spline order.
-    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    bound : BoundType
         Boundary conditions of the spline.
     square : bool
         Return the squared Euclidean distance.
@@ -364,27 +378,31 @@ def spline_distance_brent(
         Time of the closest point on the spline
     """
 
-    dist, time = spline_distance_table(loc, coeff, order=order, bound=bound, steps=steps)
-    return spline_distance_brent_(dist, time, loc, coeff, max_iter, tol, step_size, order, bound, square)
+    dist, time = spline_distance_table(
+        loc, coeff, order=order, bound=bound, steps=steps)
+    return spline_distance_brent_(
+        dist, time, loc, coeff, max_iter, tol, step_size, order, bound, square)
 
 
 def spline_distance_gaussnewton_(
-    dist: tensor, 
-    time: tensor, 
-    loc: tensor, 
-    coeff: tensor, 
-    max_iter: int = 16, 
-    tol: float = 1e-6, 
-    order: OrderType = 3, 
-    bound: BoundType = 'dct2', 
+    dist: tensor,
+    time: tensor,
+    loc: tensor,
+    coeff: tensor,
+    max_iter: int = 16,
+    tol: float = 1e-6,
+    order: OrderType = 3,
+    bound: BoundType = 'dct2',
     square: bool = False,
 ) -> Tuple[tensor, tensor]:
-    """Compute the minimum distance from a set of points to a 1D spline (inplace)
+    """
+    Compute the minimum distance from a set of points to a 1D spline (inplace)
 
     Parameters
     ----------
     dist : `(...) tensor`
-        Initial distance from each point in the set to its closest point on the spline
+        Initial distance from each point in the set to its closest point
+        on the spline
     time : `(...) tensor`
         Initial time of the closest point on the spline
     loc : `(..., D) tensor`
@@ -397,7 +415,7 @@ def spline_distance_gaussnewton_(
         Tolerance for early stopping
     order : {1..7}
         Spline order.
-    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    bound : BoundType
         Boundary conditions of the spline.
     square : bool
         Return the squared Euclidean distance.
@@ -410,9 +428,11 @@ def spline_distance_gaussnewton_(
         Time of the closest point on the spline
     """
 
-    fn = cuda_dist.splinedt_gaussnewton_ if coeff.is_cuda else cpu_dist.splinedt_gaussnewton_
+    fn = (cuda_dist.splinedt_gaussnewton_ if coeff.is_cuda else
+          cpu_dist.splinedt_gaussnewton_)
 
-    batch = torch.broadcast_shapes(dist.shape, time.shape, loc.shape[:-1], coeff.shape[:-2])
+    batch = torch.broadcast_shapes(
+        dist.shape, time.shape, loc.shape[:-1], coeff.shape[:-2])
     loc = loc.expand(torch.Size(batch) + loc.shape[-1:])
     coeff = coeff.expand(torch.Size(batch) + coeff.shape[-2:])
     time = time.expand(batch)
@@ -427,14 +447,14 @@ def spline_distance_gaussnewton_(
 
 
 def spline_distance_gaussnewton(
-    loc: tensor, 
-    coeff: tensor, 
-    max_iter: int = 16, 
-    tol: float = 1e-6, 
-    order: OrderType = 3, 
-    bound: BoundType = 'dct2', 
+    loc: tensor,
+    coeff: tensor,
+    max_iter: int = 16,
+    tol: float = 1e-6,
+    order: OrderType = 3,
+    bound: BoundType = 'dct2',
     square: bool = False,
-    steps: Optional[Union[int, tensor]] = None, 
+    steps: Optional[Union[int, tensor]] = None,
 ) -> Tuple[tensor, tensor]:
     """Compute the minimum distance from a set of points to a 1D spline
 
@@ -450,7 +470,7 @@ def spline_distance_gaussnewton(
         Tolerance for early stopping
     order : {1..7}
         Spline order.
-    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`
+    bound : BoundType
         Boundary conditions of the spline.
     square : bool
         Return the squared Euclidean distance.
@@ -465,8 +485,11 @@ def spline_distance_gaussnewton(
         Time of the closest point on the spline
     """
 
-    dist, time = spline_distance_table(loc, coeff, order=order, bound=bound, steps=steps)
-    return spline_distance_gaussnewton_(dist, time, loc, coeff, max_iter, tol, order, bound, square)
+    dist, time = spline_distance_table(
+        loc, coeff, order=order, bound=bound, steps=steps)
+    return spline_distance_gaussnewton_(
+        dist, time, loc, coeff, max_iter, tol, order, bound, square)
+
 
 # aliases
 spline_dt_table = spline_distance_table
@@ -477,12 +500,13 @@ spline_dt_ = spline_dt_gaussnewton_ = spline_distance_gaussnewton_
 
 
 def mesh_distance_signed(
-    loc: tensor, 
-    vertices: tensor, 
+    loc: tensor,
+    vertices: tensor,
     faces: tensor,
     out: Optional[tensor] = None,
 ) -> tensor:
-    """Compute the *signed* minimum distance from a set of points to a triangular mesh
+    """Compute the *signed* minimum distance from a set of points to a
+    triangular mesh
 
     Parameters
     ----------
@@ -496,8 +520,8 @@ def mesh_distance_signed(
     Returns
     -------
     dist : `(...) tensor`
-        Signed distance from each point in the set to its closest point on the mesh
-        (negative inside, positive outside)
+        Signed distance from each point in the set to its closest point
+        on the mesh (negative inside, positive outside)
     """
 
     fn_sdt = cuda_dist.mesh_sdt if loc.is_cuda else cpu_dist.mesh_sdt
@@ -539,12 +563,13 @@ def mesh_distance_signed(
 
 
 def mesh_sdt_extra(
-    loc: tensor, 
-    vertices: tensor, 
+    loc: tensor,
+    vertices: tensor,
     faces: tensor,
     out: Optional[Tuple[tensor, tensor]] = None,
 ) -> tensor:
-    """Compute the *signed* minimum distance from a set of points to a triangular mesh.
+    """Compute the *signed* minimum distance from a set of points to a
+    triangular mesh.
 
     Also return the vertex nearest (in geodesic distance) to each point.
 
@@ -560,8 +585,8 @@ def mesh_sdt_extra(
     Returns
     -------
     dist : `(...) tensor`
-        Signed distance from each point in the set to its closest point on the mesh
-        (negative inside, positive outside)
+        Signed distance from each point in the set to its closest point
+        on the mesh (negative inside, positive outside)
     nearest_vertex : `(...) tensor[integer]`
         Index of the nearest vertex to each point.
     """
@@ -608,8 +633,8 @@ def mesh_sdt_extra(
 
 
 def mesh_distance(
-    loc: tensor, 
-    vertices: tensor, 
+    loc: tensor,
+    vertices: tensor,
     faces: tensor,
     naive: bool = False,
     out: Optional[tensor] = None,
@@ -630,8 +655,8 @@ def mesh_distance(
     Returns
     -------
     dist : `(...) tensor`
-        Signed distance from each point in the set to its closest point on the mesh
-        (negative inside, positive outside)
+        Signed distance from each point in the set to its closest point
+        on the mesh (negative inside, positive outside)
     """
 
     if not naive:
@@ -658,7 +683,8 @@ def mesh_distance(
         fn_dt(out, loc, vertices, faces, tree)
 
     else:
-        fn_dt = cuda_dist.mesh_dt_naive if loc.is_cuda else cpu_dist.mesh_dt_naive
+        fn_dt = (cuda_dist.mesh_dt_naive if loc.is_cuda else
+                 cpu_dist.mesh_dt_naive)
 
         # move to loc's device
         vertices = vertices.to(loc)

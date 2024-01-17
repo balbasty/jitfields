@@ -2,7 +2,6 @@ __all__ = [
     'spline_coeff', 'spline_coeff_',
     'spline_coeff_nd', 'spline_coeff_nd_'
 ]
-
 import torch.autograd
 from torch import Tensor
 from typing import Optional
@@ -29,7 +28,7 @@ def spline_coeff(
         Input tensor
     order : `{0..7}`, default=2
         Interpolation order.
-    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `BoundType`, default='dct2'
         Boundary conditions.
     dim : `int`, default=-1
         Dimension along which to filter
@@ -60,7 +59,7 @@ def spline_coeff_(
         Input tensor
     order : `{0..7}`, default=2
         Interpolation order.
-    bound : `{'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `BoundType`, default='dct2'
         Boundary conditions.
     dim : `int`, default=-1
         Dimension along which to filter
@@ -82,7 +81,8 @@ def spline_coeff_nd(
     bound: OneOrSeveral[BoundType] = 'dct2',
     ndim: Optional[int] = None,
 ) -> Tensor:
-    """Compute the interpolating spline coefficients, along the last N dimensions.
+    """
+    Compute the interpolating spline coefficients, along the last N dimensions.
 
     Parameters
     ----------
@@ -90,7 +90,7 @@ def spline_coeff_nd(
         Input tensor, with shape `(..., *spatial)`.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         Boundary conditions (per dimension).
     ndim : `int`, default=`inp.dim()`
         Number of spatial dimensions. Defaults: all.
@@ -109,7 +109,8 @@ def spline_coeff_nd_(
     bound: OneOrSeveral[BoundType] = 'dct2',
     ndim: Optional[int] = None,
 ) -> Tensor:
-    """Compute the interpolating spline coefficients, along the last N dimensions.
+    """
+    Compute the interpolating spline coefficients, along the last N dimensions.
 
     Notes
     -----
@@ -121,7 +122,7 @@ def spline_coeff_nd_(
         Input tensor, with shape `(..., *spatial)`.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         Boundary conditions (per dimension).
     ndim : `int`, default=`inp.dim()`
         Number of spatial dimensions. Defaults: all.

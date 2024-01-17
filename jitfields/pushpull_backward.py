@@ -48,7 +48,7 @@ def pull_backward(
         Tensor of coordinates into `inp`, with shape `(..., *outshape, ndim)`.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value
@@ -75,7 +75,9 @@ def pull_backward(
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
-        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = inp.movedim(-1, 0)
+        inp = spline_coeff_nd(inp, order, bound, ndim)
+        inp = inp.movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
 
@@ -118,7 +120,7 @@ def grad_backward(
         Tensor of coordinates into `inp`, with shape `(..., *outshape, ndim)`.
     order : [sequence of] {0..7}, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value
@@ -145,7 +147,9 @@ def grad_backward(
     if ndim > 3:
         raise NotImplementedError("Not implemented for spatial dim > 3")
     if prefilter:
-        inp = spline_coeff_nd(inp.movedim(-1, 0), order, bound, ndim).movedim(0, -1)
+        inp = inp.movedim(-1, 0)
+        inp = spline_coeff_nd(inp, order, bound, ndim)
+        inp = inp.movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
 
@@ -181,7 +185,7 @@ def push_backward(
         Tensor of coordinates into `inp`, with shape `(..., *inshape, ndim)`.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value
@@ -243,7 +247,7 @@ def count_backward(
         Tensor of coordinates, with shape `(..., *inshape, ndim)`
     order : `[sequence of] {0..7}`, default=2
         Interpolation order (per dimension).
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values (per dimension).
     extrapolate : `bool or {'center', 'edge'}`
         - `True`: use bound to extrapolate out-of-bound value

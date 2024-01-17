@@ -1,11 +1,11 @@
 convert_bound = {
     'zero': 0, 'zeros': 0,
-    'repeat': 1, 'replicate': 1, 'nearest': 1,
+    'repeat': 1, 'replicate': 1, 'nearest': 1, 'border': 1,
     'dct1': 2, 'mirror': 2,
     'dct2': 3, 'reflect': 3,
     'dst1': 4, 'antimirror': 4,
     'dst2': 5, 'antireflect': 5,
-    'dft': 6, 'wrap': 6, 'circular': 6,
+    'dft': 6, 'wrap': 6, 'circular': 6, 'circulant': 6,
     'nocheck': 7,
 }
 

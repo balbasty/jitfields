@@ -138,7 +138,8 @@ def sym_addmatvec(
     elif nc2 == nc*nc:
         if out is not None:
             out = out.unsqueeze(-1)
-        return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze(-1).add_(inp)
+        return torch.matmul(
+            mat, vec.unsqueeze(-1), out=out).squeeze(-1).add_(inp)
     else:
         return torch.mul(mat, vec, out=out).add_(inp)
 
@@ -242,7 +243,8 @@ def sym_submatvec(
     elif nc2 == nc*nc:
         if out is not None:
             out = out.unsqueeze(-1)
-        return torch.matmul(mat, vec.unsqueeze(-1), out=out).squeeze(-1).neg_().add_(inp)
+        return torch.matmul(
+            mat, vec.unsqueeze(-1), out=out).squeeze(-1).neg_().add_(inp)
     else:
         return torch.mul(mat, vec, out=out).neg_().add_(inp)
 
@@ -464,7 +466,8 @@ class MatVec(torch.autograd.Function):
     def backward(ctx, grad):
         mat, vec = ctx.saved_tensors
         _vbwd = cuda_sym.sym_matvec if mat.is_cuda else cpu_sym.sym_matvec
-        _mbwd = cuda_sym.sym_matvec_backward if mat.is_cuda else cpu_sym.sym_matvec_backward
+        _mbwd = (cuda_sym.sym_matvec_backward if mat.is_cuda else
+                 cpu_sym.sym_matvec_backward)
         gvec = _vbwd(torch.empty_like(vec), mat, grad, dtype=ctx.dtype)
         gmat = _mbwd(torch.empty_like(mat), grad, vec, dtype=ctx.dtype)
         return gmat, gvec, None, None
@@ -474,7 +477,8 @@ class AddMatVec(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, mat, vec, dtype, out):
-        _fwd = cuda_sym.sym_addmatvec_ if mat.is_cuda else cpu_sym.sym_addmatvec_
+        _fwd = (cuda_sym.sym_addmatvec_ if mat.is_cuda else
+                cpu_sym.sym_addmatvec_)
         ctx.dtype = dtype
         ctx.save_for_backward(mat, vec)
         out.copy_(inp)
@@ -483,8 +487,10 @@ class AddMatVec(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         mat, vec = ctx.saved_tensors
-        _vbwd = cuda_sym.sym_addmatvec_ if mat.is_cuda else cpu_sym.sym_addmatvec_
-        _mbwd = cuda_sym.sym_matvec_backward if mat.is_cuda else cpu_sym.sym_matvec_backward
+        _vbwd = (cuda_sym.sym_addmatvec_ if mat.is_cuda else
+                 cpu_sym.sym_addmatvec_)
+        _mbwd = (cuda_sym.sym_matvec_backward if mat.is_cuda else
+                 cpu_sym.sym_matvec_backward)
         gvec = _vbwd(torch.empty_like(vec), mat, grad, dtype=ctx.dtype)
         gmat = _mbwd(torch.empty_like(mat), grad, vec, dtype=ctx.dtype)
         return grad, gmat, gvec, None, None
@@ -494,7 +500,8 @@ class AddMatVec_(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, mat, vec, dtype):
-        _fwd = cuda_sym.sym_addmatvec_ if mat.is_cuda else cpu_sym.sym_addmatvec_
+        _fwd = (cuda_sym.sym_addmatvec_ if mat.is_cuda else
+                cpu_sym.sym_addmatvec_)
         ctx.dtype = dtype
         ctx.save_for_backward(mat, vec)
         return _fwd(inp, vec, mat, dtype=dtype)
@@ -502,8 +509,10 @@ class AddMatVec_(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         mat, vec = ctx.saved_tensors
-        _vbwd = cuda_sym.sym_addmatvec_ if mat.is_cuda else cpu_sym.sym_addmatvec_
-        _mbwd = cuda_sym.sym_matvec_backward if mat.is_cuda else cpu_sym.sym_matvec_backward
+        _vbwd = (cuda_sym.sym_addmatvec_ if mat.is_cuda else
+                 cpu_sym.sym_addmatvec_)
+        _mbwd = (cuda_sym.sym_matvec_backward if mat.is_cuda else
+                 cpu_sym.sym_matvec_backward)
         gvec = _vbwd(torch.empty_like(vec), mat, grad, dtype=ctx.dtype)
         gmat = _mbwd(torch.empty_like(mat), grad, vec, dtype=ctx.dtype)
         return grad, gmat, gvec, None, None
@@ -513,7 +522,8 @@ class SubMatVec(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, mat, vec, dtype, out):
-        _fwd = cuda_sym.sym_submatvec_ if mat.is_cuda else cpu_sym.sym_submatvec_
+        _fwd = (cuda_sym.sym_submatvec_ if mat.is_cuda else
+                cpu_sym.sym_submatvec_)
         ctx.dtype = dtype
         ctx.save_for_backward(mat, vec)
         out.copy_(inp)
@@ -522,8 +532,10 @@ class SubMatVec(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         mat, vec = ctx.saved_tensors
-        _vbwd = cuda_sym.sym_submatvec_ if mat.is_cuda else cpu_sym.sym_submatvec_
-        _mbwd = cuda_sym.sym_matvec_backward if mat.is_cuda else cpu_sym.sym_matvec_backward
+        _vbwd = (cuda_sym.sym_submatvec_ if mat.is_cuda else
+                 cpu_sym.sym_submatvec_)
+        _mbwd = (cuda_sym.sym_matvec_backward if mat.is_cuda else
+                 cpu_sym.sym_matvec_backward)
         gvec = _vbwd(torch.empty_like(vec), mat, grad, dtype=ctx.dtype).neg_()
         gmat = _mbwd(torch.empty_like(mat), grad, vec, dtype=ctx.dtype).neg_()
         return grad, gmat, gvec, None, None
@@ -533,7 +545,8 @@ class SubMatVec_(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, inp, mat, vec, dtype):
-        _fwd = cuda_sym.sym_submatvec_ if mat.is_cuda else cpu_sym.sym_submatvec_
+        _fwd = (cuda_sym.sym_submatvec_ if mat.is_cuda else
+                cpu_sym.sym_submatvec_)
         ctx.dtype = dtype
         ctx.save_for_backward(mat, vec)
         return _fwd(inp, vec, mat, dtype=dtype)
@@ -541,8 +554,10 @@ class SubMatVec_(torch.autograd.Function):
     @staticmethod
     def backward(ctx, grad):
         mat, vec = ctx.saved_tensors
-        _vbwd = cuda_sym.sym_submatvec_ if mat.is_cuda else cpu_sym.sym_submatvec_
-        _mbwd = cuda_sym.sym_matvec_backward if mat.is_cuda else cpu_sym.sym_matvec_backward
+        _vbwd = (cuda_sym.sym_submatvec_ if mat.is_cuda else
+                 cpu_sym.sym_submatvec_)
+        _mbwd = (cuda_sym.sym_matvec_backward if mat.is_cuda else
+                 cpu_sym.sym_matvec_backward)
         gvec = _vbwd(torch.empty_like(vec), mat, grad, dtype=ctx.dtype).neg_()
         gmat = _mbwd(torch.empty_like(mat), grad, vec, dtype=ctx.dtype).neg_()
         return grad, gmat, gvec, None, None
@@ -565,7 +580,8 @@ class Solve(torch.autograd.Function):
     def backward(ctx, grad):
         mat, *diag, = ctx.saved_tensors
         _vbwd = cuda_sym.sym_solve if mat.is_cuda else cpu_sym.sym_solve
-        gvec = _vbwd(mat.new_empty(ctx.shape), mat, grad, *diag, dtype=ctx.dtype)
+        gvec = _vbwd(
+            mat.new_empty(ctx.shape), mat, grad, *diag, dtype=ctx.dtype)
         return None, gvec, None, None
 
 

@@ -1,5 +1,4 @@
 __all__ = ['resize', 'restrict']
-
 import torch
 from torch import Tensor
 from typing import Optional
@@ -50,7 +49,7 @@ def resize(
         requested factor is exactly applied.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values.
     prefilter : `bool`, default=True
         Whether to first compute interpolating coefficients.
@@ -134,7 +133,7 @@ def restrict(
         requested factor is exactly applied.
     order : `[sequence of] {0..7}`, default=2
         Interpolation order.
-    bound : `[sequence of] {'zero', 'replicate', 'dct1', 'dct2', 'dst1', 'dst2', 'dft'}`, default='dct2'
+    bound : `[sequence of] BoundType`, default='dct2'
         How to deal with out-of-bound values.
     make_adjoint : `bool`, default=False
         Make `restrict` the numerical adjoint of `resize` by accumulating
@@ -178,7 +177,8 @@ def restrict(
 
     order = [convert_order.get(o, o) for o in ensure_list(order, ndim)]
     bound = [convert_bound.get(b, b) for b in ensure_list(bound, ndim)]
-    x = _Restrict.apply(x, factor, shape, ndim, anchor, order, bound, make_adjoint, out)
+    x = _Restrict.apply(
+        x, factor, shape, ndim, anchor, order, bound, make_adjoint, out)
     return x
 
 
@@ -203,18 +203,21 @@ class _Resize(torch.autograd.Function):
 class _Restrict(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, x, factor, shape, ndim, anchor, order, bound, make_adjoint, out):
+    def forward(ctx, x, factor, shape, ndim, anchor, order, bound,
+                make_adjoint, out):
         restrict = (cuda_restrict if x.is_cuda else cpu_restrict).restrict
         out, scale = restrict(out, x, factor, anchor, order, bound)
         scale = prod(scale)
-        ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound, make_adjoint, scale)
+        ctx.opt = (x.shape, factor, shape, ndim, anchor, order, bound,
+                   make_adjoint, scale)
         if not make_adjoint:
             out /= scale
         return out
 
     @staticmethod
     def backward(ctx, grad, *args):
-        inshape, factor, shape, ndim, anchor, order, bound, make_adjoint, scale = ctx.opt
+        (inshape, factor, shape, ndim, anchor, order, bound,
+         make_adjoint, scale) = ctx.opt
         resize = (cuda_resize if grad.is_cuda else cpu_resize).resize
         if not make_adjoint:
             grad = grad / scale
