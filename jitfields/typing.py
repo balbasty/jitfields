@@ -47,11 +47,11 @@ discouraged
 | ------------- | ---------------- | -------------------------------------- | ------------------------- |
 |               | `"border"`       | `"nearest"`, `"replicate"`, `"repeat"` | ` a  a | a b c d |  d  d` |
 |               | <del>`"constant"`</del> | `"zero"`, `"zeros"`             | ` 0  0 | a b c d |  0  0` |
-| `"dct2"`      | `"reflect"`      |                                        | ` b  a | a b c d |  d  c` |
-| `"dct1"`      | `"mirror"`       |                                        | ` c  b | a b c d |  c  b` |
 | `"dft"`       | `"wrap"`         | `"circular"`, `"circulant"`            | ` c  d | a b c d |  a  b` |
-| `"dst2"`      |                  | `"antireflect"`                        | `-b -a | a b c d | -d -c` |
+| `"dct1"`      | `"mirror"`       |                                        | ` c  b | a b c d |  c  b` |
+| `"dct2"`      | `"reflect"`      |                                        | ` b  a | a b c d |  d  c` |
 | `"dst1"`      |                  | `"antimirror"`                         | `-a  0 | a b c d |  0 -d` |
+| `"dst2"`      |                  | `"antireflect"`                        | `-b -a | a b c d | -d -c` |
 
 """  # noqa: E501
 
