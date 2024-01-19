@@ -24,6 +24,7 @@ def pull_backward(
     bound: OneOrSeveral[BoundType] = 'dct2',
     extrapolate: ExtrapolateType = True,
     prefilter: bool = False,
+    abs: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """Sample a tensor using spline interpolation
 
@@ -60,6 +61,11 @@ def pull_backward(
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "spline sampling".
+    abs : bool
+        Take the absolute value of the corresponding matrix operator.
+        Can be useful in minimization-majorization contexts.
+
+        !!! warning "Advanced users only"
 
     Returns
     -------
@@ -84,7 +90,8 @@ def pull_backward(
     bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).pull_backward
     outgrad_inp = torch.zeros_like(inp)
     outgrad_grid = torch.empty_like(grid)
-    bwd(outgrad_inp, outgrad_grid, grad, inp, grid, order, bound, extrapolate)
+    bwd(outgrad_inp, outgrad_grid, grad, inp, grid, order,
+        bound, extrapolate, abs)
     return outgrad_inp, outgrad_grid
 
 
@@ -96,6 +103,7 @@ def grad_backward(
     bound: OneOrSeveral[BoundType] = 'dct2',
     extrapolate: ExtrapolateType = True,
     prefilter: bool = False,
+    abs: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """Sample the spatial gradients of a tensor using spline interpolation
 
@@ -132,6 +140,11 @@ def grad_backward(
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "spline sampling".
+    abs : bool
+        Take the absolute value of the corresponding matrix operator.
+        Can be useful in minimization-majorization contexts.
+
+        !!! warning "Advanced users only"
 
     Returns
     -------
@@ -156,7 +169,8 @@ def grad_backward(
     bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).grad_backward
     outgrad_inp = torch.zeros_like(inp)
     outgrad_grid = torch.empty_like(grid)
-    bwd(outgrad_inp, outgrad_grid, grad, inp, grid, order, bound, extrapolate)
+    bwd(outgrad_inp, outgrad_grid, grad, inp, grid,
+        order, bound, extrapolate, abs)
     return outgrad_inp, outgrad_grid
 
 
@@ -168,6 +182,7 @@ def push_backward(
     bound: OneOrSeveral[BoundType] = 'dct2',
     extrapolate: ExtrapolateType = True,
     prefilter: bool = False,
+    abs: bool = False,
 ) -> Tuple[Tensor, Tensor]:
     """Splat a tensor using spline interpolation
 
@@ -197,6 +212,11 @@ def push_backward(
         Whether to compute interpolating coefficients at the end.
         If the value for `prefilter` is matched across `pull` and `push`,
         they are adjoint of each other.
+    abs : bool
+        Take the absolute value of the corresponding matrix operator.
+        Can be useful in minimization-majorization contexts.
+
+        !!! warning "Advanced users only"
 
     Returns
     -------
@@ -222,7 +242,8 @@ def push_backward(
     bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).push_backward
     outgrad_inp = torch.empty_like(inp)
     outgrad_grid = torch.empty_like(grid)
-    bwd(outgrad_inp, outgrad_grid, grad, inp, grid, order, bound, extrapolate)
+    bwd(outgrad_inp, outgrad_grid, grad, inp, grid,
+        order, bound, extrapolate, abs)
     return outgrad_inp, outgrad_grid
 
 
@@ -232,6 +253,7 @@ def count_backward(
     order: OneOrSeveral[OrderType] = 2,
     bound: OneOrSeveral[BoundType] = 'dct2',
     extrapolate: ExtrapolateType = True,
+    abs: bool = False,
 ) -> Tensor:
     """Splat ones using spline interpolation
 
@@ -255,6 +277,11 @@ def count_backward(
           of the centers of the first and last voxels.
         - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
+    abs : bool
+        Take the absolute value of the corresponding matrix operator.
+        Can be useful in minimization-majorization contexts.
+
+        !!! warning "Advanced users only"
 
     Returns
     -------
@@ -270,7 +297,8 @@ def count_backward(
 
     bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).count_backward
     outgrad_grid = torch.empty_like(grid)
-    bwd(outgrad_grid, grad.unsqueeze(-1), grid, order, bound, extrapolate)
+    bwd(outgrad_grid, grad.unsqueeze(-1), grid,
+        order, bound, extrapolate, abs)
     return outgrad_grid
 
 

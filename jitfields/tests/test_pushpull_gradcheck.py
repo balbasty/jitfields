@@ -54,7 +54,8 @@ def test_gradcheck_grad(device, dim, bound, interpolation):
     vol.requires_grad = True
     grid.requires_grad = True
     assert gradcheck(
-        grad, (vol, grid, interpolation, bound, extrapolate), **kwargs)
+        grad, (vol, grid, interpolation, bound, extrapolate),
+        **kwargs)
 
 
 @pytest.mark.parametrize("device", devices)

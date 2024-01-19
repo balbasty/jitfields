@@ -165,7 +165,7 @@ void count(
     }
 }
 
-template <int nbatch, int ndim, int extrapolate,
+template <int nbatch, int ndim, int extrapolate, bool abs,
           typename reduce_t, typename scalar_t, typename offset_t,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
@@ -198,7 +198,7 @@ void grad(
 
     auto grad = [&](const reduce_t * loc, offset_t out_offset, offset_t inp_offset)
     {
-        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ>::grad(
+        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ, abs>::grad(
             out + out_offset, inp + inp_offset,
             loc, size_splinc + nbatch, stride_inp + nbatch,
             nc, osc, isc, osg);
@@ -225,7 +225,67 @@ void grad(
     }
 }
 
-template <int nbatch, int ndim, int extrapolate,
+template <int nbatch, int ndim, int extrapolate, bool abs,
+          typename reduce_t, typename scalar_t, typename offset_t,
+          spline::type IX,    bound::type BX,
+          spline::type IY=IX, bound::type BY=BX,
+          spline::type IZ=IY, bound::type BZ=BY>
+__global__
+void hess(
+    scalar_t * out,                 // (*batch, *spatial_grid, C, D) tensor | Placeholder for the pulled gradients
+    const scalar_t * inp,           // (*batch, *spatial_spln, C) tensor    | Input volume
+    const scalar_t * grid,          // (*batch, *spatial_grid, D) tensor    | Coordinates into the input volume
+    const offset_t * _size_grid,    // [*batch, *spatial_grid, D] vector
+    const offset_t * _size_splinc,  // [*batch, *spatial_spln, C] vector
+    const offset_t * _stride_out,   // [*batch, *spatial_grid, C, D] vector
+    const offset_t * _stride_inp,   // [*batch, *spatial_spln, C] vector
+            const offset_t * _stride_grid)  // [*batch, *spatial_grid, D] vector
+{
+    offset_t index = threadIdx.x + blockIdx.x * blockDim.x;
+    static constexpr int nall = ndim + nbatch;
+
+    // copy vectors to the stack
+    offset_t size_grid   [nall+1]; fillfrom<nall+1>(size_grid,   _size_grid);
+    offset_t size_splinc [nall+1]; fillfrom<nall+1>(size_splinc, _size_splinc);
+    offset_t stride_out  [nall+2]; fillfrom<nall+2>(stride_out,  _stride_out);
+    offset_t stride_inp  [nall+1]; fillfrom<nall+1>(stride_inp,  _stride_inp);
+    offset_t stride_grid [nall+1]; fillfrom<nall+1>(stride_grid, _stride_grid);
+    offset_t nc  = size_splinc[nall];
+    offset_t osc = stride_out[nall];
+    offset_t osg = stride_out[nall+1];
+    offset_t isc = stride_inp[nall];
+    offset_t gsc = stride_grid[nall];
+
+    auto grad = [&](const reduce_t * loc, offset_t out_offset, offset_t inp_offset)
+    {
+        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ, abs>::hess(
+            out + out_offset, inp + inp_offset,
+            loc, size_splinc + nbatch, stride_inp + nbatch,
+            nc, osc, isc, osg);
+    };
+
+    offset_t numel = prod<nall>(size_grid);
+    for (offset_t i=index; index < numel;
+         index += blockDim.x * gridDim.x, i=index)
+    {
+        offset_t out_offset = index2offset<nall>(i, size_grid, stride_out);
+        offset_t grid_offset = index2offset<nall>(i, size_grid, stride_grid);
+
+        reduce_t loc[ndim];  fillfrom<ndim>(loc, grid + grid_offset, gsc);
+        if (!InFOV<extrapolate, ndim>::infov(loc, size_splinc + nbatch))
+        {
+            for (offset_t c=0; c<nc; ++c)
+                fill<(ndim*(ndim+1))/2>(out + out_offset + c * osc, 0, osg);
+            continue;
+        }
+
+        offset_t inp_offset = index2offset<nbatch>(i, size_grid, stride_inp);
+
+        hess(loc, out_offset, inp_offset);
+    }
+}
+
+template <int nbatch, int ndim, int extrapolate, bool abs,
           typename reduce_t, typename scalar_t, typename offset_t,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
@@ -270,7 +330,7 @@ void pull_backward(
         offset_t inp_offset,
         offset_t ginp_offset)
     {
-        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ>::pull_backward(
+        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ, abs>::pull_backward(
             out + out_offset, gout + gout_offset,
             inp + inp_offset, ginp + ginp_offset,
             loc, size_splinc + nbatch,
@@ -300,7 +360,7 @@ void pull_backward(
     }
 }
 
-template <int nbatch, int ndim, int extrapolate,
+template <int nbatch, int ndim, int extrapolate, bool abs,
           typename reduce_t, typename scalar_t, typename offset_t,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
@@ -345,7 +405,7 @@ void push_backward(
         offset_t inp_offset,
         offset_t ginp_offset)
     {
-        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ>::push_backward(
+        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ, abs>::push_backward(
             out + out_offset, gout + gout_offset,
             inp + inp_offset, ginp + ginp_offset,
             loc, size_splinc + nbatch, stride_inp + nbatch,
@@ -376,7 +436,7 @@ void push_backward(
 }
 
 
-template <int nbatch, int ndim, int extrapolate,
+template <int nbatch, int ndim, int extrapolate, bool abs,
           typename reduce_t, typename scalar_t, typename offset_t,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
@@ -410,7 +470,7 @@ void count_backward(
         offset_t gout_offset,
         offset_t ginp_offset)
     {
-        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ>::count_backward(
+        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ, abs>::count_backward(
             gout + gout_offset, ginp + ginp_offset,
             loc, size_splinc + nbatch, stride_ginp + nbatch, osg);
     };
@@ -434,7 +494,7 @@ void count_backward(
     }
 }
 
-template <int nbatch, int ndim, int extrapolate,
+template <int nbatch, int ndim, int extrapolate, bool abs,
           typename reduce_t, typename scalar_t, typename offset_t,
           spline::type IX,    bound::type BX,
           spline::type IY=IX, bound::type BY=BX,
@@ -480,7 +540,7 @@ void grad_backward(
         offset_t inp_offset,
         offset_t ginp_offset)
     {
-        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ>::grad_backward(
+        return PushPull<ndim, IX, BX, IY, BY, IZ, BZ, abs>::grad_backward(
             out + out_offset, gout + gout_offset,
             inp + inp_offset, ginp + ginp_offset,
             loc, size_splinc + nbatch,

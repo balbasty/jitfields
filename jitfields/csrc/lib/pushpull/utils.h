@@ -21,8 +21,21 @@ const int mone  = -1;
 template <int D,
           spline::type IX=Z,  bound::type BX=B0,
           spline::type IY=IX, bound::type BY=BX,
-          spline::type IZ=IY, bound::type BZ=BY>
+          spline::type IZ=IY, bound::type BZ=BY,
+          bool ABS=false>
 struct PushPull {};
+
+template <spline::type IX=Z,  bound::type BX=B0, bool ABS=false>
+using PushPull1D = PushPull<one, IX, BX, IX, BX, IX, BX, ABS>;
+template <spline::type IX=Z,  bound::type BX=B0,
+          spline::type IY=IX, bound::type BY=BX, bool ABS=false>
+using PushPull2D = PushPull<two, IX, BX, IY, BY, IY, BY, ABS>;
+template <spline::type IX=Z,  bound::type BX=B0,
+          spline::type IY=IX, bound::type BY=BX,
+          spline::type IZ=IY, bound::type BZ=BY, bool ABS=false>
+using PushPull3D = PushPull<three, IX, BX, IY, BY, IZ, BZ, ABS>;
+template <int D, bool ABS=false>
+using PushPullND = PushPull<D, Z, B0, Z, B0, Z, B0, ABS>;
 
 
 /***********************************************************************
@@ -41,7 +54,7 @@ struct InFOV {};
 template <int D>
 struct InFOV<one, D> {
     template <typename scalar_t, typename offset_t>
-    static __device__ bool
+    static inline __device__ bool
     infov(const scalar_t * loc, const offset_t * size, offset_t stride=1) {
         return true;
     }
@@ -50,7 +63,7 @@ struct InFOV<one, D> {
 template <int D>
 struct InFOV<zero, D> { // Limits at voxel centers
     template <typename scalar_t, typename offset_t>
-    static __device__ bool
+    static inline __device__ bool
     infov(const scalar_t * loc, const offset_t * size, offset_t stride=1) {
 #       pragma unroll
         for (int d=0; d < D; ++d, loc += stride) {
@@ -67,7 +80,7 @@ struct InFOV<zero, D> { // Limits at voxel centers
 template <int D>
 struct InFOV<mone, D> { // Limits at voxel edges
     template <typename scalar_t, typename offset_t>
-    static __device__ bool
+    static inline __device__ bool
     infov(const scalar_t * loc, const offset_t * size, offset_t stride=1) {
 #       pragma unroll
         for (int d=0; d < D; ++d, loc += stride) {
@@ -182,14 +195,32 @@ struct InFOV<mone, three> {
 */
 
 
+template <bool ABS = false>
+struct PushPullMaybe {
+    template <typename T>
+    static inline __device__
+    const T& fabs(const T& val) { return val; }
+};
+
+
+template <>
+struct PushPullMaybe<true> {
+    template <typename T>
+    static inline __device__
+    T fabs(const T& val) { return ::fabs(val); }
+};
+
+
 /*** Wrap out-of-bounds indices ***************************************/
-template <spline::type I=Z,  bound::type B=B0>
+template <spline::type I=Z,  bound::type B=B0, bool ABS=false>
 struct PushPullAnyUtils {
     using spline_utils = spline::utils<I>;
     using bound_utils = bound::utils<B>;
+    using maybe = PushPullMaybe<ABS>;
+
 
     template <typename reduce_t, typename offset_t>
-    static __device__ offset_t
+    static inline __device__ offset_t
     index(reduce_t x, offset_t size, offset_t i[], reduce_t w[], signed char s[])
     {
         offset_t b0, b1;
@@ -208,7 +239,7 @@ struct PushPullAnyUtils {
     }
 
     template <typename reduce_t, typename offset_t>
-    static __device__ offset_t
+    static inline __device__ offset_t
     gindex(reduce_t x, offset_t size, offset_t i[], reduce_t w[], reduce_t g[], signed char s[])
     {
         offset_t b0, b1;
@@ -223,7 +254,7 @@ struct PushPullAnyUtils {
             bool neg = d < 0;
             if (neg) d = -d;
             *(ow++)  = spline_utils::fastweight(d);
-            *(og++)  = spline_utils::fastgrad(d) * (neg ? -1 : 1);
+            *(og++)  = maybe::fabs(spline_utils::fastgrad(d) * (neg ? -1 : 1));
             *(os++)  = bound_utils::sign(b, size);
             *(oi++)  = bound_utils::index(b, size);
         }
@@ -231,7 +262,7 @@ struct PushPullAnyUtils {
     }
 
     template <typename reduce_t, typename offset_t>
-    static __device__ offset_t
+    static inline __device__ offset_t
     hindex(reduce_t x, offset_t size, offset_t i[],
            reduce_t w[], reduce_t g[], reduce_t h[], signed char s[])
     {
@@ -248,8 +279,8 @@ struct PushPullAnyUtils {
             bool neg = d < 0;
             if (neg) d = -d;
             *(ow++)  = spline_utils::fastweight(d);
-            *(og++)  = spline_utils::fastgrad(d) * (neg ? -1 : 1);
-            *(oh++)  = spline_utils::fasthess(d);
+            *(og++)  = maybe::fabs(spline_utils::fastgrad(d) * (neg ? -1 : 1));
+            *(oh++)  = maybe::fabs(spline_utils::fasthess(d));
             *(os++)  = bound_utils::sign(b, size);
             *(oi++)  = bound_utils::index(b, size);
         }
@@ -257,16 +288,17 @@ struct PushPullAnyUtils {
     }
 };
 
-template <spline::type I=Z,  bound::type B=B0>
+template <spline::type I=Z, bound::type B=B0, bool ABS=false>
 struct PushPullUtils {};
 
-template <bound::type B>
-struct PushPullUtils<Z,B> {
+template <bound::type B, bool ABS>
+struct PushPullUtils<Z,B,ABS> {
     using bound_utils = bound::utils<B>;
     using spline_utils = spline::utils<Z>;
+    using maybe = PushPullMaybe<ABS>;
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     index(reduce_t x, offset_t size, offset_t & ix, signed char & s)
     {
         ix = static_cast<offset_t>(round(x));
@@ -275,13 +307,14 @@ struct PushPullUtils<Z,B> {
     }
 };
 
-template <bound::type B>
-struct PushPullUtils<L,B> {
+template <bound::type B, bool ABS>
+struct PushPullUtils<L,B,ABS> {
     using bound_utils = bound::utils<B>;
     using spline_utils = spline::utils<L>;
+    using maybe = PushPullMaybe<ABS>;
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     index(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1,
           reduce_t & w0, reduce_t & w1,
@@ -297,13 +330,14 @@ struct PushPullUtils<L,B> {
     }
 };
 
-template <bound::type B>
-struct PushPullUtils<Q,B> {
+template <bound::type B, bool ABS>
+struct PushPullUtils<Q,B,ABS> {
     using bound_utils = bound::utils<B>;
     using spline_utils = spline::utils<Q>;
+    using maybe = PushPullMaybe<ABS>;
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     index(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2,
           reduce_t & w0, reduce_t & w1, reduce_t & w2,
@@ -324,7 +358,7 @@ struct PushPullUtils<Q,B> {
     }
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     gindex(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2,
           reduce_t & w0, reduce_t & w1, reduce_t & w2,
@@ -337,9 +371,9 @@ struct PushPullUtils<Q,B> {
         w0 = spline_utils::fastweight(x - ix0);
         w1 = spline_utils::weight(x - ix1); // cannot use fast (sign unknown)
         w2 = spline_utils::fastweight(ix2 - x);
-        g0 = spline_utils::fastgrad(x - ix0);
-        g1 = spline_utils::grad(x - ix1); // cannot use fast (sign unknown)
-        g2 = -spline_utils::fastgrad(ix2 - x);
+        g0 = maybe::fabs(spline_utils::fastgrad(x - ix0));
+        g1 = maybe::fabs(spline_utils::grad(x - ix1)); // cannot use fast (sign unknown)
+        g2 = maybe::fabs(-spline_utils::fastgrad(ix2 - x));
         f0 = bound_utils::sign(ix0, size);
         f1 = bound_utils::sign(ix1, size);
         f2 = bound_utils::sign(ix2, size);
@@ -349,7 +383,7 @@ struct PushPullUtils<Q,B> {
     }
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     hindex(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2,
           reduce_t & w0, reduce_t & w1, reduce_t & w2,
@@ -363,12 +397,12 @@ struct PushPullUtils<Q,B> {
         w0 = spline_utils::fastweight(x - ix0);
         w1 = spline_utils::weight(x - ix1); // cannot use fast (sign unknown)
         w2 = spline_utils::fastweight(ix2 - x);
-        g0 = spline_utils::fastgrad(x - ix0);
-        g1 = spline_utils::grad(x - ix1); // cannot use fast (sign unknown)
-        g2 = -spline_utils::fastgrad(ix2 - x);
-        h0 = spline_utils::fasthess(x - ix0);
-        h1 = spline_utils::hess(x - ix1); // cannot use fast (sign unknown)
-        h2 = spline_utils::fasthess(ix2 - x);
+        g0 = maybe::fabs(spline_utils::fastgrad(x - ix0));
+        g1 = maybe::fabs(spline_utils::grad(x - ix1)); // cannot use fast (sign unknown)
+        g2 = maybe::fabs(-spline_utils::fastgrad(ix2 - x));
+        h0 = maybe::fabs(spline_utils::fasthess(x - ix0));
+        h1 = maybe::fabs(spline_utils::hess(x - ix1)); // cannot use fast (sign unknown)
+        h2 = maybe::fabs(spline_utils::fasthess(ix2 - x));
         f0 = bound_utils::sign(ix0, size);
         f1 = bound_utils::sign(ix1, size);
         f2 = bound_utils::sign(ix2, size);
@@ -378,13 +412,14 @@ struct PushPullUtils<Q,B> {
     }
 };
 
-template <bound::type B>
-struct PushPullUtils<C,B> {
+template <bound::type B, bool ABS>
+struct PushPullUtils<C,B,ABS> {
     using bound_utils = bound::utils<B>;
     using spline_utils = spline::utils<C>;
+    using maybe = PushPullMaybe<ABS>;
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     index(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2, offset_t & ix3,
           reduce_t & w0, reduce_t & w1, reduce_t & w2, reduce_t & w3,
@@ -409,7 +444,7 @@ struct PushPullUtils<C,B> {
     }
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     gindex(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2, offset_t & ix3,
           reduce_t & w0, reduce_t & w1, reduce_t & w2, reduce_t & w3,
@@ -424,10 +459,10 @@ struct PushPullUtils<C,B> {
         w1 = spline_utils::fastweight(x - ix1);
         w2 = spline_utils::fastweight(ix2 - x);
         w3 = spline_utils::fastweight(ix3 - x);
-        g0 = spline_utils::fastgrad(x - ix0);
-        g1 = spline_utils::fastgrad(x - ix1);
-        g2 = -spline_utils::fastgrad(ix2 - x);
-        g3 = -spline_utils::fastgrad(ix3 - x);
+        g0 = maybe::fabs(spline_utils::fastgrad(x - ix0));
+        g1 = maybe::fabs(spline_utils::fastgrad(x - ix1));
+        g2 = maybe::fabs(-spline_utils::fastgrad(ix2 - x));
+        g3 = maybe::fabs(-spline_utils::fastgrad(ix3 - x));
         f0 = bound_utils::sign(ix0, size);
         f1 = bound_utils::sign(ix1, size);
         f2 = bound_utils::sign(ix2, size);
@@ -439,7 +474,7 @@ struct PushPullUtils<C,B> {
     }
 
     template <typename reduce_t, typename offset_t>
-    static __device__ void
+    static inline __device__ void
     hindex(reduce_t x, offset_t size,
           offset_t & ix0, offset_t & ix1, offset_t & ix2, offset_t & ix3,
           reduce_t & w0, reduce_t & w1, reduce_t & w2, reduce_t & w3,
@@ -455,14 +490,14 @@ struct PushPullUtils<C,B> {
         w1 = spline_utils::fastweight(x - ix1);
         w2 = spline_utils::fastweight(ix2 - x);
         w3 = spline_utils::fastweight(ix3 - x);
-        g0 = spline_utils::fastgrad(x - ix0);
-        g1 = spline_utils::fastgrad(x - ix1);
-        g2 = -spline_utils::fastgrad(ix2 - x);
-        g3 = -spline_utils::fastgrad(ix3 - x);
-        h0 = spline_utils::fasthess(x - ix0);
-        h1 = spline_utils::fasthess(x - ix1);
-        h2 = spline_utils::fasthess(ix2 - x);
-        h3 = spline_utils::fasthess(ix3 - x);
+        g0 = maybe::fabs(spline_utils::fastgrad(x - ix0));
+        g1 = maybe::fabs(spline_utils::fastgrad(x - ix1));
+        g2 = maybe::fabs(-spline_utils::fastgrad(ix2 - x));
+        g3 = maybe::fabs(-spline_utils::fastgrad(ix3 - x));
+        h0 = maybe::fabs(spline_utils::fasthess(x - ix0));
+        h1 = maybe::fabs(spline_utils::fasthess(x - ix1));
+        h2 = maybe::fabs(spline_utils::fasthess(ix2 - x));
+        h3 = maybe::fabs(spline_utils::fasthess(ix3 - x));
         f0 = bound_utils::sign(ix0, size);
         f1 = bound_utils::sign(ix1, size);
         f2 = bound_utils::sign(ix2, size);

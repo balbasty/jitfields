@@ -20,12 +20,12 @@ namespace pushpull {
  *                               NEAREST
  *
  **********************************************************************/
-template <bound::type BX, bound::type BY, bound::type BZ>
-struct PushPull<three, Z, BX, Z, BY, Z, BZ> {
-    using utils_x = PushPullUtils<Z, BX>;
-    using utils_y = PushPullUtils<Z, BY>;
-    using utils_z = PushPullUtils<Z, BZ>;
-    using self = PushPull<three, Z, BX, Z, BY, Z, BZ>;
+template <bound::type BX, bound::type BY, bound::type BZ, bool ABS>
+struct PushPull<three, Z, BX, Z, BY, Z, BZ, ABS> {
+    using utils_x = PushPullUtils<Z, BX, ABS>;
+    using utils_y = PushPullUtils<Z, BY, ABS>;
+    using utils_z = PushPullUtils<Z, BZ, ABS>;
+    using self = PushPull<three, Z, BX, Z, BY, Z, BZ, ABS>;
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -102,6 +102,24 @@ struct PushPull<three, Z, BX, Z, BY, Z, BZ> {
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[3],
+              const offset_t size[3],
+              const offset_t stride[3],
+              offset_t nc, offset_t osc, offset_t isc, offset_t osg)
+    {
+        for (offset_t c = 0; c < nc; ++c, out += osc) {
+            out[0]       = static_cast<scalar_t>(0);
+            out[osg]     = static_cast<scalar_t>(0);
+            out[osg * 2] = static_cast<scalar_t>(0);
+            out[osg * 3] = static_cast<scalar_t>(0);
+            out[osg * 4] = static_cast<scalar_t>(0);
+            out[osg * 5] = static_cast<scalar_t>(0);
+        }
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
     void pull_backward(scalar_t * out, scalar_t * gout,
                        const scalar_t * inp, const scalar_t * ginp,
                        const reduce_t loc[3],
@@ -171,11 +189,12 @@ struct PushPull<three, Z, BX, Z, BY, Z, BZ> {
  *                               LINEAR
  *
  **********************************************************************/
-template <bound::type BX, bound::type BY, bound::type BZ>
-struct PushPull<three, L, BX, L, BY, L, BZ> {
-    using utils_x = PushPullUtils<L, BX>;
-    using utils_y = PushPullUtils<L, BY>;
-    using utils_z = PushPullUtils<L, BZ>;
+template <bound::type BX, bound::type BY, bound::type BZ, bool ABS>
+struct PushPull<three, L, BX, L, BY, L, BZ, ABS> {
+    using utils_x = PushPullUtils<L, BX, ABS>;
+    using utils_y = PushPullUtils<L, BY, ABS>;
+    using utils_z = PushPullUtils<L, BZ, ABS>;
+    static const signed char negate = static_cast<signed char>(ABS ? 1 : -1);
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -473,14 +492,93 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
             reduce_t v110 = bound::cget<reduce_t>(inp, i110, f110);
             reduce_t v111 = bound::cget<reduce_t>(inp, i111, f111);
             out[0] = static_cast<scalar_t>(
-                    - v000 * wx00 - v001 * wx01 - v010 * wx10 - v011 * wx11
-                    + v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11);
+                    (v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11) +
+                    (v000 * wx00 + v001 * wx01 + v010 * wx10 + v011 * wx11) * negate);
             out[osg] = static_cast<scalar_t>(
-                    - v000 * wy00 - v001 * wy01 + v010 * wy00 + v011 * wy01
-                    - v100 * wy10 - v101 * wy11 + v110 * wy10 + v111 * wy11);
+                    (v010 * wy00 + v011 * wy01 + v110 * wy10 + v111 * wy11) +
+                    (v000 * wy00 + v001 * wy01 + v100 * wy10 + v101 * wy11) * negate);
             out[osg * 2] = static_cast<scalar_t>(
-                    - v000 * wz00 + v001 * wz00 - v010 * wz01 + v011 * wz01
-                    - v100 * wz10 + v101 * wz10 - v110 * wz11 + v111 * wz11);
+                    (v001 * wz00 + v011 * wz01 + v101 * wz10 + v111 * wz11) +
+                    (v000 * wz00 + v010 * wz01 + v100 * wz10 + v110 * wz11) * negate);
+        }
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[3],
+              const offset_t size[3],
+              const offset_t stride[3],
+              offset_t nc, offset_t osc, offset_t isc,
+              offset_t osg)
+    {
+        offset_t    ix0, ix1, iy0, iy1, iz0, iz1;
+        reduce_t    wx0, wx1, wy0, wy1, wz0, wz1;
+        signed char fx0, fx1, fy0, fy1, fz0, fz1;
+        utils_x::index(loc[0], size[0], ix0, ix1, wx0, wx1, fx0, fx1);
+        utils_y::index(loc[1], size[1], iy0, iy1, wy0, wy1, fy0, fy1);
+        utils_z::index(loc[2], size[2], iz0, iz1, wz0, wz1, fz0, fz1);
+        ix0 *= stride[0]; ix1 *= stride[0];
+        iy0 *= stride[1]; iy1 *= stride[1];
+        iz0 *= stride[2]; iz1 *= stride[2];
+        offset_t i000, i001, i010, i011, i100, i101, i110, i111;
+        {
+            offset_t i00 = iy0 + iz0;
+            offset_t i01 = iy0 + iz1;
+            offset_t i10 = iy1 + iz0;
+            offset_t i11 = iy1 + iz1;
+            i000 = ix0 + i00;
+            i001 = ix0 + i01;
+            i010 = ix0 + i10;
+            i011 = ix0 + i11;
+            i100 = ix1 + i00;
+            i101 = ix1 + i01;
+            i110 = ix1 + i10;
+            i111 = ix1 + i11;
+        }
+        signed char f000, f001, f010, f011, f100, f101, f110, f111;
+        {
+            reduce_t f00 = fy0 * fz0;
+            reduce_t f01 = fy0 * fz1;
+            reduce_t f10 = fy1 * fz0;
+            reduce_t f11 = fy1 * fz1;
+            f000 = fx0 * f00;
+            f001 = fx0 * f01;
+            f010 = fx0 * f10;
+            f011 = fx0 * f11;
+            f100 = fx1 * f00;
+            f101 = fx1 * f01;
+            f110 = fx1 * f10;
+            f111 = fx1 * f11;
+        }
+
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+        {
+            reduce_t v000 = bound::cget<reduce_t>(inp, i000, f000);
+            reduce_t v001 = bound::cget<reduce_t>(inp, i001, f001);
+            reduce_t v010 = bound::cget<reduce_t>(inp, i010, f010);
+            reduce_t v011 = bound::cget<reduce_t>(inp, i011, f011);
+            reduce_t v100 = bound::cget<reduce_t>(inp, i100, f100);
+            reduce_t v101 = bound::cget<reduce_t>(inp, i101, f101);
+            reduce_t v110 = bound::cget<reduce_t>(inp, i110, f110);
+            reduce_t v111 = bound::cget<reduce_t>(inp, i111, f111);
+
+            reduce_t gxy = (
+                    (v000 * wz0 + v001 * wz1 + v110 * wz0 + v111 * wz1) +
+                    (v100 * wz0 + v101 * wz1 + v010 * wz0 + v011 * wz1) * negate);
+            reduce_t gxz = (
+                    (v000 * wy0 + v010 * wy1 + v101 * wy0 + v111 * wy1) +
+                    (v001 * wy0 + v011 * wy1 + v100 * wy0 + v110 * wy1) * negate);
+            reduce_t gyz = (
+                    (v000 * wx0 + v011 * wx0 + v100 * wx1 + v111 * wx1) +
+                    (v010 * wx0 + v001 * wx0 + v110 * wx1 + v101 * wx1) * negate);
+
+            out[0]       = static_cast<scalar_t>(0);
+            out[osg]     = static_cast<scalar_t>(0);
+            out[osg * 2] = static_cast<scalar_t>(0);
+            out[osg * 3] = static_cast<scalar_t>(gxy);
+            out[osg * 4] = static_cast<scalar_t>(gxz);
+            out[osg * 5] = static_cast<scalar_t>(gyz);
         }
     }
 
@@ -597,14 +695,14 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
             reduce_t v110 = bound::cget<reduce_t>(inp, i110, f110);
             reduce_t v111 = bound::cget<reduce_t>(inp, i111, f111);
             accx += gval * (
-                    - v000 * wx00 - v001 * wx01 - v010 * wx10 - v011 * wx11
-                    + v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11);
+                    (v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11) +
+                    (v000 * wx00 + v001 * wx01 + v010 * wx10 + v011 * wx11) * negate);
             accy += gval * (
-                    - v000 * wy00 - v001 * wy01 + v010 * wy00 + v011 * wy01
-                    - v100 * wy10 - v101 * wy11 + v110 * wy10 + v111 * wy11);
+                    (v010 * wy00 + v011 * wy01 + v110 * wy10 + v111 * wy11) +
+                    (v000 * wy00 + v001 * wy01 + v100 * wy10 + v101 * wy11) * negate );
             accz += gval * (
-                    - v000 * wz00 + v001 * wz00 - v010 * wz01 + v011 * wz01
-                    - v100 * wz10 + v101 * wz10 - v110 * wz11 + v111 * wz11);
+                    (v001 * wz00 + v011 * wz01 + v101 * wz10 + v111 * wz11) +
+                    (v000 * wz00 + v010 * wz01 + v100 * wz10 + v110 * wz11) * negate);
         }
         gout[0]       = static_cast<scalar_t>(accx);
         gout[osg]     = static_cast<scalar_t>(accy);
@@ -708,14 +806,14 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
             reduce_t v110 = bound::cget<reduce_t>(ginp, i110, f110);
             reduce_t v111 = bound::cget<reduce_t>(ginp, i111, f111);
             accx += val * (
-                    - v000 * wx00 - v001 * wx01 - v010 * wx10 - v011 * wx11
-                    + v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11);
+                    (v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11) +
+                    (v000 * wx00 + v001 * wx01 + v010 * wx10 + v011 * wx11) * negate);
             accy += val * (
-                    - v000 * wy00 - v001 * wy01 + v010 * wy00 + v011 * wy01
-                    - v100 * wy10 - v101 * wy11 + v110 * wy10 + v111 * wy11);
+                    (v010 * wy00 + v011 * wy01 + v110 * wy10 + v111 * wy11) +
+                    (v000 * wy00 + v001 * wy01 + v100 * wy10 + v101 * wy11) * negate);
             accz += val * (
-                    - v000 * wz00 + v001 * wz00 - v010 * wz01 + v011 * wz01
-                    - v100 * wz10 + v101 * wz10 - v110 * wz11 + v111 * wz11);
+                    (v001 * wz00 + v011 * wz01 + v101 * wz10 + v111 * wz11) +
+                    (v000 * wz00 + v010 * wz01 + v100 * wz10 + v110 * wz11) * negate);
         }
         gout[0]       = static_cast<scalar_t>(accx);
         gout[osg]     = static_cast<scalar_t>(accy);
@@ -801,16 +899,15 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
         reduce_t v110 = bound::cget<reduce_t>(ginp, i110, f110);
         reduce_t v111 = bound::cget<reduce_t>(ginp, i111, f111);
         gout[0] = static_cast<scalar_t>(
-                - v000 * wx00 - v001 * wx01 - v010 * wx10 - v011 * wx11
-                + v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11);
+                (v100 * wx00 + v101 * wx01 + v110 * wx10 + v111 * wx11) +
+                (v000 * wx00 + v001 * wx01 + v010 * wx10 + v011 * wx11) * negate);
         gout[osg] = static_cast<scalar_t>(
-                - v000 * wy00 - v001 * wy01 + v010 * wy00 + v011 * wy01
-                - v100 * wy10 - v101 * wy11 + v110 * wy10 + v111 * wy11);
+                (v010 * wy00 + v011 * wy01 + v110 * wy10 + v111 * wy11) +
+                (v000 * wy00 + v001 * wy01 + v100 * wy10 + v101 * wy11) * negate);
         gout[osg * 2] = static_cast<scalar_t>(
-                - v000 * wz00 + v001 * wz00 - v010 * wz01 + v011 * wz01
-                - v100 * wz10 + v101 * wz10 - v110 * wz11 + v111 * wz11);
+                (v001 * wz00 + v011 * wz01 + v101 * wz10 + v111 * wz11) +
+                (v000 * wz00 + v010 * wz01 + v100 * wz10 + v110 * wz11) * negate);
     }
-
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -841,25 +938,25 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
             reduce_t gvalz = static_cast<reduce_t>(ginp[isg*2]);
 
             // 000
-            oval = - gvalx * (wy0 * wz0) - gvaly * (wx0 * wz0) - gvalz * (wx0 * wy0);
+            oval = (gvalx * (wy0 * wz0) + gvaly * (wx0 * wz0) + gvalz * (wx0 * wy0)) * negate;
             bound::add(out, ix0 + iy0 + iz0, oval, fx0 * fy0 * fz0);
             // 001
-            oval = - gvalx * (wy0 * wz1) - gvaly * (wx0 * wz1) + gvalz * (wx0 * wy0);
+            oval = negate * gvalx * (wy0 * wz1) + negate * gvaly * (wx0 * wz1) + gvalz * (wx0 * wy0);
             bound::add(out, ix0 + iy0 + iz1, oval, fx0 * fy0 * fz1);
             // 010
-            oval = - gvalx * (wy1 * wz0) + gvaly * (wx0 * wz0) - gvalz * (wx0 * wy1);
+            oval = negate * gvalx * (wy1 * wz0) + gvaly * (wx0 * wz0) + negate * gvalz * (wx0 * wy1);
             bound::add(out, ix0 + iy1 + iz0, oval, fx0 * fy1 * fz0);
             // 011
-            oval = - gvalx * (wy1 * wz1) + gvaly * (wx0 * wz1) + gvalz * (wx0 * wy1);
+            oval = negate * gvalx * (wy1 * wz1) + gvaly * (wx0 * wz1) + gvalz * (wx0 * wy1);
             bound::add(out, ix0 + iy1 + iz1, oval, fx0 * fy1 * fz1);
             // 100
-            oval = + gvalx * (wy0 * wz0) - gvaly * (wx1 * wz0) - gvalz * (wx1 * wy0);
+            oval = + gvalx * (wy0 * wz0) + negate * gvaly * (wx1 * wz0) + negate * gvalz * (wx1 * wy0);
             bound::add(out, ix1 + iy0 + iz0, oval, fx1 * fy0 * fz0);
             // 101
-            oval = + gvalx * (wy0 * wz1) - gvaly * (wx1 * wz1) + gvalz * (wx1 * wy0);
+            oval = + gvalx * (wy0 * wz1) + negate * gvaly * (wx1 * wz1) + gvalz * (wx1 * wy0);
             bound::add(out, ix1 + iy0 + iz1, oval, fx1 * fy0 * fz1);
             // 110
-            oval = + gvalx * (wy1 * wz0) + gvaly * (wx1 * wz0) - gvalz * (wx1 * wy1);
+            oval = + gvalx * (wy1 * wz0) + gvaly * (wx1 * wz0) + negate * gvalz * (wx1 * wy1);
             bound::add(out, ix1 + iy1 + iz0 , oval, fx1 * fy1 * fz0);
             // 111
             oval = + gvalx * (wy1 * wz1) + gvaly * (wx1 * wz1) + gvalz * (wx1 * wy1);
@@ -880,11 +977,12 @@ struct PushPull<three, L, BX, L, BY, L, BZ> {
  **********************************************************************/
 template <spline::type IX, bound::type BX,
           spline::type IY, bound::type BY,
-          spline::type IZ, bound::type BZ>
-struct PushPull<three, IX, BX, IY, BY, IZ, BZ> {
-    using utils_x = PushPullAnyUtils<IX, BX>;
-    using utils_y = PushPullAnyUtils<IY, BY>;
-    using utils_z = PushPullAnyUtils<IZ, BZ>;
+          spline::type IZ, bound::type BZ,
+          bool ABS>
+struct PushPull<three, IX, BX, IY, BY, IZ, BZ, ABS> {
+    using utils_x = PushPullAnyUtils<IX, BX, ABS>;
+    using utils_y = PushPullAnyUtils<IY, BY, ABS>;
+    using utils_z = PushPullAnyUtils<IZ, BZ, ABS>;
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -1025,6 +1123,60 @@ struct PushPull<three, IX, BX, IY, BY, IZ, BZ> {
             out[0]       = static_cast<scalar_t>(accx);
             out[osg]     = static_cast<scalar_t>(accy);
             out[osg * 2] = static_cast<scalar_t>(accz);
+        }
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[3],
+              const offset_t size[3],
+              const offset_t stride[3],
+              offset_t nc, offset_t osc, offset_t isc, offset_t osg)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8], iy[8], iz[8];
+        reduce_t    wx[8], wy[8], wz[8];
+        reduce_t    gx[8], gy[8], gz[8];
+        reduce_t    hx[8], hy[8], hz[8];
+        signed char fx[8], fy[8], fz[8];
+        offset_t lx = utils_x::hindex(loc[0], size[0], ix, wx, gx, hx, fx);
+        offset_t ly = utils_y::hindex(loc[1], size[1], iy, wy, gy, hy, fy);
+        offset_t lz = utils_z::hindex(loc[2], size[2], iz, wz, gz, hz, fz);
+        for (offset_t i = 0, s = stride[0]; i <= lx; ++i)
+            ix[i] *= s;
+        for (offset_t i = 0, s = stride[1]; i <= ly; ++i)
+            iy[i] *= s;
+        for (offset_t i = 0, s = stride[2]; i <= lz; ++i)
+            iz[i] *= s;
+
+        // Convolve coefficients with basis functions
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+        {
+            reduce_t accxx = static_cast<reduce_t>(0);
+            reduce_t accyy = static_cast<reduce_t>(0);
+            reduce_t acczz = static_cast<reduce_t>(0);
+            reduce_t accxy = static_cast<reduce_t>(0);
+            reduce_t accxz = static_cast<reduce_t>(0);
+            reduce_t accyz = static_cast<reduce_t>(0);
+            for (offset_t i = 0; i <= lx; ++i)
+            for (offset_t j = 0; j <= ly; ++j)
+            for (offset_t k = 0; k <= lz; ++k) {
+                reduce_t val = bound::cget<reduce_t>(
+                    inp, ix[i] + iy[j] + iz[k], fx[i] * fy[j] * fz[k]);
+                accxx += val * (hx[i] * wy[j] * wz[k]);
+                accyy += val * (wx[i] * hy[j] * wz[k]);
+                acczz += val * (wx[i] * wy[j] * hz[k]);
+                accxy += val * (gx[i] * gy[j] * wz[k]);
+                accxz += val * (gx[i] * wy[j] * gz[k]);
+                accyz += val * (wx[i] * gy[j] * gz[k]);
+            }
+            out[0]       = static_cast<scalar_t>(accxx);
+            out[osg]     = static_cast<scalar_t>(accyy);
+            out[osg * 2] = static_cast<scalar_t>(accxz);
+            out[osg * 3] = static_cast<scalar_t>(accxy);
+            out[osg * 4] = static_cast<scalar_t>(accxz);
+            out[osg * 5] = static_cast<scalar_t>(accyz);
         }
     }
 

@@ -114,6 +114,7 @@ def grad(
     bound: OneOrSeveral[BoundType] = 'dct2',
     extrapolate: ExtrapolateType = True,
     prefilter: bool = False,
+    abs: bool = False,
     out: Optional[Tensor] = None,
 ) -> Tensor:
     """Sample the spatial gradients of a tensor using spline interpolation
@@ -141,10 +142,16 @@ def grad(
           of the centers of the first and last voxels.
         - `'edge'`: do not extrapolate values that fall outside
            of the edges of the first and last voxels.
-    prefilter : `bool`, default=False
+    prefilter : bool, default=False
         Whether to first compute interpolating coefficients.
         Must be true for proper interpolation, otherwise this
         function merely performs a non-interpolating "spline sampling".
+    abs : bool
+        Take the absolute value of the corresponding matrix operator.
+        Can be useful in minimization-majorization contexts.
+
+        !!! warning "Advanced users only"
+            Backpropagation is not implemented when `abs=True`
 
     Returns
     -------
@@ -161,7 +168,77 @@ def grad(
         inp = inp.movedim(0, -1)
     inp, grid = _broadcast_pull(inp, grid)
     order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
-    return Grad.apply(inp, grid, order, bound, extrapolate, out)
+    return Grad.apply(inp, grid, order, bound, extrapolate, abs, out)
+
+
+def hess(
+    inp: Tensor,
+    grid: Tensor,
+    order: OneOrSeveral[OrderType] = 2,
+    bound: OneOrSeveral[BoundType] = 'dct2',
+    extrapolate: ExtrapolateType = True,
+    prefilter: bool = False,
+    abs: bool = False,
+    out: Optional[Tensor] = None,
+) -> Tensor:
+    """Sample the spatial Hessians of a tensor using spline interpolation
+
+    !!! warning "Autograd not supported for this function"
+
+    !!! note
+        By default, `inp` is assumed to contain the coefficients of a
+        continuous function encoded by regularly spaced cubic splines.
+        Instead, when `prefilter` is `True`, `hess` interpolates the values
+        of `inp`. To this end, `inp` is first converted to spline coefficients
+        (_i.e._, prefiltered).
+
+    Parameters
+    ----------
+    inp : `(..., *inshape, channel) tensor`
+        Input tensor, with shape `(..., *inshape, channel)`.
+    grid : `(..., *outshape, ndim) tensor`
+        Tensor of coordinates into `inp`, with shape `(..., *outshape, ndim)`.
+    order : [sequence of] {0..7}, default=2
+        Interpolation order (per dimension).
+    bound : `[sequence of] BoundType`, default='dct2'
+        How to deal with out-of-bound values (per dimension).
+    extrapolate : `bool or {'center', 'edge'}`
+        - `True`: use bound to extrapolate out-of-bound value
+        - `False` or `'center'`: do not extrapolate values that fall outside
+          of the centers of the first and last voxels.
+        - `'edge'`: do not extrapolate values that fall outside
+           of the edges of the first and last voxels.
+    prefilter : bool, default=False
+        Whether to first compute interpolating coefficients.
+        Must be true for proper interpolation, otherwise this
+        function merely performs a non-interpolating "spline sampling".
+    abs : bool
+        Take the absolute value of the corresponding matrix operator.
+        Can be useful in minimization-majorization contexts.
+
+        !!! warning "Advanced users only"
+            Backpropagation is not implemented when `abs=True`
+
+    Returns
+    -------
+    out : `(..., *outshape, channel, ndim*(ndim+1)//2) tensor`
+        Pulled hessians, with shape
+        `(..., *outshape, channel, ndim*(ndim+1)//2)`.
+
+    """
+    ndim = grid.shape[-1]
+    if ndim > 3:
+        raise NotImplementedError("Not implemented for spatial dim > 3")
+    if prefilter:
+        inp = inp.movedim(-1, 0)
+        inp = spline_coeff_nd(inp, order, bound, ndim)
+        inp = inp.movedim(0, -1)
+    inp, grid = _broadcast_pull(inp, grid)
+    order, bound, extrapolate = _preproc_opt(order, bound, extrapolate, ndim)
+    hess = (cuda_pushpull if inp.is_cuda else cpu_pushpull).hess
+    fullshape = grid.shape[:-1] + inp.shape[-1:] + grid.shape[-1:]
+    out = inp.new_empty(fullshape) if out is None else out.view(fullshape)
+    return hess(out, inp, grid, order, bound, extrapolate, abs)
 
 
 def push(
@@ -330,23 +407,25 @@ class Count(torch.autograd.Function):
 class Grad(torch.autograd.Function):
 
     @staticmethod
-    def forward(ctx, inp, grid, order, bound, extrapolate, out):
+    def forward(ctx, inp, grid, order, bound, extrapolate, abs, out):
         fwd = (cuda_pushpull if inp.is_cuda else cpu_pushpull).grad
-        ctx.opt = (order, bound, extrapolate)
+        ctx.opt = (order, bound, extrapolate, abs)
         ctx.save_for_backward(inp, grid)
         fullshape = grid.shape[:-1] + inp.shape[-1:] + grid.shape[-1:]
         out = inp.new_empty(fullshape) if out is None else out.view(fullshape)
-        out = fwd(out, inp, grid, order, bound, extrapolate)
+        out = fwd(out, inp, grid, order, bound, extrapolate, abs)
         return out
 
     @staticmethod
     def backward(ctx, grad):
+        if ctx.opt[-1]:
+            raise ValueError('Cannot autograd through grad(..., abs=True)')
         bwd = (cuda_pushpull if grad.is_cuda else cpu_pushpull).grad_backward
         inp, grid = ctx.saved_tensors
         outgrad_inp = torch.zeros_like(inp)
         outgrad_grid = torch.empty_like(grid)
         bwd(outgrad_inp, outgrad_grid, grad, inp, grid, *ctx.opt)
-        return (outgrad_inp, outgrad_grid) + (None,) * 4
+        return (outgrad_inp, outgrad_grid) + (None,) * 5
 
 
 def _preproc_opt(order, bound, extrapolate, ndim):

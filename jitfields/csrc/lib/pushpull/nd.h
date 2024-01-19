@@ -21,8 +21,9 @@ namespace pushpull {
  *                                 ANY
  *
  **********************************************************************/
-template <int D>
-struct PushPull<D> {
+template <int D, bool ABS>
+struct PushPull<D,Z,B0,Z,B0,Z,B0,ABS> {
+    using maybe = PushPullMaybe<ABS>;
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     static __device__
@@ -202,30 +203,10 @@ struct PushPull<D> {
             for (offset_t b = b0; b <= b1; ++b) {
                 reduce_t dist = fabs(x - b);
                 *(wd++) = spline::fastweight(inter[d], dist);
-                *(gd++) = spline::fastgrad(inter[d], dist);
+                *(gd++) = maybe::fabs(spline::fastgrad(inter[d], dist));
                 *(sd++) = bound::sign(bnd[d], b, size[d]);
                 *(id++) = bound::index(bnd[d], b, size[d]);
             }
-        }
-
-        // Convolve coefficients with basis functions
-        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
-        {
-            reduce_t accx = static_cast<reduce_t>(0);
-            reduce_t accy = static_cast<reduce_t>(0);
-            reduce_t accz = static_cast<reduce_t>(0);
-            for (offset_t i = 0; i <= lx; ++i)
-            for (offset_t j = 0; j <= ly; ++j)
-            for (offset_t k = 0; k <= lz; ++k) {
-                reduce_t val = bound::cget<reduce_t>(
-                    inp, ix[i] + iy[j] + iz[k], fx[i] * fy[j] * fz[k]);
-                accx += val * (gx[i] * wy[j] * wz[k]);
-                accy += val * (wx[i] * gy[j] * wz[k]);
-                accz += val * (wx[i] * wy[j] * gz[k]);
-            }
-            out[0]       = static_cast<scalar_t>(accx);
-            out[osg]     = static_cast<scalar_t>(accy);
-            out[osg * 2] = static_cast<scalar_t>(accz);
         }
 
         // Convolve coefficients with basis functions
@@ -250,8 +231,8 @@ struct PushPull<D> {
                                * sd[k];
                     weights[d] = (d > 0 ? weights[d-1] : static_cast<reduce_t>(1))
                                * wd[k];
-                    weights[d] = (d > 0 ? weights[d-1] : static_cast<reduce_t>(1))
-                               * wd[k];
+                    grads[d] = (d > 0 ? grads[d-1] : static_cast<reduce_t>(1))
+                               * gd[k];
                     if (d == D-1) {
                         reduce_t val = bound::cget<reduce_t>(inp, offsets[D-1], signs[D-1]);
                         for (int dd = 0; dd < D; ++dd) {

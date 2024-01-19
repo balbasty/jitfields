@@ -18,9 +18,10 @@ namespace pushpull {
  *                               NEAREST
  *
  **********************************************************************/
-template <bound::type B> struct PushPull<one, Z, B> {
-    using utils = PushPullUtils<Z, B>;
-    using self = PushPull<one, Z, B>;
+template <bound::type B, bool ABS>
+struct PushPull<one, Z, B, Z, B, Z, B, ABS> {
+    using utils = PushPullUtils<Z, B, ABS>;
+    using self = PushPull<one, Z, B, Z, B, Z, B, ABS>;
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -74,6 +75,18 @@ template <bound::type B> struct PushPull<one, Z, B> {
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
     void grad(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[1],
+              const offset_t size[1],
+              const offset_t stride[1],
+              offset_t nc, offset_t osc, offset_t isc, offset_t osg)
+    {
+        for (offset_t c = 0; c < nc; ++c, out += osc)
+            *out = static_cast<scalar_t>(0);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
               const reduce_t loc[1],
               const offset_t size[1],
               const offset_t stride[1],
@@ -145,8 +158,10 @@ template <bound::type B> struct PushPull<one, Z, B> {
  *                               LINEAR
  *
  **********************************************************************/
-template <bound::type B> struct PushPull<one, L, B> {
-    using utils = PushPullUtils<L, B>;
+template <bound::type B, bool ABS>
+struct PushPull<one, L, B, L, B, L, B, ABS> {
+    using utils = PushPullUtils<L, B, ABS>;
+    static const signed char negate = static_cast<signed char>(ABS ? 1 : -1);
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -226,8 +241,27 @@ template <bound::type B> struct PushPull<one, L, B> {
 
         for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
             *out = static_cast<scalar_t>(
-                      bound::cget<reduce_t>(inp, x1, f1)
-                    - bound::cget<reduce_t>(inp, x0, f0));
+                      bound::cget<reduce_t>(inp, x1, f1) +
+                      bound::cget<reduce_t>(inp, x0, f0) * negate);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[1],
+              const offset_t size[1],
+              const offset_t stride[1],
+              offset_t nc, offset_t osc, offset_t isc, offset_t osg)
+    {
+        offset_t    x0, x1;
+        reduce_t    w0, w1;
+        signed char f0, f1;
+        utils::index(loc[0], size[0], x0, x1, w0, w1, f0, f1);
+        x0 *= stride[0];
+        x1 *= stride[0];
+
+        for (offset_t c = 0; c < nc; ++c, out += osc)
+            *out = static_cast<scalar_t>(0);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
@@ -255,8 +289,8 @@ template <bound::type B> struct PushPull<one, L, B> {
             bound::add(out, x0 * osx, gval * w0, f0);
             bound::add(out, x1 * osx, gval * w1, f1);
             // compute input spatial gradient
-            acc += gval * (bound::cget<reduce_t>(inp, x1 * isx, f1)
-                         - bound::cget<reduce_t>(inp, x0 * isx, f0));
+            acc += gval * (bound::cget<reduce_t>(inp, x1 * isx, f1) +
+                           bound::cget<reduce_t>(inp, x0 * isx, f0) * negate);
         }
         *gout = static_cast<scalar_t>(acc);
     }
@@ -287,8 +321,8 @@ template <bound::type B> struct PushPull<one, L, B> {
                     + bound::cget<reduce_t>(ginp, x1, f1) * w1);
             // compute input spatial gradient
             reduce_t val = static_cast<reduce_t>(*inp);
-            acc += val * (bound::cget<reduce_t>(ginp, x1, f1)
-                        - bound::cget<reduce_t>(ginp, x0, f0));
+            acc += val * (bound::cget<reduce_t>(ginp, x1, f1) +
+                          bound::cget<reduce_t>(ginp, x0, f0) * negate);
         }
         *gout = static_cast<scalar_t>(acc);
     }
@@ -309,8 +343,9 @@ template <bound::type B> struct PushPull<one, L, B> {
         x1 *= stride[0];
 
         // compute input spatial gradient
-        *gout = static_cast<scalar_t>(bound::cget<reduce_t>(ginp, x1, f1)
-                                    - bound::cget<reduce_t>(ginp, x0, f0));
+        *gout = static_cast<scalar_t>(
+            bound::cget<reduce_t>(ginp, x1, f1) +
+            bound::cget<reduce_t>(ginp, x0, f0) * negate);
     }
 
 
@@ -336,8 +371,9 @@ template <bound::type B> struct PushPull<one, L, B> {
  *                               QUADRATIC
  *
  **********************************************************************/
-template <bound::type B> struct PushPull<one, Q, B> {
-    using utils = PushPullUtils<Q, B>;
+template <bound::type B, bool ABS>
+struct PushPull<one, Q, B, Q, B, Q, B, ABS> {
+    using utils = PushPullUtils<Q, B, ABS>;
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -347,9 +383,9 @@ template <bound::type B> struct PushPull<one, Q, B> {
               const offset_t stride[1],
               offset_t nc, offset_t osc, offset_t isc)
     {
-        offset_t x0, x1, x2;
-        reduce_t w0, w1, w2;
-        signed char   f0, f1, f2;
+        offset_t     x0, x1, x2;
+        reduce_t     w0, w1, w2;
+        signed char  f0, f1, f2;
         utils::index(loc[0], size[0], x0, x1, x2, w0, w1, w2, f0, f1, f2);
         x0 *= stride[0];
         x1 *= stride[0];
@@ -428,6 +464,36 @@ template <bound::type B> struct PushPull<one, Q, B> {
                       bound::cget<reduce_t>(inp, x0, f0) * g0
                     + bound::cget<reduce_t>(inp, x1, f1) * g1
                     + bound::cget<reduce_t>(inp, x2, f2) * g2);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[1],
+              const offset_t size[1],
+              const offset_t stride[1],
+              offset_t nc, offset_t osc, offset_t isc, offset_t osg)
+    {
+        offset_t    x0, x1, x2;
+        reduce_t    w0, w1, w2;
+        reduce_t    g0, g1, g2;
+        reduce_t    h0, h1, h2;
+        signed char f0, f1, f2;
+        utils::hindex(loc[0], size[0],
+                      x0, x1, x2,
+                      w0, w1, w2,
+                      g0, g1, g2,
+                      h0, h1, h2,
+                      f0, f1, f2);
+        x0 *= stride[0];
+        x1 *= stride[0];
+        x2 *= stride[0];
+
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+            *out = static_cast<scalar_t>(
+                      bound::cget<reduce_t>(inp, x0, f0) * h0
+                    + bound::cget<reduce_t>(inp, x1, f1) * h1
+                    + bound::cget<reduce_t>(inp, x2, f2) * h2);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
@@ -564,8 +630,9 @@ template <bound::type B> struct PushPull<one, Q, B> {
  *                               CUBIC
  *
  **********************************************************************/
-template <bound::type B> struct PushPull<one, C, B> {
-    using utils = PushPullUtils<C, B>;
+template <bound::type B, bool ABS>
+struct PushPull<one, C, B, C, B, C, B, ABS> {
+    using utils = PushPullUtils<C, B, ABS>;
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -665,6 +732,38 @@ template <bound::type B> struct PushPull<one, C, B> {
                     + bound::cget<reduce_t>(inp, x1, f1) * g1
                     + bound::cget<reduce_t>(inp, x2, f2) * g2
                     + bound::cget<reduce_t>(inp, x3, f3) * g3);
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[1],
+              const offset_t size[1],
+              const offset_t stride[1],
+              offset_t nc, offset_t osc, offset_t isc, offset_t osg)
+    {
+        offset_t x0, x1, x2, x3;
+        reduce_t w0, w1, w2, w3;
+        reduce_t g0, g1, g2, g3;
+        reduce_t h0, h1, h2, h3;
+        signed char f0, f1, f2, f3;
+        utils::hindex(loc[0], size[0],
+                      x0, x1, x2, x3,
+                      w0, w1, w2, w3,
+                      g0, g1, g2, g3,
+                      h0, h1, h2, h3,
+                      f0, f1, f2, f3);
+        x0 *= stride[0];
+        x1 *= stride[0];
+        x2 *= stride[0];
+        x3 *= stride[0];
+
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+            *out = static_cast<scalar_t>(
+                      bound::cget<reduce_t>(inp, x0, f0) * h0
+                    + bound::cget<reduce_t>(inp, x1, f1) * h1
+                    + bound::cget<reduce_t>(inp, x2, f2) * h2
+                    + bound::cget<reduce_t>(inp, x3, f3) * h3);
     }
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
@@ -814,9 +913,9 @@ template <bound::type B> struct PushPull<one, C, B> {
  *                                 ANY
  *
  **********************************************************************/
-template <spline::type I, bound::type B>
-struct PushPull<one, I, B> {
-    using utils = PushPullAnyUtils<I, B>;
+template <spline::type I, bound::type B, bool ABS>
+struct PushPull<one, I, B, I, B, I, B, ABS> {
+    using utils = PushPullAnyUtils<I, B, ABS>;
 
     template <typename reduce_t, typename scalar_t, typename offset_t>
     __device__ static inline
@@ -909,6 +1008,35 @@ struct PushPull<one, I, B> {
             reduce_t acc = static_cast<reduce_t>(0);
             for (offset_t i = 0; i <= length; ++i)
                 acc += static_cast<reduce_t>(bound::get(inp, ix[i], fx[i])) * gx[i];
+            *out = static_cast<scalar_t>(acc);
+        }
+    }
+
+    template <typename reduce_t, typename scalar_t, typename offset_t>
+    __device__ static inline
+    void hess(scalar_t * out, const scalar_t * inp,
+              const reduce_t loc[1],
+              const offset_t size[1],
+              const offset_t stride[1],
+              offset_t nc, offset_t osc, offset_t isc,
+              offset_t osg, offset_t osg2)
+    {
+        // Precompute weights and indices
+        offset_t    ix[8];
+        reduce_t    wx[8];
+        signed char fx[8];
+        reduce_t    gx[8];
+        reduce_t    hx[8];
+        offset_t length = utils::hindex(loc[0], size[0], ix, wx, gx, hx, fx);
+        for (offset_t i = 0, s = stride[0]; i <= length; ++i)
+            ix[i] *= s;
+
+        // Convolve coefficients with basis functions
+        for (offset_t c = 0; c < nc; ++c, out += osc, inp += isc)
+        {
+            reduce_t acc = static_cast<reduce_t>(0);
+            for (offset_t i = 0; i <= length; ++i)
+                acc += static_cast<reduce_t>(bound::get(inp, ix[i], fx[i])) * hx[i];
             *out = static_cast<scalar_t>(acc);
         }
     }
