@@ -9,7 +9,6 @@ from ...utils import prod
 from ..common.utils import ctypename
 import re
 import cupy as cp
-from cupy_backends.cuda.api.driver import CUDADriverError
 
 try:
     from cupy import from_dlpack as cupy_from_dlpack
@@ -22,6 +21,7 @@ except ImportError:
     cupy_to_dlpack = cupy.ndarray.toDlpack
 
 
+CUDADriverError = cp.cuda.driver.CUDADriverError
 _cuda_num_threads = os.environ.get('CUDA_NUM_THREADS', 1024)
 _num_threads = torch.get_num_threads()
 

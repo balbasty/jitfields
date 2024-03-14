@@ -2,7 +2,7 @@
 {% set version = "0.1.0" %}
 
 package:
-  name: "{{ name|lower }}"
+  name: "{{ name | lower }}"
   version: "{{ version }}"
 
 source:
@@ -21,7 +21,7 @@ requirements:
   run:
     - python >=3.6
     - pytorch >=1.8
-    - cppyy
+    - cppyy ~=2.0
     - numpy
     - cupy # [not osx]
 
