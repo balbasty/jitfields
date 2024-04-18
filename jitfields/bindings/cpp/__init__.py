@@ -7,5 +7,5 @@ import torch as _
 # O3 enables various loop optimizations (unrolling, splitting, peeling, ...)
 import os
 EXTRA_CLING_ARGS = os.environ.get('EXTRA_CLING_ARGS', '')
-EXTRA_CLING_ARGS = '-fopenmp -O3 ' + EXTRA_CLING_ARGS
+EXTRA_CLING_ARGS = '-fopenmp -O3' + EXTRA_CLING_ARGS
 os.environ['EXTRA_CLING_ARGS'] = EXTRA_CLING_ARGS
