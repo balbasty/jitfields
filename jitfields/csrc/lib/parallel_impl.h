@@ -62,7 +62,7 @@ inline size_t set_parallel_threads(int nthreads) { return set_num_threads(nthrea
 inline std::string get_parallel_backend() { return "native"; }
 }
 #elif JF_CAN_USE_OPENMP
-#pragma cling load("libomp").
+// #pragma cling load("libomp").
 #include <omp.h>
 namespace jf {
 inline size_t get_parallel_threads() { return omp_get_max_threads(); }
