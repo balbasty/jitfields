@@ -29,12 +29,9 @@ def strides_np2c(array):
 
 
 _torch_to_np_dtype = {
-    torch.float16: np.float16,
     torch.float32: np.float32,
     torch.float64: np.float64,
-    torch.complex32: np.complex64,
     torch.complex64: np.complex128,
-    torch.complex128: np.complex256,
     torch.bool: np.bool_,
     torch.uint8: np.uint8,
     torch.int8: np.int8,
@@ -42,6 +39,12 @@ _torch_to_np_dtype = {
     torch.int32: np.int32,
     torch.int64: np.int64,
 }
+if hasattr(torch, 'float16') and hasattr(np, 'float16'):
+    _torch_to_np_dtype[torch.float16] = np.float16
+if hasattr(torch, 'complex32') and hasattr(np, 'complex64'):
+    _torch_to_np_dtype[torch.complex32] = np.complex64
+if hasattr(torch, 'complex128') and hasattr(np, 'complex256'):
+    _torch_to_np_dtype[torch.complex128] = np.complex256
 
 
 def to_np_dtype(dtype):
